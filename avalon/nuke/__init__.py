@@ -5,13 +5,12 @@ Anything that isn't defined here is INTERNAL and unreliable for external use.
 """
 
 from .lib import (
-    add_publish_knob,
-    ls_img_sequence,
     maintained_selection,
+    imprint,
+    read,
+
+    add_publish_knob,
     get_node_path,
-    get_avalon_knob_data,
-    set_avalon_knob_data,
-    imprint
 )
 
 from .workio import (
@@ -52,29 +51,27 @@ __all__ = [
 
     "Creator",
 
+    "file_extensions",
+    "has_unsaved_changes",
+    "save_file",
+    "open_file",
+    "current_file",
+    "work_root",
+
     "containerise",
     "parse_container",
     "update_container",
     "get_handles",
 
+    "imprint",
+    "read",
+
     # Experimental
     "viewer_update_and_undo_stop",
 
-    "imprint",
-    "get_avalon_knob_data",
-    "set_avalon_knob_data",
     "add_publish_knob",
-    "ls_img_sequence",
     "maintained_selection",
     "get_node_path",
-
-    # Workfiles API
-    "open_file",
-    "save_file",
-    "current_file",
-    "has_unsaved_changes",
-    "file_extensions",
-    "work_root"
 ]
 
 # Backwards API compatibility
