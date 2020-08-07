@@ -3,9 +3,10 @@ import logging
 import collections
 
 from ..vendor.Qt import QtCore, QtGui
-from ..vendor import qtawesome
+from ..vendor import Qt, qtawesome
 from .. import io
 from .. import style
+from . import lib
 
 log = logging.getLogger(__name__)
 
@@ -14,10 +15,17 @@ class TreeModel(QtCore.QAbstractItemModel):
 
     Columns = list()
     ItemRole = QtCore.Qt.UserRole + 1
+    item_class = None
 
     def __init__(self, parent=None):
         super(TreeModel, self).__init__(parent)
-        self._root_item = Item()
+        self._root_item = self.ItemClass()
+
+    @property
+    def ItemClass(self):
+        if self.item_class is not None:
+            return self.item_class
+        return Item
 
     def rowCount(self, parent):
         if parent.isValid():
@@ -62,7 +70,10 @@ class TreeModel(QtCore.QAbstractItemModel):
                 item[key] = value
 
                 # passing `list()` for PyQt5 (see PYSIDE-462)
-                self.dataChanged.emit(index, index, list())
+                if Qt.__binding__ in ("PyQt4", "PySide"):
+                    self.dataChanged.emit(index, index)
+                else:
+                    self.dataChanged.emit(index, index, [role])
 
                 # must return true if successful
                 return True
@@ -129,7 +140,7 @@ class TreeModel(QtCore.QAbstractItemModel):
 
     def clear(self):
         self.beginResetModel()
-        self._root_item = Item()
+        self._root_item = self.ItemClass()
         self.endResetModel()
 
 
@@ -213,41 +224,40 @@ class TasksModel(TreeModel):
                                       color=style.colors.default)
                 self._icons[task["name"]] = icon
 
-    def set_assets(self, asset_ids=[], asset_entities=None):
+    def set_assets(self, asset_ids=None, asset_docs=None):
         """Set assets to track by their database id
 
         Arguments:
             asset_ids (list): List of asset ids.
-            asset_entities (list): List of asset entities from MongoDB.
+            asset_docs (list): List of asset entities from MongoDB.
 
         """
 
-        assets = list()
-        if asset_entities is not None:
-            assets = asset_entities
-        else:
+        if asset_docs is None and asset_ids is not None:
             # prepare filter query
-            or_query = [{"_id": asset_id} for asset_id in asset_ids]
-            _filter = {"type": "asset", "$or": or_query}
+            _filter = {"type": "asset", "_id": {"$in": asset_ids}}
 
             # find assets in db by query
-            assets = [asset for asset in io.find_one(_filter)]
-            db_assets_ids = [asset["_id"] for asset in assets]
+            asset_docs = list(io.find(_filter))
+            db_assets_ids = [asset["_id"] for asset in asset_docs]
 
             # check if all assets were found
             not_found = [
-                str(a_id) for a_id in assets_ids if a_id not in db_assets_ids
+                str(a_id) for a_id in asset_ids if a_id not in db_assets_ids
             ]
 
             assert not not_found, "Assets not found by id: {0}".format(
                 ", ".join(not_found)
             )
 
-        self._num_assets = len(assets)
+        if asset_docs is None:
+            asset_docs = list()
+
+        self._num_assets = len(asset_docs)
 
         tasks = collections.Counter()
-        for asset in assets:
-            asset_tasks = asset.get("data", {}).get("tasks", [])
+        for asset_doc in asset_docs:
+            asset_tasks = asset_doc.get("data", {}).get("tasks", [])
             tasks.update(asset_tasks)
 
         self.clear()
@@ -286,7 +296,9 @@ class TasksModel(TreeModel):
         # it is listing the tasks for
         if role == QtCore.Qt.DisplayRole:
             if orientation == QtCore.Qt.Horizontal:
-                if section == 1:  # count column
+                if section == 0:
+                    return "Tasks"
+                elif section == 1:  # count column
                     return "count ({0})".format(self._num_assets)
 
         return super(TasksModel, self).headerData(section, orientation, role)
@@ -394,20 +406,20 @@ class AssetModel(TreeModel):
         self.clear()
         self.beginResetModel()
 
-        # Get all assets in current silo sorted by name
+        # Get all assets sorted by name
         db_assets = io.find({"type": "asset"}).sort("name", 1)
-        silos = db_assets.distinct("silo") or None
-        # if any silo is set to None then it's expected it should not be used
-        if silos and None in silos:
-            silos = None
+        project_doc = io.find_one({"type": "project"})
+
+        silos = None
+        if lib.project_use_silo(project_doc):
+            silos = db_assets.distinct("silo")
 
         # Group the assets by their visual parent's id
         assets_by_parent = collections.defaultdict(list)
         for asset in db_assets:
-            parent_id = (
-                asset.get("data", {}).get("visualParent") or
-                asset.get("silo")
-            )
+            parent_id = asset.get("data", {}).get("visualParent")
+            if parent_id is None and silos is not None:
+                parent_id = asset.get("silo")
             assets_by_parent[parent_id].append(asset)
 
         # Build the hierarchical tree items recursively
@@ -431,7 +443,10 @@ class AssetModel(TreeModel):
             self.asset_colors[asset_id] = value
 
             # passing `list()` for PyQt5 (see PYSIDE-462)
-            self.dataChanged.emit(index, index, list())
+            if Qt.__binding__ in ("PyQt4", "PySide"):
+                self.dataChanged.emit(index, index)
+            else:
+                self.dataChanged.emit(index, index, [role])
 
             return True
 

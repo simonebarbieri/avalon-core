@@ -1,10 +1,11 @@
 """Host API required Work Files tool"""
 import os
 import nuke
+from avalon import api
 
 
 def file_extensions():
-    return [".nk"]
+    return api.HOST_WORKFILE_EXTENSIONS["nuke"]
 
 
 def has_unsaved_changes():
@@ -29,6 +30,13 @@ def open_file(filepath):
     nuke.Root()["name"].setValue(filepath)
     nuke.Root()["project_directory"].setValue(os.path.dirname(filepath))
     nuke.Root().setModified(False)
+
+    # Since we clear the current script and read in contents of the file path
+    # instead of loading the script (to stay within the same window), there are
+    # no callbacks emitted by Nuke. To accommodate callbacks on loading we
+    # introduce this signal.
+    api.emit("workio.open_file")
+
     return True
 
 
@@ -42,6 +50,13 @@ def current_file():
     return os.path.normpath(current_file).replace("\\", "/")
 
 
-def work_root():
-    from avalon import Session
-    return os.path.normpath(Session["AVALON_WORKDIR"]).replace("\\", "/")
+def work_root(session):
+
+    work_dir = session["AVALON_WORKDIR"]
+    scene_dir = session.get("AVALON_SCENEDIR")
+    if scene_dir:
+        path = os.path.join(work_dir, scene_dir)
+    else:
+        path = work_dir
+
+    return os.path.normpath(path).replace("\\", "/")

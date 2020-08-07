@@ -1,16 +1,18 @@
+import os
 import datetime
 import pprint
 import inspect
 
-from ...vendor import Qt
-from ...vendor.Qt import QtWidgets, QtCore, QtGui
+from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
 from ...vendor import qtawesome
 from ... import io
 from ... import api
 from ... import pipeline
+from ... import style
+from ...lib import MasterVersionType
 
 from .. import lib as tools_lib
-from ..delegates import VersionDelegate
+from ..delegates import VersionDelegate, PrettyTimeDelegate
 from ..widgets import OptionalMenu, OptionalAction, OptionDialog
 
 from .model import (
@@ -18,7 +20,6 @@ from .model import (
     SubsetFilterProxyModel,
     FamiliesFilterProxyModel,
 )
-from .delegates import PrettyTimeDelegate
 
 
 class SubsetWidget(QtWidgets.QWidget):
@@ -26,6 +27,19 @@ class SubsetWidget(QtWidgets.QWidget):
 
     active_changed = QtCore.Signal()    # active index changed
     version_changed = QtCore.Signal()   # version state changed for a subset
+
+    default_widths = (
+        ("subset", 190),
+        ("asset", 130),
+        ("family", 90),
+        ("version", 60),
+        ("time", 120),
+        ("author", 85),
+        ("frames", 80),
+        ("duration", 60),
+        ("handles", 55),
+        ("step", 50)
+    )
 
     def __init__(self, enable_grouping=True, parent=None):
         super(SubsetWidget, self).__init__(parent=parent)
@@ -45,7 +59,7 @@ class SubsetWidget(QtWidgets.QWidget):
         top_bar_layout.addWidget(filter)
         top_bar_layout.addWidget(groupable)
 
-        view = QtWidgets.QTreeView()
+        view = SubsetTreeView()
         view.setObjectName("SubsetView")
         view.setIndentation(20)
         view.setStyleSheet("""
@@ -100,12 +114,9 @@ class SubsetWidget(QtWidgets.QWidget):
         self.view.setModel(self.family_proxy)
         self.view.customContextMenuRequested.connect(self.on_context_menu)
 
-        header = self.view.header()
-        # Enforce the columns to fit the data (purely cosmetic)
-        if Qt.__binding__ in ("PySide2", "PyQt5"):
-            header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        else:
-            header.setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        for column_name, width in self.default_widths:
+            idx = model.Columns.index(column_name)
+            view.setColumnWidth(idx, width)
 
         selection = view.selectionModel()
         selection.selectionChanged.connect(self.active_changed)
@@ -129,6 +140,18 @@ class SubsetWidget(QtWidgets.QWidget):
         with tools_lib.preserve_selection(tree_view=self.view,
                                           current_index=False):
             self.model.set_grouping(state)
+
+    def set_loading_state(self, loading, empty):
+        view = self.view
+
+        if view.is_loading != loading:
+            if loading:
+                view.spinner.repaintNeeded.connect(view.viewport().update)
+            else:
+                view.spinner.repaintNeeded.disconnect()
+
+        view.is_loading = loading
+        view.is_empty = empty
 
     def on_context_menu(self, point):
         """Shows menu with loader actions on Right-click.
@@ -156,7 +179,8 @@ class SubsetWidget(QtWidgets.QWidget):
                 continue
 
             elif item.get("isMerged"):
-                # TODO use `for` loop of index's rowCount instead of `while` loop
+                # TODO use `for` loop of index's rowCount
+                # instead of `while` loop
                 idx = 0
                 while idx < 2000:
                     child_index = row_index.child(idx, 0)
@@ -358,7 +382,7 @@ class SubsetWidget(QtWidgets.QWidget):
                 "This is a BUG: Selected_subsets args must contain"
                 " at least one value set to True"
             ))
-            return subset
+            return subsets
 
         for row in rows:
             item = row.data(self.model.ItemRole)
@@ -403,6 +427,44 @@ class SubsetWidget(QtWidgets.QWidget):
         print(message)
 
 
+class SubsetTreeView(QtWidgets.QTreeView):
+
+    def __init__(self, parent=None):
+        super(SubsetTreeView, self).__init__(parent=parent)
+        loading_gif = os.path.dirname(style.__file__) + "/svg/spinner-200.svg"
+        spinner = QtSvg.QSvgRenderer(loading_gif)
+        self.spinner = spinner
+        self.is_loading = False
+        self.is_empty = True
+
+    def paint_loading(self, event):
+        size = 160
+        rect = event.rect()
+        rect = QtCore.QRectF(rect.topLeft(), rect.bottomRight())
+        rect.moveTo(rect.x() + rect.width() / 2 - size / 2,
+                    rect.y() + rect.height() / 2 - size / 2)
+        rect.setSize(QtCore.QSizeF(size, size))
+        painter = QtGui.QPainter(self.viewport())
+        self.spinner.render(painter, rect)
+
+    def paint_empty(self, event):
+        painter = QtGui.QPainter(self.viewport())
+        rect = event.rect()
+        rect = QtCore.QRectF(rect.topLeft(), rect.bottomRight())
+        qtext_opt = QtGui.QTextOption(
+            QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+        )
+        painter.drawText(rect, "No Data", qtext_opt)
+
+    def paintEvent(self, event):
+        if self.is_loading:
+            self.paint_loading(event)
+        elif self.is_empty:
+            self.paint_empty(event)
+        else:
+            super(SubsetTreeView, self).paintEvent(event)
+
+
 class VersionTextEdit(QtWidgets.QTextEdit):
     """QTextEdit that displays version specific information.
 
@@ -422,9 +484,8 @@ class VersionTextEdit(QtWidgets.QTextEdit):
         # Reset
         self.set_version(None)
 
-    def set_version(self, version_id):
-
-        if not version_id:
+    def set_version(self, version_doc=None, version_id=None):
+        if not version_doc and not version_id:
             # Reset state to empty
             self.data = {
                 "source": None,
@@ -438,44 +499,68 @@ class VersionTextEdit(QtWidgets.QTextEdit):
 
         print("Querying..")
 
-        version = io.find_one({"_id": version_id, "type": "version"})
-        assert version, "Not a valid version id"
+        if not version_doc:
+            version_doc = io.find_one({
+                "_id": version_id,
+                "type": {"$in": ["version", "master_version"]}
+            })
+            assert version_doc, "Not a valid version id"
 
-        subset = io.find_one({"_id": version["parent"], "type": "subset"})
+        if version_doc["type"] == "master_version":
+            _version_doc = io.find_one({
+                "_id": version_doc["version_id"],
+                "type": "version"
+            })
+            version_doc["data"] = _version_doc["data"]
+            version_doc["name"] = MasterVersionType(
+                _version_doc["name"]
+            )
+
+        subset = io.find_one({
+            "_id": version_doc["parent"],
+            "type": "subset"
+        })
         assert subset, "No valid subset parent for version"
 
         # Define readable creation timestamp
-        created = version["data"]["time"]
+        created = version_doc["data"]["time"]
         created = datetime.datetime.strptime(created, "%Y%m%dT%H%M%SZ")
         created = datetime.datetime.strftime(created, "%b %d %Y %H:%M")
 
-        comment = version["data"].get("comment", None) or "No comment"
+        comment = version_doc["data"].get("comment", None) or "No comment"
 
-        source = version["data"].get("source", None)
+        source = version_doc["data"].get("source", None)
         source_label = source if source else "No source"
 
         # Store source and raw data
         self.data["source"] = source
-        self.data["raw"] = version
+        self.data["raw"] = version_doc
+
+        if version_doc["type"] == "master_version":
+            version_name = "Master"
+        else:
+            version_name = tools_lib.format_version(version_doc["name"])
 
         data = {
             "subset": subset["name"],
-            "version": version["name"],
+            "version": version_name,
             "comment": comment,
             "created": created,
             "source": source_label
         }
 
-        self.setHtml(u"""
-<h3>{subset} v{version:03d}</h3>
-<b>Comment</b><br>
-{comment}<br>
-<br>
-<b>Created</b><br>
-{created}<br>
-<br>
-<b>Source</b><br>
-{source}<br>""".format(**data))
+        self.setHtml((
+            "<h2>{subset}</h2>"
+            "<h3>{version}</h3>"
+            "<b>Comment</b><br>"
+            "{comment}<br><br>"
+
+            "<b>Created</b><br>"
+            "{created}<br><br>"
+
+            "<b>Source</b><br>"
+            "{source}"
+        ).format(**data))
 
     def contextMenuEvent(self, event):
         """Context menu with additional actions"""
@@ -524,6 +609,106 @@ class VersionTextEdit(QtWidgets.QTextEdit):
         clipboard.setText(raw_text)
 
 
+class ThumbnailWidget(QtWidgets.QLabel):
+
+    aspect_ratio = (16, 9)
+    max_width = 300
+
+    def __init__(self, dbcon=None, parent=None):
+        super(ThumbnailWidget, self).__init__(parent)
+        if dbcon is None:
+            dbcon = io
+        self.dbcon = dbcon
+
+        self.current_thumb_id = None
+        self.current_thumbnail = None
+
+        self.setAlignment(QtCore.Qt.AlignCenter)
+
+        # TODO get res path much better way
+        loader_path = os.path.dirname(os.path.abspath(__file__))
+        avalon_path = os.path.dirname(os.path.dirname(loader_path))
+        default_pix_path = os.path.join(
+            os.path.dirname(avalon_path),
+            "res", "tools", "images", "default_thumbnail.png"
+        )
+        self.default_pix = QtGui.QPixmap(default_pix_path)
+
+    def height(self):
+        width = self.width()
+        asp_w, asp_h = self.aspect_ratio
+
+        return (width / asp_w) * asp_h
+
+    def width(self):
+        width = super(ThumbnailWidget, self).width()
+        if width > self.max_width:
+            width = self.max_width
+        return width
+
+    def set_pixmap(self, pixmap=None):
+        if not pixmap:
+            pixmap = self.default_pix
+            self.current_thumb_id = None
+
+        self.current_thumbnail = pixmap
+
+        pixmap = self.scale_pixmap(pixmap)
+        self.setPixmap(pixmap)
+
+    def resizeEvent(self, event):
+        if not self.current_thumbnail:
+            return
+        cur_pix = self.scale_pixmap(self.current_thumbnail)
+        self.setPixmap(cur_pix)
+
+    def scale_pixmap(self, pixmap):
+        return pixmap.scaled(
+            self.width(), self.height(), QtCore.Qt.KeepAspectRatio
+        )
+
+    def set_thumbnail(self, entity=None):
+        if not entity:
+            self.set_pixmap()
+            return
+
+        if isinstance(entity, (list, tuple)):
+            if len(entity) == 1:
+                entity = entity[0]
+            else:
+                self.set_pixmap()
+                return
+
+        thumbnail_id = entity.get("data", {}).get("thumbnail_id")
+        if thumbnail_id == self.current_thumb_id:
+            if self.current_thumbnail is None:
+                self.set_pixmap()
+            return
+
+        self.current_thumb_id = thumbnail_id
+        if not thumbnail_id:
+            self.set_pixmap()
+            return
+
+        thumbnail_ent = self.dbcon.find_one(
+            {"type": "thumbnail", "_id": thumbnail_id}
+        )
+        if not thumbnail_ent:
+            return
+
+        thumbnail_bin = pipeline.get_thumbnail_binary(
+            thumbnail_ent, "thumbnail", self.dbcon
+        )
+        if not thumbnail_bin:
+            self.set_pixmap()
+            return
+
+        thumbnail = QtGui.QPixmap()
+        thumbnail.loadFromData(thumbnail_bin)
+
+        self.set_pixmap(thumbnail)
+
+
 class VersionWidget(QtWidgets.QWidget):
     """A Widget that display information about a specific version"""
     def __init__(self, parent=None):
@@ -531,16 +716,17 @@ class VersionWidget(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout(self)
 
-        label = QtWidgets.QLabel("Version")
+        label = QtWidgets.QLabel("Version", self)
         data = VersionTextEdit()
         data.setReadOnly(True)
+
         layout.addWidget(label)
         layout.addWidget(data)
 
         self.data = data
 
-    def set_version(self, version_id):
-        self.data.set_version(version_id)
+    def set_version(self, version_doc):
+        self.data.set_version(version_doc)
 
 
 class FamilyListWidget(QtWidgets.QListWidget):

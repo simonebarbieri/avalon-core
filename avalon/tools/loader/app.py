@@ -8,7 +8,9 @@ from ..models import AssetModel
 from ..widgets import AssetWidget
 from .. import lib
 
-from .widgets import SubsetWidget, VersionWidget, FamilyListWidget
+from .widgets import (
+    SubsetWidget, VersionWidget, FamilyListWidget, ThumbnailWidget
+)
 
 module = sys.modules[__name__]
 module.window = None
@@ -23,9 +25,8 @@ class Window(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
         self.setWindowTitle(
-            "Asset Loader 2.1 - %s/%s" % (
-                api.registered_root().replace("\\", "/"),
-                api.Session.get("AVALON_PROJECT")))
+            "Asset Loader 2.1 - {}".format(api.Session.get("AVALON_PROJECT"))
+        )
 
         # Enable minimize and maximize for app
         self.setWindowFlags(QtCore.Qt.Window)
@@ -41,6 +42,13 @@ class Window(QtWidgets.QDialog):
         families = FamilyListWidget()
         subsets = SubsetWidget(parent=self)
         version = VersionWidget()
+        thumbnail = ThumbnailWidget()
+
+        thumb_ver_body = QtWidgets.QWidget()
+        thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_body)
+        thumb_ver_layout.setContentsMargins(0, 0, 0, 0)
+        thumb_ver_layout.addWidget(thumbnail)
+        thumb_ver_layout.addWidget(version)
 
         # Create splitter to show / hide family filters
         asset_filter_splitter = QtWidgets.QSplitter()
@@ -55,7 +63,7 @@ class Window(QtWidgets.QDialog):
         split = QtWidgets.QSplitter()
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
-        split.addWidget(version)
+        split.addWidget(thumb_ver_body)
         split.setSizes([180, 950, 200])
 
         container_layout.addWidget(split)
@@ -76,7 +84,10 @@ class Window(QtWidgets.QDialog):
         layout.addWidget(footer)
 
         self.data = {
-            "widgets": {"families": families},
+            "widgets": {
+                "families": families,
+                "thumbnail": thumbnail
+            },
             "model": {
                 "assets": assets,
                 "subsets": subsets,
@@ -86,23 +97,13 @@ class Window(QtWidgets.QDialog):
                 "message": message,
             },
             "state": {
-                "template": None,
-                "locations": list(),
-                "context": {
-                    "root": None,
-                    "project": None,
-                    "assets": None,
-                    "assetIds": None,
-                    "silo": None,
-                    "subset": None,
-                    "version": None,
-                    "representation": None,
-                },
+                "assetIds": None
             }
         }
 
         families.active_changed.connect(subsets.set_family_filters)
         assets.selection_changed.connect(self.on_assetschanged)
+        assets.view.clicked.connect(self.on_assetview_click)
         subsets.active_changed.connect(self.on_subsetschanged)
         subsets.version_changed.connect(self.on_versionschanged)
 
@@ -118,6 +119,12 @@ class Window(QtWidgets.QDialog):
     # -------------------------------
     # Delay calling blocking methods
     # -------------------------------
+
+    def on_assetview_click(self, *args):
+        subsets_widget = self.data["model"]["subsets"]
+        selection_model = subsets_widget.view.selectionModel()
+        if selection_model.selectedIndexes():
+            selection_model.clearSelection()
 
     def refresh(self):
         self.echo("Fetching results..")
@@ -156,19 +163,13 @@ class Window(QtWidgets.QDialog):
         families = self.data["widgets"]["families"]
         families.refresh()
 
-        # Update state
-        state = self.data["state"]
-        state["template"] = project["config"]["template"]["publish"]
-        state["context"]["root"] = api.registered_root()
-        state["context"]["project"] = project["name"]
-
     def clear_assets_underlines(self):
         """Clear colors from asset data to remove colored underlines
         When multiple assets are selected colored underlines mark which asset
         own selected subsets. These colors must be cleared from asset data
         on selection change so they match current selection.
         """
-        last_asset_ids = self.data["state"]["context"]["assetIds"]
+        last_asset_ids = self.data["state"]["assetIds"]
         if not last_asset_ids:
             return
 
@@ -189,37 +190,43 @@ class Window(QtWidgets.QDialog):
 
         assets_widget = self.data["model"]["assets"]
         subsets_widget = self.data["model"]["subsets"]
+        subsets_model = subsets_widget.model
 
-        subsets_widget.model.clear()
+        subsets_model.clear()
         self.clear_assets_underlines()
 
         # filter None docs they are silo
         asset_docs = assets_widget.get_selected_assets()
-        if len(asset_docs) == 0:
-            return
 
-        asset_ids = [a["_id"] for a in asset_docs]
-        asset_names = [a["name"] for a in asset_docs]
-        subsets_widget.model.set_assets(asset_ids)
+        asset_ids = [asset_doc["_id"] for asset_doc in asset_docs]
+        # Start loading
+        subsets_widget.set_loading_state(
+            loading=bool(asset_ids),
+            empty=True
+        )
+
+        def on_refreshed(has_item):
+            empty = not has_item
+            subsets_widget.set_loading_state(loading=False, empty=empty)
+            subsets_model.refreshed.disconnect()
+            self.echo("Duration: %.3fs" % (time.time() - t1))
+
+        subsets_model.refreshed.connect(on_refreshed)
+
+        subsets_model.set_assets(asset_ids)
         subsets_widget.view.setColumnHidden(
-            subsets_widget.model.Columns.index("asset"),
+            subsets_model.Columns.index("asset"),
             len(asset_ids) < 2
         )
 
         # Clear the version information on asset change
         self.data["model"]["version"].set_version(None)
+        self.data["widgets"]["thumbnail"].set_thumbnail(asset_docs)
 
-        self.data["state"]["context"]["assets"] = asset_names
-        self.data["state"]["context"]["assetIds"] = asset_ids
-        silo = None
-        if len(asset_docs) == 1:
-            silo = asset_docs[0].get("silo")
-        self.data["state"]["context"]["silo"] = silo
-
-        self.echo("Duration: %.3fs" % (time.time() - t1))
+        self.data["state"]["assetIds"] = asset_ids
 
     def _subsetschanged(self):
-        asset_ids = self.data["state"]["context"]["assetIds"]
+        asset_ids = self.data["state"]["assetIds"]
         # Skip setting colors if not asset multiselection
         if not asset_ids or len(asset_ids) < 2:
             self._versionschanged()
@@ -270,19 +277,43 @@ class Window(QtWidgets.QDialog):
 
         # Active must be in the selected rows otherwise we
         # assume it's not actually an "active" current index.
-        version = None
+        version_docs = None
+        version_doc = None
         active = selection.currentIndex()
+        rows = selection.selectedRows(column=active.column())
         if active:
-            rows = selection.selectedRows(column=active.column())
             if active in rows:
                 item = active.data(subsets.model.ItemRole)
                 if (
                     item is not None and
                     not (item.get("isGroup") or item.get("isMerged"))
                 ):
-                    version = item["version_document"]["_id"]
+                    version_doc = item["version_document"]
 
-        self.data["model"]["version"].set_version(version)
+        if rows:
+            version_docs = []
+            for index in rows:
+                if not index or not index.isValid():
+                    continue
+                item = index.data(subsets.model.ItemRole)
+                if (
+                    item is None
+                    or item.get("isGroup")
+                    or item.get("isMerged")
+                ):
+                    continue
+                version_docs.append(item["version_document"])
+
+        self.data["model"]["version"].set_version(version_doc)
+
+        thumbnail_docs = version_docs
+        if not thumbnail_docs:
+            assets_widget = self.data["model"]["assets"]
+            asset_docs = assets_widget.get_selected_assets()
+            if len(asset_docs) > 0:
+                thumbnail_docs = asset_docs
+
+        self.data["widgets"]["thumbnail"].set_thumbnail(thumbnail_docs)
 
     def _set_context(self, context, refresh=True):
         """Set the selection in the interface using a context.
@@ -335,14 +366,6 @@ class Window(QtWidgets.QDialog):
             print("Force quitted..")
             self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
-        # Kill on holding SHIFT
-        modifiers = QtWidgets.QApplication.queryKeyboardModifiers()
-        shift_pressed = QtCore.Qt.ShiftModifier & modifiers
-
-        if shift_pressed:
-            print("Force quitted..")
-            self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-
         print("Good bye")
         return super(Window, self).closeEvent(event)
 
@@ -356,7 +379,8 @@ class Window(QtWidgets.QDialog):
             self.show_grouping_dialog()
             return
 
-        return super(Window, self).keyPressEvent(event)
+        super(Window, self).keyPressEvent(event)
+        event.setAccepted(True)  # Avoid interfering other widgets
 
     def show_grouping_dialog(self):
         subsets = self.data["model"]["subsets"]
@@ -386,7 +410,7 @@ class SubsetGroupingDialog(QtWidgets.QDialog):
 
         self.items = items
         self.subsets = parent.data["model"]["subsets"]
-        self.asset_ids = parent.data["state"]["context"]["assetIds"]
+        self.asset_ids = parent.data["state"]["assetIds"]
 
         name = QtWidgets.QLineEdit()
         name.setPlaceholderText("Remain blank to ungroup..")
@@ -488,10 +512,7 @@ def show(debug=False, parent=None, use_context=False):
             module.window.activateWindow()     # for Windows
             module.window.refresh()
             return
-        except RuntimeError as e:
-            if not e.message.rstrip().endswith("already deleted."):
-                raise
-
+        except (AttributeError, RuntimeError):
             # Garbage collected
             module.window = None
 
@@ -527,6 +548,10 @@ def show(debug=False, parent=None, use_context=False):
 
         module.window = window
 
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()
+
 
 def cli(args):
 
@@ -537,6 +562,8 @@ def cli(args):
 
     args = parser.parse_args(args)
     project = args.project
+
+    print("Entering Project: %s" % project)
 
     io.install()
 

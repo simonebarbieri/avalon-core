@@ -13,6 +13,7 @@ from .widgets import (
     FamilyListWidget,
     AssetWidget
 )
+from ..loader.widgets import ThumbnailWidget
 from .models import AssetModel
 
 from pypeapp import config
@@ -64,6 +65,13 @@ class Window(QtWidgets.QDialog):
             dbcon=self.dbcon, tool_name=self.tool_name, parent=self
         )
         version = VersionWidget(dbcon=self.dbcon, parent=self)
+        thumbnail = ThumbnailWidget(dbcon=self.dbcon)
+
+        thumb_ver_body = QtWidgets.QWidget()
+        thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_body)
+        thumb_ver_layout.setContentsMargins(0, 0, 0, 0)
+        thumb_ver_layout.addWidget(thumbnail)
+        thumb_ver_layout.addWidget(version)
 
         # Project
         self.combo_projects = QtWidgets.QComboBox()
@@ -82,7 +90,7 @@ class Window(QtWidgets.QDialog):
         split = QtWidgets.QSplitter()
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
-        split.addWidget(version)
+        split.addWidget(thumb_ver_body)
         split.setSizes([180, 950, 200])
         container_layout.addWidget(split)
 
@@ -107,38 +115,38 @@ class Window(QtWidgets.QDialog):
                 "assets": assets,
                 "subsets": subsets,
                 "version": version,
+                "thumbnail": thumbnail
             },
             "label": {
                 "message": message,
             },
             "state": {
-                "template": None,
-                "locations": list(),
-                "context": {
-                    "root": None,
-                    "project": None,
-                    "assets": None,
-                    "assetIds": None,
-                    "silo": None,
-                    "subset": None,
-                    "version": None,
-                    "representation": None,
-                },
+                "assetIds": None
             }
         }
 
         families.active_changed.connect(subsets.set_family_filters)
         assets.selection_changed.connect(self.on_assetschanged)
+        assets.view.clicked.connect(self.on_assetview_click)
         assets.refreshButton.clicked.connect(self.on_refresh_clicked)
         subsets.active_changed.connect(self.on_subsetschanged)
         subsets.version_changed.connect(self.on_versionschanged)
         self.combo_projects.currentTextChanged.connect(self.on_project_change)
+
+        # Set default thumbnail on start
+        thumbnail.set_thumbnail(None)
 
         # Try set default project
         self._set_projects(True)
 
         # Defaults
         self.resize(1330, 700)
+
+    def on_assetview_click(self, *args):
+        subsets_widget = self.data["widgets"]["subsets"]
+        selection_model = subsets_widget.view.selectionModel()
+        if selection_model.selectedIndexes():
+            selection_model.clearSelection()
 
     def on_refresh_clicked(self):
         assets_widget = self.data["widgets"]["assets"]
@@ -203,20 +211,8 @@ class Window(QtWidgets.QDialog):
         self._refresh()
         self._assetschanged()
 
-        title = "{} - {}"
-        if self.dbcon.active_project() is None:
-            title = title.format(
-                self.tool_title,
-                "No project selected"
-            )
-        else:
-            title = title.format(
-                self.tool_title,
-                os.path.sep.join([
-                    lib.registered_root(self.dbcon),
-                    self.dbcon.active_project()
-                ])
-            )
+        project_name = self.dbcon.active_project() or "No project selected"
+        title = "{} - {}".format(self.tool_title, project_name)
         self.setWindowTitle(title)
 
     def get_default_project(self):
@@ -295,14 +291,8 @@ class Window(QtWidgets.QDialog):
         families = self.data["widgets"]["families"]
         families.refresh()
 
-        # Update state
-        state = self.data["state"]
-        state["template"] = project["config"]["template"]["publish"]
-        state["context"]["root"] = lib.registered_root(self.dbcon)
-        state["context"]["project"] = project["name"]
-
     def clear_assets_underlines(self):
-        last_asset_ids = self.data["state"]["context"]["assetIds"]
+        last_asset_ids = self.data["state"]["assetIds"]
         if not last_asset_ids:
             return
 
@@ -332,8 +322,7 @@ class Window(QtWidgets.QDialog):
         if len(asset_docs) == 0:
             return
 
-        asset_ids = [a["_id"] for a in asset_docs]
-        asset_names = [a["name"] for a in asset_docs]
+        asset_ids = [asset_doc["_id"] for asset_doc in asset_docs]
         subsets_widget.model.set_assets(asset_ids)
         subsets_widget.view.setColumnHidden(
             subsets_widget.model.Columns.index("asset"),
@@ -342,18 +331,14 @@ class Window(QtWidgets.QDialog):
 
         # Clear the version information on asset change
         self.data["widgets"]["version"].set_version(None)
+        self.data["widgets"]["thumbnail"].set_thumbnail(asset_docs)
 
-        self.data["state"]["context"]["assets"] = asset_names
-        self.data["state"]["context"]["assetIds"] = asset_ids
-        silo = None
-        if len(asset_docs) == 1:
-            silo = asset_docs[0].get("silo")
-        self.data["state"]["context"]["silo"] = silo
+        self.data["state"]["assetIds"] = asset_ids
 
         self.echo("Duration: %.3fs" % (time.time() - t1))
 
     def _subsetschanged(self):
-        asset_ids = self.data["state"]["context"]["assetIds"]
+        asset_ids = self.data["state"]["assetIds"]
         # Skip setting colors if not asset multiselection
         if not asset_ids or len(asset_ids) < 2:
             self._versionschanged()
@@ -404,19 +389,42 @@ class Window(QtWidgets.QDialog):
 
         # Active must be in the selected rows otherwise we
         # assume it's not actually an "active" current index.
-        version = None
+        version_docs = None
+        version_doc = None
         active = selection.currentIndex()
-        if active:
-            rows = selection.selectedRows(column=active.column())
-            if active in rows:
-                item = active.data(subsets.model.ItemRole)
-                if (
-                    item is not None and
-                    not (item.get("isGroup") or item.get("isMerged"))
-                ):
-                    version = item["version_document"]["_id"]
+        rows = selection.selectedRows(column=active.column())
+        if active and active in rows:
+            item = active.data(subsets.model.ItemRole)
+            if (
+                item is not None
+                and not (item.get("isGroup") or item.get("isMerged"))
+            ):
+                version_doc = item["version_document"]
 
-        self.data["widgets"]["version"].set_version(version)
+        if rows:
+            version_docs = []
+            for index in rows:
+                if not index or not index.isValid():
+                    continue
+                item = index.data(subsets.model.ItemRole)
+                if (
+                    item is None
+                    or item.get("isGroup")
+                    or item.get("isMerged")
+                ):
+                    continue
+                version_docs.append(item["version_document"])
+
+        self.data["widgets"]["version"].set_version(version_doc)
+
+        thumbnail_docs = version_docs
+        if not thumbnail_docs:
+            assets_widget = self.data["widgets"]["assets"]
+            asset_docs = assets_widget.get_selected_assets()
+            if len(asset_docs) > 0:
+                thumbnail_docs = asset_docs
+
+        self.data["widgets"]["thumbnail"].set_thumbnail(thumbnail_docs)
 
     def _set_context(self, context, refresh=True):
         """Set the selection in the interface using a context.

@@ -6,12 +6,14 @@ import re
 import json
 import errno
 import types
+import copy
 import shutil
 import getpass
 import logging
 import weakref
 import inspect
 import traceback
+import platform
 import importlib
 
 from collections import OrderedDict
@@ -31,7 +33,7 @@ from . import (
 )
 
 from .vendor import six, acre
-
+from pypeapp import Anatomy
 
 self = sys.modules[__name__]
 self._is_installed = False
@@ -43,6 +45,19 @@ log = logging.getLogger(__name__)
 
 AVALON_CONTAINER_ID = "pyblish.avalon.container"
 
+HOST_WORKFILE_EXTENSIONS = {
+    "blender": [".blend"],
+    "fusion": [".comp"],
+    "harmony": [".zip"],
+    "houdini": [".hip", ".hiplc", ".hipnc"],
+    "maya": [".ma", ".mb"],
+    "nuke": [".nk"],
+    "nukestudio": [".hrox"],
+    "photoshop": [".psd"],
+    "premiere": [".prproj"],
+    "resolve": [".drp"]
+}
+
 
 class IncompatibleLoaderError(ValueError):
     """Error when Loader is incompatible with a representation."""
@@ -51,11 +66,9 @@ class IncompatibleLoaderError(ValueError):
 
 def install(host):
     """Install `host` into the running Python session.
-
     Arguments:
         host (module): A Python module containing the Avalon
             avalon host-interface.
-
     """
 
     io.install()
@@ -78,16 +91,18 @@ def install(host):
 
     # Optional host install function
     if hasattr(host, "install"):
-        host.install(config)
+        host.install()
 
     # Optional config.host.install()
     host_name = host.__name__.rsplit(".", 1)[-1]
     config_host = lib.find_submodule(config, host_name)
-    if hasattr(config_host, "install"):
-        config_host.install()
+    if config_host != host:
+        if hasattr(config_host, "install"):
+            config_host.install()
 
     register_host(host)
     register_config(config)
+
     config.install()
 
     self._is_installed = True
@@ -119,7 +134,7 @@ def uninstall():
         config_host.uninstall()
 
     try:
-        host.uninstall(config)
+        host.uninstall()
     except AttributeError:
         pass
 
@@ -173,7 +188,13 @@ class Loader(list):
 
     def __init__(self, context):
         representation = context['representation']
-        self.fname = get_representation_path(representation)
+        project_doc = context.get("project")
+        root = None
+        if project_doc and project_doc["name"] != Session["AVALON_PROJECT"]:
+            anatomy = Anatomy(project_doc["name"])
+            root = anatomy.roots_obj
+
+        self.fname = get_representation_path(representation, root)
 
     def load(self, context, name=None, namespace=None, options=None):
         """Load asset via database
@@ -323,6 +344,111 @@ class InventoryAction(object):
         return True
 
 
+def compile_list_of_regexes(in_list):
+    """Convert strings in entered list to compiled regex objects."""
+    regexes = list()
+    if not in_list:
+        return regexes
+
+    for item in in_list:
+        if item:
+            try:
+                regexes.append(re.compile(item))
+            except TypeError:
+                log.warning((
+                    "Invalid type \"{}\" value \"{}\"."
+                    " Expected string based object. Skipping."
+                ).format(str(type(item)), str(item)))
+    return regexes
+
+
+def should_start_last_workfile(project_name, host_name, task_name):
+    """Define if host should start last version workfile if possible.
+
+    Default output is `False`. Can be overriden with environment variable
+    `AVALON_OPEN_LAST_WORKFILE`, valid values without case sensitivity are
+    `"0", "1", "true", "false", "yes", "no"`.
+
+    Args:
+        project_name (str): Name of project.
+        host_name (str): Name of host which is launched. In avalon's
+            application context it's value stored in app definition under
+            key `"application_dir"`. Is not case sensitive.
+        task_name (str): Name of task which is used for launching the host.
+            Task name is not case sensitive.
+
+    Returns:
+        bool: True if host should start workfile.
+
+    """
+    default_output = False
+
+    env_override = os.environ.get("AVALON_OPEN_LAST_WORKFILE")
+    if env_override is not None:
+        env_override = env_override.lower().strip()
+        if env_override in ("true", "yes", "1"):
+            default_output = True
+        elif env_override in ("false", "no", "0"):
+            default_output = False
+
+    try:
+        from pype.api import config
+        startup_presets = (
+            config.get_presets(project_name)
+            .get("tools", {})
+            .get("workfiles", {})
+            .get("last_workfile_on_startup")
+        )
+    except Exception:
+        startup_presets = None
+        log.warning("Couldn't load pype's presets", exc_info=True)
+
+    if not startup_presets:
+        return default_output
+
+    host_name_lowered = host_name.lower()
+    task_name_lowered = task_name.lower()
+
+    max_points = 2
+    matching_points = -1
+    matching_item = None
+    for item in startup_presets:
+        hosts = item.get("hosts") or tuple()
+        tasks = item.get("tasks") or tuple()
+
+        hosts_lowered = tuple(_host_name.lower() for _host_name in hosts)
+        # Skip item if has set hosts and current host is not in
+        if hosts_lowered and host_name_lowered not in hosts_lowered:
+            continue
+
+        tasks_lowered = tuple(_task_name.lower() for _task_name in tasks)
+        # Skip item if has set tasks and current task is not in
+        if tasks_lowered:
+            task_match = False
+            for task_regex in compile_list_of_regexes(tasks_lowered):
+                if re.match(task_regex, task_name_lowered):
+                    task_match = True
+                    break
+
+            if not task_match:
+                continue
+
+        points = int(bool(hosts_lowered)) + int(bool(tasks_lowered))
+        if points > matching_points:
+            matching_item = item
+            matching_points = points
+
+        if matching_points == max_points:
+            break
+
+    if matching_item is not None:
+        output = matching_item.get("enabled")
+        if output is None:
+            output = default_output
+        return output
+    return default_output
+
+
 class Application(Action):
     """Default application launcher
 
@@ -334,8 +460,7 @@ class Application(Action):
     config = None
 
     def is_compatible(self, session):
-        required = ["AVALON_PROJECTS",
-                    "AVALON_PROJECT",
+        required = ["AVALON_PROJECT",
                     "AVALON_ASSET",
                     "AVALON_TASK"]
         missing = [x for x in required if x not in session]
@@ -348,14 +473,50 @@ class Application(Action):
         """Build application environment"""
 
         session = session.copy()
-        session["AVALON_APP"] = self.config["application_dir"]
+        host_name = self.config["application_dir"]
+        session["AVALON_APP"] = host_name
         session["AVALON_APP_NAME"] = self.name
 
         # Compute work directory
         project = io.find_one({"type": "project"})
-        template = project["config"]["template"]["work"]
-        workdir = _format_work_template(template, session)
-        session["AVALON_WORKDIR"] = os.path.normpath(workdir)
+        anatomy = Anatomy(project["name"])
+        template_data = template_data_from_session(session)
+        anatomy_filled = anatomy.format(template_data)
+        session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
+
+        last_workfile_path = None
+        extensions = HOST_WORKFILE_EXTENSIONS.get(session["AVALON_APP"])
+        if extensions:
+            # Find last workfile
+            file_template = anatomy.templates["work"]["file"]
+            template_data.update({
+                "version": 1,
+                "user": getpass.getuser(),
+                "ext": extensions[0]
+            })
+
+            last_workfile_path = last_workfile(
+                session["AVALON_WORKDIR"],
+                file_template,
+                template_data,
+                extensions,
+                True
+            )
+
+        start_last_workfile = should_start_last_workfile(
+            project["name"], host_name, session["AVALON_TASK"]
+        )
+        # Store boolean as "0"(False) or "1"(True)
+        session["AVALON_OPEN_LAST_WORKFILE"] = (
+            str(int(bool(start_last_workfile)))
+        )
+
+        if (
+            start_last_workfile
+            and last_workfile_path
+            and os.path.exists(last_workfile_path)
+        ):
+            session["AVALON_LAST_WORKFILE"] = last_workfile_path
 
         # dynamic environmnets
         tools_attr = []
@@ -365,19 +526,20 @@ class Application(Action):
             tools_attr.append(session["AVALON_APP_NAME"])
 
         # collect all the 'environment' attributes from parents
-        asset = io.find_one({"type": "asset"})
+        asset = io.find_one({
+            "type": "asset",
+            "name": session["AVALON_ASSET"]
+        })
         tools = self.find_tools(asset)
         tools_attr.extend(tools)
 
         tools_env = acre.get_tools(tools_attr)
         dyn_env = acre.compute(tools_env)
-        dyn_env = acre.merge(dyn_env, current_env=dict(os.environ))
-        env = acre.append(dict(os.environ), dyn_env)
+        env = acre.merge(dyn_env, current_env=dict(os.environ))
 
         # Build environment
-        # env = os.environ.copy()
         env.update(self.config.get("environment", {}))
-        # env.update(dyn_env)
+        env.update(anatomy.root_environments())
         env.update(session)
 
         return env
@@ -442,8 +604,17 @@ class Application(Action):
                 self.log.error(" - %s -> %s" % (src, dst))
 
     def launch(self, environment):
+        executable_path = self.config["executable"]
+        pype_config_path = os.environ.get("PYPE_CONFIG")
+        if pype_config_path:
+            # Get platform folder name
+            os_plat = platform.system().lower()
+            # Path to folder with launchers
+            path = os.path.join(pype_config_path, "launchers", os_plat)
+            if os.path.exists(path):
+                executable_path = os.path.join(path, executable_path)
+        executable = lib.which(executable_path)
 
-        executable = lib.which(self.config["executable"])
         if executable is None:
             raise ValueError(
                 "'%s' not found on your PATH\n%s"
@@ -485,6 +656,81 @@ class Application(Action):
             raise ValueError(
                 "This is typically a bug in the pipeline, "
                 "ask your developer.")
+
+
+@lib.log
+class ThumbnailResolver(object):
+    """Determine how to get data from thumbnail entity.
+
+    "priority" - determines the order of processing in `get_thumbnail_binary`,
+        lower number is processed earlier.
+    "thumbnail_types" - it is expected that thumbnails will be used in more
+        more than one level, there is only ["thumbnail"] type at the moment
+        of creating this docstring but it is expected to add "ico" and "full"
+        in future.
+    """
+
+    priority = 100
+    thumbnail_types = ["*"]
+
+    def __init__(self, dbcon):
+        self.dbcon = dbcon
+
+    def process(self, thumbnail_entity, thumbnail_type):
+        pass
+
+
+class TemplateResolver(ThumbnailResolver):
+
+    priority = 90
+
+    def process(self, thumbnail_entity, thumbnail_type):
+
+        if not os.environ.get("AVALON_THUMBNAIL_ROOT"):
+            return
+
+        template = thumbnail_entity["data"].get("template")
+        if not template:
+            log.debug("Thumbnail entity does not have set template")
+            return
+
+        project = self.dbcon.find_one({"type": "project"})
+
+        template_data = copy.deepcopy(
+            thumbnail_entity["data"].get("template_data") or {}
+        )
+        template_data.update({
+            "_id": str(thumbnail_entity["_id"]),
+            "thumbnail_type": thumbnail_type,
+            "thumbnail_root": os.environ.get("AVALON_THUMBNAIL_ROOT"),
+            "project": {
+                "name": project["name"],
+                "code": project["data"].get("code")
+            }
+        })
+
+        try:
+            filepath = os.path.normpath(template.format(**template_data))
+        except KeyError:
+            log.warning((
+                "Missing template data keys for template <{0}> || Data: {1}"
+            ).format(template, str(template_data)))
+            return
+
+        if not os.path.exists(filepath):
+            log.warning("File does not exist \"{0}\"".format(filepath))
+            return
+
+        with open(filepath, "rb") as _file:
+            content = _file.read()
+
+        return content
+
+
+class BinaryThumbnail(ThumbnailResolver):
+
+    def process(self, thumbnail_entity, thumbnail_type):
+        return thumbnail_entity["data"].get("binary_data")
 
 
 def discover(superclass):
@@ -636,6 +882,10 @@ def register_plugin(superclass, obj):
         _registered_plugins[superclass].append(obj)
 
 
+register_plugin(ThumbnailResolver, BinaryThumbnail)
+register_plugin(ThumbnailResolver, TemplateResolver)
+
+
 def register_plugin_path(superclass, path):
     """Register a directory of one or more plug-ins
 
@@ -683,10 +933,15 @@ def register_root(path):
 
 def registered_root():
     """Return currently registered root"""
-    return os.path.normpath(
-        _registered_root["_"] or
-        Session.get("AVALON_PROJECTS") or ""
-    )
+    root = _registered_root["_"]
+    if root:
+        return root
+
+    root = Session.get("AVALON_PROJECTS")
+    if root:
+        return os.path.normpath(root)
+
+    return ""
 
 
 def register_host(host):
@@ -913,7 +1168,7 @@ def create(name, asset, family, options=None, data=None):
                 print("Running %s" % plugin)
                 instance = plugin.process()
         except Exception:
-            log.warning(traceback.format_exc())
+            traceback.print_exception(*sys.exc_info())
             continue
         plugins.append(plugin)
 
@@ -959,6 +1214,116 @@ def get_representation_context(representation):
     return context
 
 
+def template_data_from_session(session):
+    """ Return dictionary with template from session keys.
+
+    Args:
+        session (dict, Optional): The Session to use. If not provided use the
+            currently active global Session.
+    Returns:
+        dict: All available data from session.
+    """
+    if session is None:
+        session = Session
+
+    project_name = session["AVALON_PROJECT"]
+    project = io._database[project_name].find_one(
+        {"type": "project"}
+    )
+
+    return {
+        "root": registered_root(),
+        "project": {
+            "name": project.get("name", session["AVALON_PROJECT"]),
+            "code": project["data"].get("code", ""),
+        },
+        "asset": session["AVALON_ASSET"],
+        "task": session["AVALON_TASK"],
+        "app": session["AVALON_APP"],
+
+        # Optional
+        "silo": session.get("AVALON_SILO"),
+        "user": session.get("AVALON_USER", getpass.getuser()),
+        "hierarchy": session.get("AVALON_HIERARCHY"),
+    }
+
+
+def compute_session_changes(session, task=None, asset=None, app=None):
+    """Compute the changes for a Session object on asset, task or app switch
+
+    This does *NOT* update the Session object, but returns the changes
+    required for a valid update of the Session.
+
+    Args:
+        session (dict): The initial session to compute changes to.
+            This is required for computing the full Work Directory, as that
+            also depends on the values that haven't changed.
+        task (str, Optional): Name of task to switch to.
+        asset (str or dict, Optional): Name of asset to switch to.
+            You can also directly provide the Asset dictionary as returned
+            from the database to avoid an additional query. (optimization)
+        app (str, Optional): Name of app to switch to.
+
+    Returns:
+        dict: The required changes in the Session dictionary.
+
+    """
+
+    changes = dict()
+
+    # If no changes, return directly
+    if not any([task, asset, app]):
+        return changes
+
+    # Get asset document and asset
+    asset_document = None
+    if asset:
+        if isinstance(asset, dict):
+            # Assume asset database document
+            asset_document = asset
+            asset = asset["name"]
+        else:
+            # Assume asset name
+            asset_document = io.find_one({"name": asset,
+                                          "type": "asset"})
+            assert asset_document, "Asset must exist"
+
+    # Detect any changes compared session
+    mapping = {
+        "AVALON_ASSET": asset,
+        "AVALON_TASK": task,
+        "AVALON_APP": app,
+    }
+    changes = {key: value for key, value in mapping.items()
+               if value and value != session.get(key)}
+    if not changes:
+        return changes
+
+    # Update silo and hierarchy when asset changed
+    if "AVALON_ASSET" in changes:
+
+        # Update silo
+        changes["AVALON_SILO"] = asset_document.get("silo") or ""
+
+        # Update hierarchy
+        parents = asset_document['data'].get('parents', [])
+        hierarchy = ""
+        if len(parents) > 0:
+            hierarchy = os.path.sep.join(parents)
+        changes['AVALON_HIERARCHY'] = hierarchy
+
+    # Compute work directory (with the temporary changed session so far)
+    project = io.find_one({"type": "project"})
+    _session = session.copy()
+    _session.update(changes)
+    anatomy = Anatomy(project["name"])
+    template_data = template_data_from_session(_session)
+    anatomy_filled = anatomy.format(template_data)
+    changes["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
+
+    return changes
+
+
 def update_current_task(task=None, asset=None, app=None):
     """Update active Session to a new task work area.
 
@@ -974,92 +1339,23 @@ def update_current_task(task=None, asset=None, app=None):
 
     """
 
-    mapping = {
-        "AVALON_ASSET": asset,
-        "AVALON_TASK": task,
-        "AVALON_APP": app,
-    }
-    changed = {key: value for key, value in mapping.items() if value}
-    if not changed:
-        return
+    changes = compute_session_changes(
+        Session, task=task, asset=asset, app=app
+    )
 
-    # Update silo when asset changed
-    if "AVALON_ASSET" in changed:
-        asset_document = io.find_one({"name": changed["AVALON_ASSET"],
-                                      "type": "asset"})
-        assert asset_document, "Asset must exist"
-        changed["AVALON_SILO"] = asset_document.get("silo") or ""
-
-    # Compute work directory (with the temporary changed session so far)
-    project = io.find_one({"type": "project"},
-                          projection={"config.template.work": True})
-    template = project["config"]["template"]["work"]
-
-    hierarchy = asset_document["data"].get("hierarchy")
-    if hierarchy is None:
-        parents = asset_document["data"].get("parents") or []
-        hierarchy = os.path.sep.join(parents) or ""
-
-    changed['AVALON_HIERARCHY'] = hierarchy
-
-    _session = Session.copy()
-    _session.update(changed)
-
-    workdir = os.path.normpath(_format_work_template(template, _session))
-
-    changed["AVALON_WORKDIR"] = workdir
-
-    if not os.path.exists(workdir):
-        os.makedirs(workdir)
-
-    # Update the full session in one go to avoid half updates
-    Session.update(changed)
-
-    # Update the environment
-    os.environ.update(changed)
+    # Update the Session and environments. Pop from environments all keys with
+    # value set to None.
+    for key, value in changes.items():
+        Session[key] = value
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
     # Emit session change
-    emit("taskChanged", changed.copy())
+    emit("taskChanged", changes.copy())
 
-    return changed
-
-
-def _format_work_template(template, session=None):
-    """Return a formatted configuration template with a Session.
-
-    Note: This *cannot* format the templates for published files since the
-        session does not hold the context for a published file. Instead use
-        `get_representation_path` to parse the full path to a published file.
-
-    Args:
-        template (str): The template to format.
-        session (dict, Optional): The Session to use. If not provided use the
-            currently active global Session.
-
-    Returns:
-        str: The fully formatted path.
-
-    """
-    if session is None:
-        session = Session
-
-    project = io.find_one({'type': 'project'})
-
-    return template.format(**{
-        "root": registered_root(),
-        "project": {
-            "name": project.get("name", session["AVALON_PROJECT"]),
-            "code": project["data"].get("code", ''),
-        },
-        "asset": session["AVALON_ASSET"],
-        "task": session["AVALON_TASK"],
-        "app": session["AVALON_APP"],
-
-        # Optional
-        "silo": session.get("AVALON_SILO"),
-        "user": session.get("AVALON_USER", getpass.getuser()),
-        "hierarchy": session.get("AVALON_HIERARCHY"),
-    })
+    return changes
 
 
 def _make_backwards_compatible_loader(Loader):
@@ -1174,11 +1470,18 @@ def update(container, version=-1):
             "parent": subset["_id"]
         }, sort=[("name", -1)])
     else:
-        new_version = io.find_one({
-            "type": "version",
-            "parent": subset["_id"],
-            "name": version,
-        })
+        if isinstance(version, lib.MasterVersionType):
+            version_query = {
+                "parent": subset["_id"],
+                "type": "master_version"
+            }
+        else:
+            version_query = {
+                "parent": subset["_id"],
+                "type": "version",
+                "name": version
+            }
+        new_version = io.find_one(version_query)
 
     assert new_version is not None, "This is a bug"
 
@@ -1212,6 +1515,7 @@ def switch(container, representation):
 
     # Get the Loader for this container
     Loader = _get_container_loader(container)
+
     if not Loader:
         raise RuntimeError("Can't switch container. See log for details.")
 
@@ -1241,7 +1545,7 @@ def switch(container, representation):
 
 def format_template_with_optional_keys(data, template):
     # Remove optional missing keys
-    pattern = re.compile(r"<.*?>")
+    pattern = re.compile(r"(<.*?[^{0]*>)[^0-9]*?")
     invalid_optionals = []
     for group in pattern.findall(template):
         try:
@@ -1258,10 +1562,13 @@ def format_template_with_optional_keys(data, template):
     work_file = work_file.replace("<", "")
     work_file = work_file.replace(">", "")
 
+    # Remove double dots when dot for extension is in template
+    work_file = work_file.replace("..", ".")
+
     return work_file
 
 
-def get_representation_path(representation):
+def get_representation_path(representation, root=None, dbcon=None):
     """Get filename from representation document
 
     There are three ways of getting the path from representation which are
@@ -1278,29 +1585,37 @@ def get_representation_path(representation):
         str: fullpath of the representation
 
     """
+    if dbcon is None:
+        dbcon = io
+
+    if root is None:
+        root = registered_root()
 
     def path_from_represenation():
         try:
             template = representation["data"]["template"]
-
         except KeyError:
             return None
 
         try:
             context = representation["context"]
-            context["root"] = registered_root()
+            context["root"] = root
             path = format_template_with_optional_keys(context, template)
-
         except KeyError:
             # Template references unavailable data
             return None
 
-        if os.path.exists(path):
-            return os.path.normpath(path)
+        if not path:
+            return path
+
+        normalized_path = os.path.normpath(path)
+        if os.path.exists(normalized_path):
+            return normalized_path
+        return path
 
     def path_from_config():
         try:
-            version_, subset, asset, project = io.parenthood(representation)
+            version_, subset, asset, project = dbcon.parenthood(representation)
         except ValueError:
             log.debug(
                 "Representation %s wasn't found in database, "
@@ -1327,7 +1642,7 @@ def get_representation_path(representation):
 
         # Cannot fail, required members only
         data = {
-            "root": registered_root(),
+            "root": root,
             "project": {
                 "name": project["name"],
                 "code": project.get("data", {}).get("code")
@@ -1339,9 +1654,9 @@ def get_representation_path(representation):
             "version": version_["name"],
             "representation": representation["name"],
             "family": representation.get("context", {}).get("family"),
-            "user": Session.get("AVALON_USER", getpass.getuser()),
-            "app": Session.get("AVALON_APP", ""),
-            "task": Session.get("AVALON_TASK", "")
+            "user": dbcon.Session.get("AVALON_USER", getpass.getuser()),
+            "app": dbcon.Session.get("AVALON_APP", ""),
+            "task": dbcon.Session.get("AVALON_TASK", "")
         }
 
         try:
@@ -1350,8 +1665,10 @@ def get_representation_path(representation):
             log.debug("Template references unavailable data: %s" % e)
             return None
 
-        if os.path.exists(path):
-            return os.path.normpath(path)
+        normalized_path = os.path.normpath(path)
+        if os.path.exists(normalized_path):
+            return normalized_path
+        return path
 
     def path_from_data():
         if "path" not in representation["data"]:
@@ -1388,6 +1705,39 @@ def get_representation_path(representation):
     )
 
 
+def get_thumbnail_binary(thumbnail_entity, thumbnail_type, dbcon=None):
+    if not thumbnail_entity:
+        return
+
+    resolvers = discover(ThumbnailResolver)
+    resolvers = sorted(resolvers, key=lambda cls: cls.priority)
+    if dbcon is None:
+        dbcon = io
+
+    for Resolver in resolvers:
+        available_types = Resolver.thumbnail_types
+        if (
+            thumbnail_type not in available_types
+            and "*" not in available_types
+            and (
+                isinstance(available_types, (list, tuple))
+                and len(available_types) == 0
+            )
+        ):
+            continue
+        try:
+            instance = Resolver(dbcon)
+            result = instance.process(thumbnail_entity, thumbnail_type)
+            if result:
+                return result
+
+        except Exception:
+            log.warning("Resolver {0} failed durring process.".format(
+                Resolver.__class__.__name__
+            ))
+            traceback.print_exception(*sys.exc_info())
+
+
 def is_compatible_loader(Loader, context):
     """Return whether a loader is compatible with a context.
 
@@ -1416,3 +1766,102 @@ def loaders_from_representation(loaders, representation):
 
     context = get_representation_context(representation)
     return [l for l in loaders if is_compatible_loader(l, context)]
+
+
+def last_workfile_with_version(workdir, file_template, fill_data, extensions):
+    """Return last workfile version.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+
+    Returns:
+        tuple: Last workfile<str> with version<int> if there is any otherwise
+            returns (None, None).
+    """
+    if not os.path.exists(workdir):
+        return None, None
+
+    # Fast match on extension
+    filenames = [
+        filename
+        for filename in os.listdir(workdir)
+        if os.path.splitext(filename)[1] in extensions
+    ]
+
+    # Build template without optionals, version to digits only regex
+    # and comment to any definable value.
+    file_template = re.sub("<.*?>", ".*?", file_template)
+    file_template = re.sub("{version.*}", "([0-9]+)", file_template)
+    file_template = re.sub("{comment.*?}", ".+?", file_template)
+    partially_filled = format_template_with_optional_keys(
+        fill_data,
+        file_template
+    )
+
+    _ext = []
+    for ext in extensions:
+        if not ext.startswith("."):
+            ext = "." + ext
+        # Escape dot for regex
+        ext = "\\" + ext
+        _ext.append(ext)
+
+    # Add or regex expression for extensions
+    partially_filled += "(?:" + "|".join(_ext) + ")"
+    file_template = "^" + partially_filled + "$"
+
+    # Match with ignore case on Windows due to the Windows
+    # OS not being case-sensitive. This avoids later running
+    # into the error that the file did exist if it existed
+    # with a different upper/lower-case.
+    kwargs = {}
+    if platform.system().lower() == "windows":
+        kwargs["flags"] = re.IGNORECASE
+
+    # Get highest version among existing matching files
+    output_filename = None
+    version = None
+    for filename in sorted(filenames):
+        match = re.match(file_template, filename, **kwargs)
+        if match:
+            file_version = int(match.group(1))
+            if version is None or file_version >= version:
+                version = file_version
+                output_filename = filename
+    return output_filename, version
+
+
+def last_workfile(
+    workdir, file_template, fill_data, extensions, full_path=False
+):
+    """Return last workfile filename.
+
+    Returns file with version 1 if there is not workfile yet.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+        full_path(bool): Full path to file is returned if set to True.
+
+    Returns:
+        str: Last or first workfile as filename of full path to filename.
+    """
+    filename, version = last_workfile_with_version(
+        workdir, file_template, fill_data, extensions
+    )
+    if filename is None:
+        data = copy.deepcopy(fill_data)
+        data["version"] = 1
+        data.pop("comment", None)
+        if not data.get("ext"):
+            data["ext"] = extensions[0]
+        filename = format_template_with_optional_keys(data, file_template)
+
+    if full_path:
+        return os.path.join(workdir, filename)
+    return filename

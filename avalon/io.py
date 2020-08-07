@@ -44,6 +44,19 @@ self._database = None
 self._is_installed = False
 
 log = logging.getLogger(__name__)
+PY2 = sys.version_info[0] == 2
+
+
+def extract_port_from_url(url):
+    if PY2:
+        from urlparse import urlparse
+    else:
+        from urllib.parse import urlparse
+    parsed_url = urlparse(url)
+    if parsed_url.scheme is None:
+        _url = "mongodb://{}".format(url)
+        parsed_url = urlparse(_url)
+    return parsed_url.port
 
 
 def install():
@@ -55,8 +68,17 @@ def install():
     Session.update(_from_environment())
 
     timeout = int(Session["AVALON_TIMEOUT"])
-    self._mongo_client = pymongo.MongoClient(
-        Session["AVALON_MONGO"], serverSelectionTimeoutMS=timeout)
+    mongo_url = Session["AVALON_MONGO"]
+    kwargs = {
+        "host": mongo_url,
+        "serverSelectionTimeoutMS": timeout
+    }
+
+    port = extract_port_from_url(mongo_url)
+    if port is not None:
+        kwargs["port"] = int(port)
+
+    self._mongo_client = pymongo.MongoClient(**kwargs)
 
     for retry in range(3):
         try:
@@ -137,6 +159,14 @@ def _from_environment():
 
             # Optional path to scenes directory (see Work Files API)
             ("AVALON_SCENEDIR", None),
+
+            # Optional hierarchy for the current Asset. This can be referenced
+            # as `{hierarchy}` in your file templates.
+            # This will be (re-)computed when you switch the context to another
+            # asset. It is computed by checking asset['data']['parents'] and
+            # joining those together with `os.path.sep`.
+            # E.g.: ['ep101', 'scn0010'] -> 'ep101/scn0010'.
+            ("AVALON_HIERARCHY", None),
 
             # Name of current Config
             # TODO(marcus): Establish a suitable default config
@@ -225,17 +255,19 @@ def requires_install(f):
 
 def auto_reconnect(f):
     """Handling auto reconnect in 3 retry times"""
+    retry_times = 3
+
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        for retry in range(3):
+        for retry in range(1, retry_times + 1):
             try:
                 return f(*args, **kwargs)
             except pymongo.errors.AutoReconnect:
                 log.error("Reconnecting..")
-                time.sleep(0.1)
-        else:
-            raise
-
+                if retry < retry_times:
+                    time.sleep(0.1)
+                else:
+                    raise
     return decorated
 
 
@@ -390,6 +422,12 @@ def distinct(*args, **kwargs):
 
 
 @auto_reconnect
+def aggregate(*args, **kwargs):
+    return self._database[Session["AVALON_PROJECT"]].aggregate(
+        *args, **kwargs)
+
+
+@auto_reconnect
 def drop(*args, **kwargs):
     return self._database[Session["AVALON_PROJECT"]].drop(
         *args, **kwargs)
@@ -411,6 +449,10 @@ def parenthood(document):
 
         if document is None:
             break
+
+        if document.get("type") == "master_version":
+            _document = self.find_one({"_id": document["version_id"]})
+            document["data"] = _document["data"]
 
         parents.append(document)
 

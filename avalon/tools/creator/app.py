@@ -138,6 +138,7 @@ class Window(QtWidgets.QDialog):
         container = QtWidgets.QWidget()
 
         listing = QtWidgets.QListWidget()
+        listing.setSortingEnabled(True)
         asset = QtWidgets.QLineEdit()
         name = SubsetNameLineEdit()
         result = QtWidgets.QLineEdit()
@@ -192,12 +193,13 @@ class Window(QtWidgets.QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
 
         create_btn = QtWidgets.QPushButton("Create")
-        error_msg = QtWidgets.QLabel()
-        error_msg.setFixedHeight(20)
+        # Need to store error_msg to prevent garbage collection.
+        self.error_msg = QtWidgets.QLabel()
+        self.error_msg.setFixedHeight(20)
 
         layout = QtWidgets.QVBoxLayout(footer)
         layout.addWidget(create_btn)
-        layout.addWidget(error_msg)
+        layout.addWidget(self.error_msg)
         layout.setContentsMargins(0, 0, 0, 0)
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -212,7 +214,7 @@ class Window(QtWidgets.QDialog):
             "Subset Menu": subset_menu,
             "Result": result,
             "Asset": asset,
-            "Error Message": error_msg,
+            "Error Message": self.error_msg,
         }
 
         for _name, widget in self.data.items():
@@ -424,6 +426,8 @@ class Window(QtWidgets.QDialog):
         asset = self.data["Asset"]
         asset.setText(api.Session["AVALON_ASSET"])
 
+        listing.clear()
+
         has_families = False
 
         creators = api.discover(api.Creator)
@@ -609,9 +613,11 @@ def show(debug=False, parent=None):
 
     """
 
-    if module.window:
+    try:
         module.window.close()
         del(module.window)
+    except (AttributeError, RuntimeError):
+        pass
 
     if debug:
         from avalon import mock
@@ -638,3 +644,7 @@ def show(debug=False, parent=None):
         window.show()
 
         module.window = window
+
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()

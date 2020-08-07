@@ -90,9 +90,14 @@ class AssetWidget(QtWidgets.QWidget):
         self._refresh_model()
 
     def get_active_asset(self):
-        """Return the asset id the current asset."""
+        """Return the asset item of the current selection."""
         current = self.view.currentIndex()
         return current.data(self.model.ItemRole)
+
+    def get_active_asset_document(self):
+        """Return the asset document of the current selection."""
+        current = self.view.currentIndex()
+        return current.data(self.model.DocumentRole)
 
     def get_active_index(self):
         return self.view.currentIndex()
@@ -126,13 +131,12 @@ class AssetWidget(QtWidgets.QWidget):
         the more asset, only the first found will be selected.
 
         """
-        # TODO: Instead of individual selection optimize for many assets
 
         if not isinstance(assets, (tuple, list)):
             assets = [assets]
 
         # convert to list - tuple cant be modified
-        assets = list(assets)
+        assets = set(assets)
 
         # Clear selection
         selection_model = self.view.selectionModel()
@@ -152,10 +156,9 @@ class AssetWidget(QtWidgets.QWidget):
                 continue
 
             # Remove processed asset
-            assets.pop(assets.index(value))
+            assets.discard(value)
 
             selection_model.select(index, mode)
-
             if expand:
                 # Expand parent index
                 self.view.expand(self.proxy.parent(index))
@@ -282,10 +285,13 @@ class OptionalActionWidget(QtWidgets.QWidget):
         layout.addWidget(option)
 
         body.setMouseTracking(True)
+        label.setMouseTracking(True)
+        option.setMouseTracking(True)
         self.setMouseTracking(True)
         self.setFixedHeight(32)
 
         self.icon = icon
+        self.label = label
         self.option = option
         self.body = body
 
@@ -298,7 +304,7 @@ class OptionalActionWidget(QtWidgets.QWidget):
         self.icon.setPixmap(pixmap)
 
 
-class OptionBox(QtWidgets.QWidget):
+class OptionBox(QtWidgets.QLabel):
     """Option box widget class for `OptionalActionWidget`"""
 
     clicked = QtCore.Signal()
@@ -306,19 +312,12 @@ class OptionBox(QtWidgets.QWidget):
     def __init__(self, parent):
         super(OptionBox, self).__init__(parent)
 
-        label = QtWidgets.QLabel()
-
-        layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addSpacing(8)
-        layout.addWidget(label)
+        self.setAlignment(QtCore.Qt.AlignCenter)
 
         icon = qtawesome.icon("fa.sticky-note-o", color="#c6c6c6")
         pixmap = icon.pixmap(18, 18)
-        label.setPixmap(pixmap)
+        self.setPixmap(pixmap)
 
-        label.setMouseTracking(True)
-        self.setMouseTracking(True)
         self.setStyleSheet("background: transparent;")
 
     def is_hovered(self, global_pos):

@@ -209,7 +209,7 @@ def ls():
             yield container
 
 
-def install(config):
+def install():
     """Install Nuke-specific functionality of avalon-core.
 
     This is where you install menus and register families, data
@@ -226,22 +226,8 @@ def install(config):
 
     pyblish.register_host("nuke")
 
-    log.info("config.nuke installed")
 
-
-def get_main_window():
-    """Acquire Nuke's main window"""
-    if self._parent is None:
-        top_widgets = QtWidgets.QApplication.topLevelWidgets()
-        name = "Foundry::UI::DockMainWindow"
-        main_window = next(widget for widget in top_widgets if
-                           widget.inherits("QMainWindow") and
-                           widget.metaObject().className() == name)
-        self._parent = main_window
-    return self._parent
-
-
-def uninstall(config):
+def uninstall():
     """Uninstall all that was previously installed
 
     This is where you undo everything that was done in `install()`.
@@ -267,9 +253,17 @@ def _install_menu():
         workfiles,
         loader,
         sceneinventory,
-        contextmanager
+        libraryloader
     )
+    from ..vendor.Qt import QtWidgets
 
+    main_window = None
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        if widget.isWindow():
+            if widget.parentWidget() is None:
+                if widget.windowTitle() != '':
+                    main_window = widget
+                    break
     # Create menu
     menubar = nuke.menu("Nuke")
     menu = menubar.addMenu(api.Session["AVALON_LABEL"])
@@ -277,21 +271,8 @@ def _install_menu():
     label = "{0}, {1}".format(
         api.Session["AVALON_ASSET"], api.Session["AVALON_TASK"]
     )
-    context_menu = menu.addMenu(label)
-    context_menu.addCommand("Set Context",
-                            lambda: contextmanager.show(
-                                parent=get_main_window())
-                            )
-    menu.addSeparator()
-    menu.addCommand("Create...",
-                    lambda: creator.show(parent=get_main_window()))
-    menu.addCommand("Load...",
-                    lambda: loader.show(parent=get_main_window(),
-                                        use_context=True))
-    menu.addCommand("Publish...",
-                    lambda: publish.show(parent=get_main_window()))
-    menu.addCommand("Manage...",
-                    lambda: sceneinventory.show(parent=get_main_window()))
+    context_action = menu.addCommand(label)
+    context_action.setEnabled(False)
 
     menu.addSeparator()
     menu.addCommand("Work Files...",
@@ -299,6 +280,19 @@ def _install_menu():
                         os.environ["AVALON_WORKDIR"],
                         parent=get_main_window())
                     )
+                    )
+    menu.addSeparator()
+    menu.addCommand("Create...", creator.show)
+    menu.addCommand(
+        "Load...", command=lambda *args:
+        loader.show(use_context=True)
+    )
+    menu.addCommand(
+        "Publish...",
+        lambda *args: publish.show(parent=main_window)
+    )
+    menu.addCommand("Manage...", sceneinventory.show)
+    menu.addCommand("Library...", libraryloader.show)
 
     menu.addSeparator()
     menu.addCommand("Reset Frame Range", command.reset_frame_range)
