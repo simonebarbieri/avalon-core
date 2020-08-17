@@ -151,7 +151,12 @@ def containerise(name, namespace, nodes, context, loader=None, suffix="_CON"):
     """
     # 1 - create directory for container
     root = "/Game"
-    container_name = "{}{}".format(name, suffix)
+    asset = context.get('asset')
+    asset_name = asset.get('name')
+    if asset_name:
+        container_name = "{}_{}{}".format(asset_name, name, suffix)
+    else:
+        container_name = "{}{}".format(name, suffix)
     new_name = move_assets_to_path(root, container_name, nodes)
 
     # 2 - create Asset Container there
@@ -165,8 +170,11 @@ def containerise(name, namespace, nodes, context, loader=None, suffix="_CON"):
         "id": AVALON_CONTAINER_ID,
         "name": new_name,
         "namespace": namespace,
+        "asset_name": asset_name,
         "loader": str(loader),
         "representation": context["representation"]["_id"],
+        "parent": context["representation"]["parent"],
+        "family": context["representation"]["context"]["family"]
     }
     # 3 - imprint data
     imprint("{}/{}".format(path, container_name), data)
