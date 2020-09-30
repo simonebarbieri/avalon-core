@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+"""Utility functions used for Avalon - Harmony integration."""
 import subprocess
 import threading
 import os
@@ -16,7 +18,7 @@ import time
 from .server import Server
 from ..vendor.Qt import QtWidgets
 from ..tools import workfiles
-from ..toonboom import setup_startup_scripts
+from ..toonboom import setup_startup_scripts, check_libs
 
 self = sys.modules[__name__]
 self.server = None
@@ -33,6 +35,7 @@ self.log.setLevel(logging.DEBUG)
 
 class _ZipFile(zipfile.ZipFile):
     """Extended check for windows invalid characters."""
+
     # this is extending default zipfile table for few invalid characters
     # that can come from Mac
     _windows_illegal_characters = ":<>|\"?*\r\n\x00"
@@ -52,22 +55,27 @@ def main_thread_listen():
 
 
 def launch(application_path):
-    """Setup for Harmony launch.
+    """Set Harmony for launch.
 
     Launches Harmony and the server, then starts listening on the main thread
     for callbacks from the server. This is to have Qt applications run in the
     main thread.
+
+    Args:
+        application_path (str): Path to Harmony.
+
     """
     from avalon import api, harmony
 
     api.install(harmony)
 
-    self.port = random.randrange(5000, 6000)
+    self.port = random.randrange(49152, 65535)
     os.environ["AVALON_HARMONY_PORT"] = str(self.port)
     self.application_path = application_path
 
     # Launch Harmony.
     setup_startup_scripts()
+    check_libs()
 
     if os.environ.get("AVALON_HARMONY_WORKFILES_ON_LAUNCH", False):
         workfiles.show(save=False)
@@ -91,7 +99,7 @@ def get_local_harmony_path(filepath):
 
 def launch_zip_file(filepath):
     """Launch a Harmony application instance with the provided zip file."""
-    print("Localizing {}".format(filepath))
+    print(f"Localizing {filepath}")
 
     temp_path = get_local_harmony_path(filepath)
     scene_path = os.path.join(
@@ -101,7 +109,11 @@ def launch_zip_file(filepath):
     if os.path.exists(scene_path):
         # Check remote scene is newer than local.
         if os.path.getmtime(scene_path) < os.path.getmtime(filepath):
-            shutil.rmtree(temp_path)
+            try:
+                shutil.rmtree(temp_path)
+            except Exception as e:
+                self.log.error(e)
+                raise Exception("Cannot delete working folder") from e
             unzip = True
     else:
         unzip = True
@@ -170,7 +182,6 @@ def on_file_changed(path, threaded=True):
 
     This method is called when the `.xstage` file is changed.
     """
-
     self.log.debug("File changed: " + path)
 
     if self.workfile_path is None:
@@ -187,11 +198,12 @@ def on_file_changed(path, threaded=True):
 
 
 def zip_and_move(source, destination):
-    """Zip a directory and move to `destination`
+    """Zip a directory and move to `destination`.
 
     Args:
-        - source (str): Directory to zip and move to destination.
-        - destination (str): Destination file path to zip file.
+        source (str): Directory to zip and move to destination.
+        destination (str): Destination file path to zip file.
+
     """
     os.chdir(os.path.dirname(source))
     shutil.make_archive(os.path.basename(source), "zip", source)
@@ -199,7 +211,7 @@ def zip_and_move(source, destination):
         if zr.testzip() is not None:
             raise Exception("File archive is corrupted.")
     shutil.move(os.path.basename(source) + ".zip", destination)
-    self.log.debug("Saved \"{}\" to \"{}\"".format(source, destination))
+    self.log.debug(f"Saved '{source}' to '{destination}'")
 
 
 def show(module_name):
@@ -210,8 +222,8 @@ def show(module_name):
 
     Args:
         module_name (str): Name of module to call "show" on.
-    """
 
+    """
     # Requests often get doubled up when showing tools, so we wait a second for
     # requests to be received properly.
     time.sleep(1)
@@ -237,6 +249,12 @@ def show(module_name):
 
 
 def get_scene_data():
+    """Get scene data from metadata.
+
+    Returns:
+        dict: Of scene data.
+
+    """
     func = """function func(args)
     {
         var metadata = scene.metadata("avalon");
@@ -259,7 +277,12 @@ def get_scene_data():
 
 
 def set_scene_data(data):
-    # Write scene data.
+    """Write scene data to metadata.
+
+    Args:
+        data (dict): Data to write.
+
+    """
     func = """function func(args)
     {
         scene.setMetadata({
@@ -285,13 +308,14 @@ def read(node_id):
         dict
     """
     scene_data = get_scene_data()
-    if node_id in get_scene_data():
+    if node_id in scene_data:
         return scene_data[node_id]
 
     return {}
 
 
 def remove(node_id):
+    """Remove node data from scene."""
     data = get_scene_data()
     del data[node_id]
     set_scene_data(data)
@@ -327,7 +351,6 @@ def imprint(node_id, data, remove=False):
 @contextlib.contextmanager
 def maintained_selection():
     """Maintain selection during context."""
-
     func = """function get_selection_nodes()
     {
         var selection_length = selection.numberOfNodesSelected();
@@ -409,12 +432,13 @@ def maintained_nodes_state(nodes):
 
 
 def save_scene():
-    """Saves the Harmony scene safely.
+    """Save the Harmony scene safely.
 
     The built-in (to Avalon) background zip and moving of the Harmony scene
     folder, interfers with server/client communication by sending two requests
     at the same time. This only happens when sending "scene.saveAll()". This
     method prevents this double request and safely saves the scene.
+
     """
     # Need to turn off the backgound watcher else the communication with
     # the server gets spammed with two requests at the same time.
@@ -448,7 +472,6 @@ def save_scene():
 
 def save_scene_as(filepath):
     """Save Harmony scene as `filepath`."""
-
     scene_dir = os.path.dirname(filepath)
     destination = os.path.join(
         os.path.dirname(self.workfile_path),
@@ -456,7 +479,11 @@ def save_scene_as(filepath):
     )
 
     if os.path.exists(scene_dir):
-        shutil.rmtree(scene_dir)
+        try:
+            shutil.rmtree(scene_dir)
+        except Exception as e:
+            self.log.error(f"Cannot remove {scene_dir}")
+            raise Exception(f"Cannot remove {scene_dir}") from e
 
     send(
         {"function": "scene.saveAs", "args": [scene_dir]}
@@ -479,6 +506,16 @@ def save_scene_as(filepath):
 
 
 def find_node_by_name(name, node_type):
+    """Find node by its name.
+
+    Args:
+        name (str): Name of the Node.
+        node_typ (str): Type of the Node.
+
+    Returns:
+        str: FQ Node name.
+
+    """
     nodes = send(
         {"function": "node.getNodes", "args": [[node_type]]}
     )["result"]

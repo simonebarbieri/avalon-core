@@ -17,7 +17,7 @@ class Server(object):
 
     Attributes:
         connection (Socket): connection holding object.
-        recieved (str): recieved data buffer.any(iterable)
+        received (str): received data buffer.any(iterable)
         port (int): port number.
         message_id (int): index of last message going out.
         queue (dict): dictionary holding queue of incoming messages.
@@ -39,7 +39,7 @@ class Server(object):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Bind the socket to the port
-        server_address = ("localhost", port)
+        server_address = ("127.0.0.1", port)
         self.log.debug("Starting up on {}".format(server_address))
         self.socket.bind(server_address)
 
@@ -61,7 +61,7 @@ class Server(object):
         """
         timestamp = datetime.now().strftime("%H:%M:%S.%f")
         self.log.debug(
-            "Processing request [{}]: {}".format(timestamp, request))
+            f"Processing request [{timestamp}]: {request}")
 
         try:
             module = importlib.import_module(request["module"])
@@ -87,7 +87,7 @@ class Server(object):
             # Receive the data in small chunks and retransmit it
             request = None
             while True:
-                time.sleep(0.1)
+                time.sleep(1)
                 if time.time() > current_time + 30:
                     self.log.error("Connection timeout.")
                     break
@@ -103,7 +103,7 @@ class Server(object):
 
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")
                 self.log.debug(
-                    "Received [{}]: {}".format(timestamp, self.received))
+                    f"Received [{timestamp}]: {self.received}")
 
                 try:
                     request = json.loads(self.received)
@@ -116,7 +116,7 @@ class Server(object):
 
             self.received = ""
             timestamp = datetime.now().strftime("%H:%M:%S.%f")
-            self.log.debug("Request [{}]: {}".format(timestamp, request))
+            self.log.debug(f"Request [{timestamp}]: {request}")
             if "message_id" in request.keys():
                 self.log.debug("--- storing request as {}".format(
                     request["message_id"]))
@@ -137,7 +137,7 @@ class Server(object):
                         self.log.debug("{} is no longer in queue".format(
                             request["message_id"]))
             else:
-                self.log.debug("Recieved data was just reply.")
+                self.log.debug("received data was just reply.")
 
     def start(self):
         """Entry method for server.
@@ -148,7 +148,7 @@ class Server(object):
         self.log.debug("Waiting for a connection.")
         self.connection, client_address = self.socket.accept()
 
-        self.log.debug("Connection from: {}".format(client_address))
+        self.log.debug(f"Connection from: {client_address}")
 
         self.receive()
 
@@ -178,7 +178,7 @@ class Server(object):
 
         timestamp = datetime.now().strftime("%H:%M:%S.%f")
         self.log.debug(
-            "Sending [{}][{}]: {}".format(self.message_id, timestamp, message))
+            f"Sending [{self.message_id}][{timestamp}]: {message}")
         self.connection.sendall(message.encode("utf-8"))
         self.message_id += 1
 
@@ -217,7 +217,7 @@ class Server(object):
                 del self.queue[request["message_id"]]
                 break
             except KeyError:
-                # response not in recieved queue yey
+                # response not in received queue yey
                 pass
             try:
                 result = json.loads(self.received)

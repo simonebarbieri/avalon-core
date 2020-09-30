@@ -85,9 +85,9 @@ harmony.save_scene()
 <details>
   <summary>Click to expand for details on scene save.</summary>
 
-  Because Avalon tools does not deal well with folders for a single entity like a Harmony scene, this integration has implemented to use zip files to encapsulate the Harmony scene folders. This is done with a background watcher for when the `.xstage` file is changed, at which point a request is sent to zip up the Harmony scene folder and move from the local to remote storage.
-
-  This does come with an edge case where if you send `scene.saveAll` to Harmony, two request will be sent back; the reply to `scene.saveAll` and the request to zip and move the scene folder. To prevent this a boolean has been implemented to the background watcher; `app.avalon_on_file_changed`, enable and disable to zip and move.
+  Because Avalon tools does not deal well with folders for a single entity like a Harmony scene, this integration has implemented to use zip files to encapsulate the Harmony scene folders. Saving scene in Harmony via menu or CTRL+S will not result in producing zip file, only saving it from Workfiles will. This is because
+  zipping process can take some time in which we cannot block user from saving again. If xstage file is changed during zipping process it will produce corrupted zip
+  archive.
 </details>
 
 ### Plugin Examples

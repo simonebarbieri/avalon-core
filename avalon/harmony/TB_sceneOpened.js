@@ -1,108 +1,136 @@
-function Client()
-{
+/*
+Avalon Harmony Integration - Client
+-----------------------------------
+
+This script implements client communication with Avalon server to bridge
+gap between Python and QtScript.
+
+*/
+// include openharmony path
+var LD_OPENHARMONY_PATH = System.getenv('LIB_OPENHARMONY_PATH');
+include(LD_OPENHARMONY_PATH + "/openHarmony.js");
+this.__proto__["$"] = $;
+
+// Patch string format function if missing.
+if (!String.prototype.format) {
+  String.prototype.format = function() {
+    var args = arguments;
+    return this.replace(/{(\d+)}/g, function(match, number) {
+      return typeof args[number] != 'undefined'
+        ? args[number]
+        : match
+      ;
+    });
+  };
+}
+
+
+function Client() {
   var self = this;
   self.socket = new QTcpSocket(this);
   self.received = "";
+  self._lock = false;
 
-  self.log_debug = function(data)
-  {
-      message = typeof(data.message) != "undefined" ? data.message : data;
-      MessageLog.trace("(DEBUG): " + message.toString());
+  self.prettifyJson = function(json) {
+    var jsonString = JSON.stringify(json);
+    return JSON.stringify(JSON.parse(jsonString), null, 2);
   };
 
-
-  self.log_info = function(data)
-  {
+  self.log_debug = function(data) {
       message = typeof(data.message) != "undefined" ? data.message : data;
-      MessageLog.trace("(INFO): " + message.toString());
+      MessageLog.trace("(DEBUG): {0}".format(message.toString()));
   };
 
-
-  self.log_warning = function(data)
-  {
+  self.log_info = function(data) {
       message = typeof(data.message) != "undefined" ? data.message : data;
-      MessageLog.trace("(WARNING): " + message.toString());
+      MessageLog.trace("(INFO): {0}".format(message.toString()));
   };
 
-
-  self.log_error = function(data)
-  {
+  self.log_warning = function(data) {
       message = typeof(data.message) != "undefined" ? data.message : data;
-      MessageLog.trace("(ERROR): " + message.toString());
+      MessageLog.trace("(WARNING): {0}".format(message.toString()));
   };
 
-  self.show_message = function(msg)
-  {
+  self.log_error = function(data) {
+      message = typeof(data.message) != "undefined" ? data.message : data;
+      MessageLog.trace("(ERROR): {0}".format(message.toString()));
+  };
+
+  self.show_message = function(msg) {
     MessageBox.information(msg);
   };
 
-  self.process_request = function(request)
-  {
-    self.log_debug("Processing: " + JSON.stringify(request));
+  self.process_request = function(request) {
+    var mid = request["message_id"]
+    self.log_debug("[{0}] - Processing: {1}".format(mid, self.prettifyJson(request)));
     var result = null;
 
-    if (request["function"] != null)
-    {
-      try
-      {
+    if (request["function"] != null) {
+      try {
         var func = eval.call( null, request["function"]);
-
-        if (request.args == null)
-        {
+        if (request.args === null) {
           result = func();
-        }else
-        {
+        } else {
           result = func(request.args);
         }
-      }
-
-      catch (error)
-      {
-        result = "Error processing request.\nRequest:\n" + JSON.stringify(request) + "\nError:\n" + error;
+      } catch (error) {
+        result = "Error processing request.\nRequest:\n{0}\nError:\n{1}".format(self.prettifyJson(request), error);
       }
     }
-
     return result;
   };
 
-  self.on_ready_read = function()
-  {
-    self.log_debug("Receiving data...");
+  self.on_ready_read = function() {
+    self.log_debug("--- Receiving data ...");
+    self.log_debug("<<< Locking ...");
+    self._lock = true;
     data = self.socket.readAll();
 
-    if (data.size() != 0)
-    {
-      for ( var i = 0; i < data.size(); ++i)
-      {
+    if (data.size() != 0) {
+      for ( var i = 0; i < data.size(); ++i) {
         self.received = self.received.concat(String.fromCharCode(data.at(i)));
       }
     }
 
-    self.log_debug("Received: " + self.received);
+    self.log_debug("--- Received: {0}".format(self.received));
 
     request = JSON.parse(self.received);
-    self.log_debug("Request: " + JSON.stringify(request));
+    var mid = request["message_id"];
+    self.log_debug("[{0}] - Request: {1}".format(mid, JSON.stringify(request)));
 
     request.result = self.process_request(request);
 
-    if (!request.reply)
-    {
+    if (!request.reply) {
       request.reply = true;
       self._send(JSON.stringify(request));
     }
 
     self.received = "";
+    self.log_debug(">>> Unlocking ...");
+    self._lock = false;
   };
 
-  self.on_connected = function()
-  {
-    self.log_debug("Connected to server.");
+  self.on_connected = function() {
+    self.log_debug("Connected to server ...");
     self.socket.readyRead.connect(self.on_ready_read);
+    var app = QCoreApplication.instance();
+    setTimeout(self.emit_launched, 1000);
+
   };
 
-  self._send = function(message)
-  {
-    self.log_debug("Sending: " + message);
+  self.emit_launched = function() {
+    app.avalon_client.send(
+      {
+        "module": "avalon.api",
+        "method": "emit",
+        "args": ["application.launched"]
+      },
+      false
+    );
+  }
+
+  self._send = function(message) {
+    self.log_debug("Sending: {0}".format(message));
 
     var data = new QByteArray();
     outstr = new QDataStream(data, QIODevice.WriteOnly);
@@ -114,19 +142,28 @@ function Client()
     self.socket.write(codec.fromUnicode(message));
   };
 
-  self.send = function(request, wait)
-  {
+  self.waitForLock = function() {
+    if (self._lock === false) {
+      self.log_debug(">>> Unlocking ...");
+      return;
+    } else {
+      setTimeout(self.waitForLock, 300);
+    }
+  };
+
+  self.send = function(request, wait) {
+    if (self._lock !== false ) {
+      self.log_debug("Still locked, waiting for unlock ...");
+      self.waitForLock();
+    }
+
     self._send(JSON.stringify(request));
 
-    while (wait)
-    {
-      try
-      {
+    while (wait) {
+      try {
         JSON.parse(self.received);
         break;
-      }
-      catch(err)
-      {
+      } catch(err) {
         self.socket.waitForReadyRead(5000);
       }
     }
@@ -134,13 +171,11 @@ function Client()
     self.received = "";
   };
 
-  self.on_disconnected = function()
-  {
+  self.on_disconnected = function() {
     self.socket.close();
   };
 
-  self.disconnect = function()
-  {
+  self.disconnect = function() {
     self.socket.close();
   };
 
@@ -148,8 +183,7 @@ function Client()
   self.socket.disconnected.connect(self.on_disconnected);
 }
 
-function start()
-{
+function start() {
   var self = this;
   var host = "127.0.0.1";
   var port = parseInt(System.getenv("AVALON_HARMONY_PORT"));
@@ -157,8 +191,7 @@ function start()
   // Attach the client to the QApplication to preserve.
   var app = QCoreApplication.instance();
 
-  if (app.avalon_client == null)
-  {
+  if (app.avalon_client == null) {
     app.avalon_client = new Client();
     app.avalon_client.socket.connectToHost(host, port);
   }
@@ -166,8 +199,7 @@ function start()
 	var menu_bar = QApplication.activeWindow().menuBar();
 	var actions = menu_bar.actions();
 	app.avalon_menu = null;
-	for (var i = 0 ; i < actions.length; i++)
-	{
+	for (var i = 0 ; i < actions.length; i++) {
     if (actions[i].text == "Avalon")
     {
       app.avalon_menu = true;
@@ -175,13 +207,11 @@ function start()
   }
 
   var menu = null;
-	if (app.avalon_menu == null)
-	{
+	if (app.avalon_menu == null) {
     var menu = menu_bar.addMenu("Avalon");
   }
 
-  self.on_creator = function()
-  {
+  self.on_creator = function() {
     app.avalon_client.send(
       {
         "module": "avalon.harmony.lib",
@@ -191,8 +221,7 @@ function start()
       false
     );
   };
-	if (app.avalon_menu == null)
-	{
+	if (app.avalon_menu == null) {
     var action = menu.addAction("Create...");
     action.triggered.connect(self.on_creator);
 	}
@@ -208,14 +237,12 @@ function start()
       false
     );
   };
-	if (app.avalon_menu == null)
-	{
+	if (app.avalon_menu == null) {
     action = menu.addAction("Workfiles");
     action.triggered.connect(self.on_workfiles);
 	}
 
-  self.on_load = function()
-  {
+  self.on_load = function() {
     app.avalon_client.send(
         {
           "module": "avalon.harmony.lib",
@@ -225,14 +252,12 @@ function start()
         false
     );
   };
-	if (app.avalon_menu == null)
-	{
+	if (app.avalon_menu == null) {
     action = menu.addAction("Load...");
     action.triggered.connect(self.on_load);
 	}
 
-  self.on_publish = function()
-  {
+  self.on_publish = function() {
     app.avalon_client.send(
         {
           "module": "avalon.harmony.lib",
@@ -242,14 +267,12 @@ function start()
         false
     );
   };
-	if (app.avalon_menu == null)
-	{
+	if (app.avalon_menu == null) {
     action = menu.addAction("Publish...");
     action.triggered.connect(self.on_publish);
 	}
 
-  self.on_manage = function()
-  {
+  self.on_manage = function() {
     app.avalon_client.send(
         {
           "module": "avalon.harmony.lib",
@@ -259,8 +282,7 @@ function start()
         false
     );
   };
-	if (app.avalon_menu == null)
-	{
+	if (app.avalon_menu == null) {
     action = menu.addAction("Manage...");
     action.triggered.connect(self.on_manage);
 	}
@@ -294,14 +316,7 @@ function start()
 	app.watcher.fileChanged.connect(app.on_file_changed);
   app.avalon_on_file_changed = true;
   */
-  app.avalon_client.send(
-    {
-      "module": "avalon.api",
-      "method": "emit",
-      "args": ["application.launched"]
-    },
-    false
-  );
+
 }
 
 function TB_sceneOpened()

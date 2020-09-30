@@ -24,14 +24,14 @@ def ls():
     Yields:
         dict: container
     """
-    objects = lib.get_scene_data()
+    objects = lib.get_scene_data() or {}
     for _, data in objects.items():
         # Skip non-tagged objects.
         if not data:
             continue
 
         # Filter to only containers.
-        if "container" not in data["id"]:
+        if "container" not in data.get("id"):
             continue
 
         yield data
@@ -161,7 +161,7 @@ def containerise(name,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"]),
         "nodes": nodes
-        }
+    }
 
     lib.imprint(node, data)
 
