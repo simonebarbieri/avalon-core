@@ -1,3 +1,5 @@
+import sys
+import traceback
 import datetime
 import logging
 import inspect
@@ -143,17 +145,11 @@ class SubsetWidget(loader_widgets.SubsetWidget):
                 continue
 
             elif item.get("isMerged"):
-                # TODO use `for` loop of index's rowCount
-                # - instead of `while` loop
-                idx = 0
-                while idx < 2000:
+                for idx in range(row_index.model().rowCount(row_index)):
                     child_index = row_index.child(idx, 0)
-                    if not child_index.isValid():
-                        break
                     item = child_index.data(self.model.ItemRole)
                     if item not in items:
                         items.append(item)
-                    idx += 1
             else:
                 if item not in items:
                     items.append(item)
@@ -323,6 +319,7 @@ class SubsetWidget(loader_widgets.SubsetWidget):
         # same representation available
 
         # Trigger
+        error_info = []
         for item in items:
             version_id = item["version_document"]["_id"]
             representation = self.dbcon.find_one({
@@ -346,7 +343,30 @@ class SubsetWidget(loader_widgets.SubsetWidget):
 
             except pipeline.IncompatibleLoaderError as exc:
                 self.echo(exc)
-                continue
+                error_info.append((
+                    "Incompatible Loader",
+                    None,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+            except Exception as exc:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                formatted_traceback = "".join(traceback.format_exception(
+                    exc_type, exc_value, exc_traceback
+                ))
+                error_info.append((
+                    str(exc),
+                    formatted_traceback,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+        if error_info:
+            box = loader_widgets.LoadErrorMessageBox(error_info)
+            box.show()
 
     def group_subsets(self, name, asset_id, items):
         field = "data.subsetGroup"

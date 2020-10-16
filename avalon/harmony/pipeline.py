@@ -49,18 +49,20 @@ class Creator(api.Creator):
     node_type = "COMPOSITE"
 
     def setup_node(self, node):
-        func = """function func(args)
+        sig = lib.signature()
+        func = """function %s(args)
         {
             node.setTextAttr(args[0], "COMPOSITE_MODE", 1, "Pass Through");
         }
-        func
-        """
+        %s
+        """ % (sig, sig)
         lib.send(
             {"function": func, "args": [node]}
         )
 
     def process(self):
-        func = """function func(args)
+        sig = lib.signature("get_node_names")
+        func = """function %s(args)
         {
             var nodes = node.getNodes([args[0]]);
             var node_names = [];
@@ -70,8 +72,8 @@ class Creator(api.Creator):
             }
             return node_names
         }
-        func
-        """
+        %s
+        """ % (sig, sig)
 
         existing_node_names = lib.send(
             {"function": func, "args": [self.node_type]}
@@ -87,7 +89,8 @@ class Creator(api.Creator):
                 message_box.exec_()
                 return False
 
-        func = """function func(args)
+        sig = lib.signature()
+        func = """function %s_func(args)
         {
             var result_node = node.add("Top", args[0], args[1], 0, 0, 0);
 
@@ -103,8 +106,8 @@ class Creator(api.Creator):
             }
             return result_node
         }
-        func
-        """
+        %s_func
+        """ % (sig, sig)
 
         with lib.maintained_selection() as selection:
             node = None
