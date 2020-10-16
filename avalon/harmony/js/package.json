@@ -1,0 +1,19 @@
+{
+  "name": "avalon-harmony",
+  "version": "1.0.0",
+  "description": "Avalon Harmony Host integration",
+  "main": "AvalonHarmony.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Avalon",
+    "Harmony",
+    "pipeline"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^7.11.0"
+  }
+}

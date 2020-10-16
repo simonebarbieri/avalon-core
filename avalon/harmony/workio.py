@@ -47,19 +47,11 @@ def save_file(filepath):
 
         lib.workfile_path = filepath
 
-        func = """function add_path(path)
-        {
-            var app = QCoreApplication.instance();
-            app.watcher.addPath(path);
-        }
-        add_path
-        """
-
         scene_path = os.path.join(
             temp_path, os.path.basename(temp_path) + ".xstage"
         )
         lib.server.send(
-            {"function": func, "args": [scene_path]}
+            {"function": "AvalonHarmony.addPathToWatcher", "args": scene_path}
         )
     else:
         os.environ["HARMONY_NEW_WORKFILE_PATH"] = filepath.replace("\\", "/")

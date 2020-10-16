@@ -11,19 +11,6 @@ var LD_OPENHARMONY_PATH = System.getenv('LIB_OPENHARMONY_PATH');
 include(LD_OPENHARMONY_PATH + "/openHarmony.js");
 this.__proto__["$"] = $;
 
-// Patch string format function if missing.
-if (!String.prototype.format) {
-  String.prototype.format = function() {
-    var args = arguments;
-    return this.replace(/{(\d+)}/g, function(match, number) {
-      return typeof args[number] != 'undefined'
-        ? args[number]
-        : match
-      ;
-    });
-  };
-}
-
 
 function Client() {
   var self = this;
@@ -95,7 +82,7 @@ function Client() {
 
     if (request["function"] != null) {
       try {
-        var _func = eval.call( null, request["function"]);
+        var _func = eval.call(null, request["function"]);
 
         if (request.args == null) {
           result = _func();

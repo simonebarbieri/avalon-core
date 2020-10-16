@@ -14,7 +14,6 @@ import contextlib
 import json
 import signal
 import time
-from uuid import uuid4
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
@@ -34,19 +33,6 @@ self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
 
 
-def signature(postfix="func") -> str:
-    """Return random ECMA6 compatible function name.
-
-    Args;
-        postfix (str): name to append to random string.
-
-    Returns:
-        str: random function name.
-
-    """
-    return "f{}_{}".format(str(uuid4()).replace("-", "_"), postfix)
-
-
 class _ZipFile(zipfile.ZipFile):
     """Extended check for windows invalid characters."""
 
@@ -60,10 +46,16 @@ class _ZipFile(zipfile.ZipFile):
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
+    """Queue function for execution in main thread.
+
+    Args:
+        func_to_call_from_main_thread (Callable): function
+    """
     self.callback_queue.put(func_to_call_from_main_thread)
 
 
 def main_thread_listen():
+    """Execute function from queue in main thread."""
     callback = self.callback_queue.get()
     callback()
 
@@ -121,7 +113,11 @@ def get_local_harmony_path(filepath):
 
 
 def launch_zip_file(filepath):
-    """Launch a Harmony application instance with the provided zip file."""
+    """Launch a Harmony application instance with the provided zip file.
+
+    Args:
+        filepath (str): Path to file.
+    """
     print(f"Localizing {filepath}")
 
     temp_path = get_local_harmony_path(filepath)
@@ -272,20 +268,11 @@ def show(module_name):
 
 
 def get_scene_data():
-    sig = signature("get_scene_data")
-    func = """function %s(args)
-    {
-        var metadata = scene.metadata("avalon");
-        if (metadata){
-            return JSON.parse(metadata.value);
-        }else {
-            return {};
-        }
-    }
-    %s
-    """ % (sig, sig)
     try:
-        return self.send({"function": func})["result"]
+        return self.send(
+            {
+                "function": "AvalonHarmony.getSceneData"
+            })["result"]
     except json.decoder.JSONDecodeError:
         # Means no sceen metadata has been made before.
         return {}
@@ -302,20 +289,11 @@ def set_scene_data(data):
 
     """
     # Write scene data.
-    sig = signature("set_scene_data")
-    func = """function %s(args)
-    {
-        scene.setMetadata({
-          "name"       : "avalon",
-          "type"       : "string",
-          "creator"    : "Avalon",
-          "version"    : "1.0",
-          "value"      : JSON.stringify(args[0])
-        });
-    }
-    %s
-    """ % (sig, sig)
-    self.send({"function": func, "args": [data]})
+    self.send(
+        {
+            "function": "AvalonHarmony.setSceneData",
+            "args": data
+        })
 
 
 def read(node_id):
@@ -371,37 +349,20 @@ def imprint(node_id, data, remove=False):
 @contextlib.contextmanager
 def maintained_selection():
     """Maintain selection during context."""
-    sig = signature("get_selection_nodes")
-    func = """function %s()
-    {
-        var selection_length = selection.numberOfNodesSelected();
-        var selected_nodes = [];
-        for (var i = 0 ; i < selection_length; i++)
-        {
-            selected_nodes.push(selection.selectedNode(i));
-        }
-        return selected_nodes
-    }
-    %s
-    """ % (sig, sig)
-    selected_nodes = self.send({"function": func})["result"]
 
-    sig = signature("select_nodes")
-    func = """function %s(node_paths)
-    {
-        selection.clearSelection();
-        for (var i = 0 ; i < node_paths.length; i++)
+    selected_nodes = self.send(
         {
-            selection.addNodeToSelection(node_paths[i]);
-        }
-    }
-    %s
-    """ % (sig, sig)
+            "function": "AvalonHarmony.getSelectedNodes"
+        })["result"]
+
     try:
         yield selected_nodes
     finally:
         selected_nodes = self.send(
-            {"function": func, "args": selected_nodes}
+            {
+                "function": "AvalonHarmony.selectNodes",
+                "args": selected_nodes
+            }
         )
 
 
@@ -414,44 +375,25 @@ def send(request):
 def maintained_nodes_state(nodes):
     """Maintain nodes states during context."""
     # Collect current state.
-    states = []
-    for node in nodes:
-        states.append(
-            self.send(
-                {"function": "node.getEnable", "args": [node]}
-            )["result"]
-        )
+    states = self.send(
+        {
+            "function": "AvalonHarmony.areEnabled", "args": nodes
+        })["result"]
 
     # Disable all nodes.
-    sig = signature("disable_all_nodes")
-    func = """function %s(nodes)
-    {
-        for (var i = 0 ; i < nodes.length; i++)
+    self.send(
         {
-            node.setEnable(nodes[i], false);
-        }
-    }
-    %s
-    """ % (sig, sig)
-    self.send({"function": func, "args": [nodes]})
-    sig = signature("restore")
-    # Restore state after yield.
-    func = """function %s(args)
-    {
-        var nodes = args[0];
-        var states = args[1];
-        for (var i = 0 ; i < nodes.length; i++)
-        {
-            node.setEnable(nodes[i], states[i]);
-        }
-    }
-    %s
-    """ % (sig, sig)
+            "function": "AvalonHarmony.disableNodes", "args": nodes
+        })
 
     try:
         yield
     finally:
-        self.send({"function": func, "args": [nodes, states]})
+        self.send(
+            {
+                "function": "AvalonHarmony.setState",
+                "args": [nodes, states]
+            })
 
 
 def save_scene():
@@ -465,34 +407,14 @@ def save_scene():
     """
     # Need to turn off the backgound watcher else the communication with
     # the server gets spammed with two requests at the same time.
-    sig = signature("save_scene")
-    func = """function %s()
-    {
-        var app = QCoreApplication.instance();
-        app.avalon_on_file_changed = false;
-        scene.saveAll();
-        return (
-            scene.currentProjectPath() + "/" +
-            scene.currentVersionName() + ".xstage"
-        );
-    }
-    %s
-    """ % (sig, sig)
-    scene_path = self.send({"function": func})["result"]
+    scene_path = self.send(
+        {"function": "AvalonHarmony.saveScene"})["result"]
 
     # Manually update the remote file.
     self.on_file_changed(scene_path, threaded=False)
 
     # Re-enable the background watcher.
-    sig = signature("enable_watcher")
-    func = """function %s()
-    {
-        var app = QCoreApplication.instance();
-        app.avalon_on_file_changed = true;
-    }
-    %s
-    """ % (sig, sig)
-    self.send({"function": func})
+    self.send({"function": "AvalonHarmony.enableFileWather"})
 
 
 def save_scene_as(filepath):
@@ -517,16 +439,9 @@ def save_scene_as(filepath):
     zip_and_move(scene_dir, destination)
 
     self.workfile_path = destination
-    sig = signature("add_path")
-    func = """function %s(path)
-    {
-        var app = QCoreApplication.instance();
-        app.watcher.addPath(path);
-    }
-    %s
-    """ % (sig, sig)
+
     send(
-        {"function": func, "args": [filepath]}
+        {"function": "AvalonHarmony.addPathToWatcher", "args": filepath}
     )
 
 
