@@ -349,19 +349,6 @@ function start() {
   };
 }
 
-function ensure_scene_settings(args)
-{
-  var app = QCoreApplication.instance();
-
-  app.avalon_client.send({
-      "module": "pype.harmony",
-      "method": "ensure_scene_settings",
-      "args": []
-    }, false);
-
-}
-
-
 function ensureSceneSettings() {
   var app = QCoreApplication.instance();
   app.avalon_client.send(
