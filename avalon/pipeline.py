@@ -57,7 +57,8 @@ HOST_WORKFILE_EXTENSIONS = {
     "hiero": [".hrox"],
     "photoshop": [".psd"],
     "premiere": [".prproj"],
-    "resolve": [".drp"]
+    "resolve": [".drp"],
+    "aftereffects": [".aep"]
 }
 
 
