@@ -7,7 +7,7 @@ import pyblish.api
 
 
 def install():
-    """Install Photoshop-specific functionality of avalon-core.
+    """Install After Effects-specific functionality of avalon-core.
 
     This function is called automatically on calling `api.install(photoshop)`.
     """
@@ -32,11 +32,28 @@ def ls():
         print("Not connected yet, ignoring")
         return
 
+    layers_meta = stub.get_metadata()
+    for layer in stub.get_layers():
+        data = stub.read(layer, layers_meta)
+
+        # Skip non-tagged layers.
+        if not data:
+            continue
+
+        # Filter to only containers.
+        if "container" not in data["id"]:
+            continue
+
+        # Append transient data
+        data["layer"] = layer
+
+        yield data
+
     return []  # TODO
 
 
 class Creator(api.Creator):
-    """Creator plugin to create instances in AfterEffects
+    """Creator plugin to create instances in After Effects
 
     A LayerSet is created to support any number of layers in an instance. If
     the selection is used, these layers will be added to the LayerSet.
@@ -46,11 +63,11 @@ class Creator(api.Creator):
         # Photoshop can have multiple LayerSets with the same name, which does
         # not work with Avalon.
         msg = "Instance with name \"{}\" already exists.".format(self.name)
-        stub = lib.stub()  # only after Photoshop is up
+        stub = lib.stub()  # only after After Effects is up
 
 def containerise(name,
                  namespace,
-                 layer,
+                 comp,
                  context,
                  loader=None,
                  suffix="_CON"):
@@ -62,7 +79,7 @@ def containerise(name,
     Arguments:
         name (str): Name of resulting assembly
         namespace (str): Namespace under which to host container
-        layer (Layer): Layer to containerise
+        comp (Comp): Composition to containerise
         context (dict): Asset information
         loader (str, optional): Name of loader used to produce this container.
         suffix (str, optional): Suffix of container, defaults to `_CON`.
@@ -70,4 +87,15 @@ def containerise(name,
     Returns:
         container (str): Name of container assembly
     """
-    pass
+    data = {
+        "schema": "avalon-core:container-2.0",
+        "id": pipeline.AVALON_CONTAINER_ID,
+        "name": name,
+        "namespace": namespace,
+        "loader": str(loader),
+        "representation": str(context["representation"]["_id"]),
+    }
+    stub = lib.stub()
+    stub.imprint(comp, data)
+
+    return comp

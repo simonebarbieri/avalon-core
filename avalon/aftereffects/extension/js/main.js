@@ -1,4 +1,5 @@
-/*jslint vars: true, plusplus: true, devel: true, nomen: true, regexp: true, indent: 4, maxerr: 50 */
+/*jslint vars: true, plusplus: true, devel: true, nomen: true, regexp: true,
+indent: 4, maxerr: 50 */
 /*global $, window, location, CSInterface, SystemPath, themeManager*/
 
 
@@ -8,14 +9,6 @@ log.warn("script start");
 
 WSRPC.DEBUG = false;
 WSRPC.TRACE = false;
-
-function runEvalScript(script) {
-    // because of asynchronous nature of functions in jsx
-    // this waits for response
-    return new Promise(function(resolve, reject){
-        csInterface.evalScript(script, resolve);
-    });
-}
 
 // get websocket server url from environment value
 async function startUp(url){
@@ -28,49 +21,89 @@ async function startUp(url){
 }
 
 function main(websocket_url){
-  // creates connection to 'websocket_url', registers routes      
-  var default_url = 'ws://localhost:8099/ws/';
+    // creates connection to 'websocket_url', registers routes      
+    var default_url = 'ws://localhost:8099/ws/';
 
-  if  (websocket_url == ''){
-       websocket_url = default_url;
-  }
-  RPC = new WSRPC(websocket_url, 5000); // spin connection
+    if  (websocket_url == ''){
+         websocket_url = default_url;
+    }
+    RPC = new WSRPC(websocket_url, 5000); // spin connection
 
-  RPC.connect();
+    RPC.connect();
 
-  log.warn("connected"); 
+    log.warn("connected"); 
+
+    RPC.addRoute('AfterEffects.open', function (data) {
+        log.warn('Server called client route "open":', data);
+        var escapedPath = EscapeStringForJSX(data.path);
+        return runEvalScript("fileOpen('" + escapedPath +"')")
+            .then(function(result){
+                log.warn("open: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.get_metadata', function (data) {
+        log.warn('Server called client route "get_metadata":', data);
+        return runEvalScript("getMetadata()")
+            .then(function(result){
+                log.warn("getMetadata: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.get_active_document_name', function (data) {
+        log.warn('Server called client route ' + 
+            '"get_active_document_name":', data);
+        return runEvalScript("getActiveDocumentName()")
+            .then(function(result){
+                log.warn("get_active_document_name: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.get_active_document_full_name', function (data){
+        log.warn('Server called client route ' + 
+            '"get_active_document_full_name":', data);
+        return runEvalScript("getActiveDocumentFullName()")
+            .then(function(result){
+                log.warn("get_active_document_full_name: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.get_items', function (data) {
+        log.warn('Server called client route "get_items":', data);
+        return runEvalScript("getItems(" + data.layers + ")")
+            .then(function(result){
+                log.warn("get_active_document_name: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.saveAs', function (data) {
+        log.warn('Server called client route "saveAs":', data);
+        var escapedPath = EscapeStringForJSX(data.image_path);
+        return runEvalScript("saveAs('" + escapedPath + "', " +
+                                     data.as_copy + ")")
+            .then(function(result){
+                log.warn("saveAs: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.save', function (data) {
+        log.warn('Server called client route "save":', data);
+        return runEvalScript("save()")
+            .then(function(result){
+                log.warn("save: " + result);
+                return result;
+            });
+    });
 }
-
-
-function EscapeStringForJSX(str){
-    // Replaces:
-    //  \ with \\
-    //  ' with \'
-    //  " with \"
-    // See: https://stackoverflow.com/a/3967927/5285364
-    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-}
-
-
 
 /** main entry point **/
 startUp("WEBSOCKET_URL");
-
-var escapedPath = EscapeStringForJSX("C:\Users\petrk\Documents\TestProject.aep");
-runEvalScript("fileOpen('" + escapedPath +"')")
-                  .then(function(result){
-                      log.warn("open: " + result);
-                      return result;
-                  });
-
-runEvalScript("getHeadline()")
-                  .then(function(result){
-                      log.warn("getHeadline: " + result);
-                      return result;
-                  });
-
-
-
 
 (function () {
     'use strict';
@@ -90,4 +123,21 @@ runEvalScript("getHeadline()")
     init();
 
 }());
+
+function EscapeStringForJSX(str){
+    // Replaces:
+    //  \ with \\
+    //  ' with \'
+    //  " with \"
+    // See: https://stackoverflow.com/a/3967927/5285364
+    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g,'\\"');
+}
+
+function runEvalScript(script) {
+    // because of asynchronous nature of functions in jsx
+    // this waits for response
+    return new Promise(function(resolve, reject){
+        csInterface.evalScript(script, resolve);
+    });
+}
     

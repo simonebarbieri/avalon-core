@@ -96,8 +96,7 @@ def launch(application):
 
     api.install(aftereffects)
     sys.excepthook = safe_excepthook
-    print("application:: {}".format(application))
-    self.log.debug("application:: {}".format(application))
+
     # Launch aftereffects and the websocket server.
     process = subprocess.Popen(application, stdout=subprocess.PIPE)
 
