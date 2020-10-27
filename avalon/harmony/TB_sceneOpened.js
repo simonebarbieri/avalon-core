@@ -143,24 +143,24 @@ function Client() {
      * @return {object} result of evaled function.
      */
     self.processRequest = function(request) {
-        var mid = request['message_id'];
-        if (typeof request['reply'] !== 'undefined') {
+        var mid = request.message_id;
+        if (typeof request.reply !== 'undefined') {
             self.logDebug('['+ mid +'] *** received reply.');
             return;
         }
         self.logDebug('['+ mid +'] - Processing: ' + self.prettifyJson(request));
         var result = null;
 
-        if (typeof request['script'] !== 'undefined') {
+        if (typeof request.script !== 'undefined') {
             self.logDebug('[' + mid + '] Injecting script.');
             try {
-                eval.call(null, request['script']);
+                eval.call(null, request.script);
             } catch (error) {
                 self.logError(error);
             }
-        } else if (typeof request['function'] !== 'undefined') {
+        } else if (typeof request.function !== 'undefined') {
             try {
-                var _func = eval.call(null, request['function']);
+                var _func = eval.call(null, request.function);
 
                 if (request.args == null) {
                     result = _func();
@@ -237,7 +237,7 @@ function Client() {
         // self.logDebug('--- Received: ' + self.received);
         var to_parse = self.received;
         var request = JSON.parse(to_parse);
-        var mid = request['message_id'];
+        var mid = request.message_id;
         // self.logDebug('[' + mid + '] - Request: ' + '\n' + JSON.stringify(request));
         self.logDebug('[' + mid + '] Recieved.');
 
@@ -245,7 +245,7 @@ function Client() {
         self.logDebug('[' + mid + '] Processing done.');
         self.received = '';
 
-        if (request['reply'] !== true) {
+        if (request.reply !== true) {
             request.reply = true;
             self.logDebug('[' + mid + '] Replying.');
             self._send(JSON.stringify(request));
@@ -307,7 +307,7 @@ function Client() {
      * @param {object} request - json encoded request.
      */
     self.send = function(request) {
-        request['message_id'] = self.messageId;
+        request.message_id = self.messageId;
         if (typeof request.reply == 'undefined') {
             self.logDebug("[" + self.messageId + "] sending:\n" + self.prettifyJson(request));
         }
@@ -375,11 +375,10 @@ function start() {
             'args': ['avalon.tools.creator']
         }, false);
     };
-    // Add creator item to menu
-    if (app.avalonMenu == null) {
-        var action = menu.addAction('Create...');
-        action.triggered.connect(self.onCreator);
-    }
+
+    var action = menu.addAction('Create...');
+    action.triggered.connect(self.onCreator);
+
 
     /**
      * Show Workfiles
