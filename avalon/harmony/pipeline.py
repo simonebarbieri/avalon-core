@@ -6,6 +6,14 @@ from . import lib
 import pyblish.api
 
 
+def inject_avalon_js():
+    """Inject AvalonHarmony.js into Harmony."""
+    avalon_harmony_js = Path(__file__).parent.joinpath("js/AvalonHarmony.js")
+    script = avalon_harmony_js.read_text()
+    # send AvalonHarmony.js to Harmony
+    lib.send({"script": script})
+
+
 def install():
     """Install Harmony-specific functionality of avalon-core.
 
@@ -13,12 +21,7 @@ def install():
     """
     print("Installing Avalon Harmony...")
     pyblish.api.register_host("harmony")
-    avalon_harmony_js = Path(__file__).parent.joinpath("js/AvalonHarmony.js")
-    with open(avalon_harmony_js, "r") as af:
-        lib.send(
-            {
-                "function": af.reada
-            })
+    api.on("application.launched", inject_avalon_js)
 
 
 def ls():
@@ -62,7 +65,10 @@ class Creator(api.Creator):
             node (str): Path to node.
         """
         lib.send(
-            {"function": "AvalonHarmony.setupNodeForCreator", "args": node}
+            {
+                "function": "AvalonHarmony.setupNodeForCreator",
+                "args": node
+            }
         )
 
     def process(self):

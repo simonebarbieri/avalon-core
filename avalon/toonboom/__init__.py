@@ -11,7 +11,7 @@ from .lib import (
     show,
     save_scene,
     setup_startup_scripts,
-    setup_libs
+    check_libs
 )
 
 __all__ = [
@@ -28,5 +28,5 @@ __all__ = [
     "show",
     "save_scene",
     "setup_startup_scripts",
-    "setup_libs"
+    "check_libs"
 ]
