@@ -479,17 +479,19 @@ function start() {
     };
 }
 
-function ensureSceneSettings(args) {
-    var app = QCoreApplication.instance();
-
-    app.avalon_client.send({
-        'module': 'pype.harmony',
-        'method': 'ensure_scene_settings',
-        'args': []
-    }, false);
+function ensureSceneSettings() {
+  var app = QCoreApplication.instance();
+  app.avalon_client.send(
+    {
+      "module": "pype.hosts.harmony",
+      "method": "ensure_scene_settings",
+      "args": []
+    },
+    false
+  );
 }
 
-
-function TB_sceneOpened() {
-    start();
+function TB_sceneOpened()
+{
+  start();
 }
