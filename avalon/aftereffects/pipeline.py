@@ -4,7 +4,8 @@ from ..vendor import Qt
 from collections import namedtuple
 
 import pyblish.api
-
+import logging
+log = logging.getLogger(__name__)
 
 def install():
     """Install After Effects-specific functionality of avalon-core.
@@ -33,7 +34,7 @@ def ls():
         return
 
     layers_meta = stub.get_metadata()
-    for layer in stub.get_layers():
+    for layer in stub.get_items(False):
         data = stub.read(layer, layers_meta)
 
         # Skip non-tagged layers.
@@ -95,6 +96,8 @@ def containerise(name,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"]),
     }
+    print("containerize::")
+    log.debug("containerize::")
     stub = lib.stub()
     stub.imprint(comp, data)
 

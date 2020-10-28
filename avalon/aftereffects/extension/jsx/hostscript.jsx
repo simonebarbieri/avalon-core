@@ -3,6 +3,9 @@ indent: 4, maxerr: 50 */
 /*global $, Folder*/
 #include "../js/libs/json.js";
 
+app.preferences.savePrefAsBool("General Section", "Show Welcome Screen", false) ;
+
+
 
 function sayHello(){
     alert("hello from ExtendScript");
@@ -129,14 +132,83 @@ function getItems(collectLayers){
             }          
         }
     }
-    return items;
+    return '[' + items.join() + ']';
 }
 
-function importFile(path){
+function importFile(path, item_name){
+    /**
+     * Imports file (image tested for now) as a FootageItem.
+     * Creates new composition
+     * 
+     * Args:
+     *    path (string): absolute path to image file
+     *    item_name (string): label for composition
+     * Returns:
+     *    JSON {name, id}
+     */
+    var comp;
+    var ret = {}
+    app.beginUndoGroup("Import File");
     fp = new File(path);
     if (fp.exists){
-        app.project.importFile(new ImportOptions(fp));
+        try { 
+            comp = app.project.importFile(new ImportOptions(fp));
+        } catch (error) {
+            alert(error.toString() + importOptions.file.fsName, scriptName);
+        } finally {
+            fp.close();
+        }
     }
+    if (comp){
+        comp.name = item_name;
+        $.writeln(comp.id);
+        ret = {"name": comp.name, "id": comp.id}
+    }
+    app.endUndoGroup();
+
+    return JSON.stringify(ret);
+}
+
+function replaceItem(comp_id, path, item_name){
+    /**
+     * Replaces loaded file with new file and updates name
+     * 
+     * Args:
+     *    comp_id (int): id of composition, not a index!
+     *    path (string): absolute path to new file
+     *    item_name (string): new composition name
+     */
+    app.beginUndoGroup("Replace File");
+    
+    fp = new File(path);
+    for (var i = app.project.numItems; i >= 1; i--) {
+        var curItem = app.project.item(i);
+        if (curItem.id == comp_id){
+            try{
+                curItem.replace(fp);
+                curItem.name = item_name;
+            } catch (error) {
+                alert(error.toString() + path, scriptName);
+            } finally {
+                fp.close();
+            }
+            break;
+        } 
+    }
+    app.endUndoGroup();
+}
+
+function deleteItem(comp_id){
+    /**
+     * Deletes by 'comp_id', which is not index of 'items'
+     */
+    for (var i = app.project.numItems; i >= 1; i--) {
+        var curItem = app.project.item(i);
+        if (curItem.id == comp_id){
+            curItem.remove();
+            break;
+        } 
+    }  
 }
 
 function save(){
@@ -153,13 +225,17 @@ function saveAs(path){
     return app.project.save(fp = new File(path));
 }
 
-// imprint("{content}");
-// var content = getMetadata();
+var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
+var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
 
-// $.writeln(getActiveDocumentName());
-// $.writeln(getItems(true));
-// saveAs("c:\\Users\\petrk\\Documents\\TestProjectCopy.aep", true);
-$.writeln(getActiveDocumentFullName());
+//importFile(psd, "new_psd"); // should be able to import PSD and all its layers
+
+
+
+
+
+
+
 
 
 

@@ -76,7 +76,49 @@ function main(websocket_url){
         log.warn('Server called client route "get_items":', data);
         return runEvalScript("getItems(" + data.layers + ")")
             .then(function(result){
-                log.warn("get_active_document_name: " + result);
+                log.warn("get_items: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.import_file', function (data) {
+        log.warn('Server called client route "import_file":', data);
+        var escapedPath = EscapeStringForJSX(data.path);
+        return runEvalScript("importFile('" + escapedPath +"', " +
+                                         "'" + data.item_name + "')")
+            .then(function(result){
+                log.warn("open: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.replace_item', function (data) {
+        log.warn('Server called client route "replace_item":', data);
+        var escapedPath = EscapeStringForJSX(data.path);
+        return runEvalScript("replaceItem(" + data.item_id + ", " +
+                                     "'" + escapedPath + "', " +
+                                     "'" + data.item_name + "')")
+            .then(function(result){
+                log.warn("replaceItem: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.delete_item', function (data) {
+        log.warn('Server called client route "delete_item":', data);
+        return runEvalScript("deleteItem(" + data.item_id + "')")
+            .then(function(result){
+                log.warn("deleteItem: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.imprint', function (data) {
+        log.warn('Server called client route "imprint":', data);
+        var escaped = data.payload.replace(/\n/g, "\\n");
+        return runEvalScript("imprint('" + escaped +"')")
+            .then(function(result){
+                log.warn("imprint: " + result);
                 return result;
             });
     });

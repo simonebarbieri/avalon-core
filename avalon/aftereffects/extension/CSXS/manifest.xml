@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="8.0" ExtensionBundleId="com.avalon.panel" ExtensionBundleVersion="1.0.0"
-		ExtensionBundleName="avalon" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ExtensionManifest Version="8.0" ExtensionBundleId="com.pype.panel" ExtensionBundleVersion="1.0.0"
+		ExtensionBundleName="pype" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<ExtensionList>
-		<Extension Id="com.avalon.panel" Version="1.0" />
+		<Extension Id="com.pype.panel" Version="1.0" />
 	</ExtensionList>
 	<ExecutionEnvironment>
 		<HostList>
@@ -52,8 +52,8 @@
 					<Menu>avalon</Menu>
 					<Geometry>
 						<Size>
-							<Height>300</Height>
-							<Width>300</Width>
+							<Height>200</Height>
+							<Width>100</Width>
 						</Size>
                     <!--<MinSize>
                             <Height>550</Height>
