@@ -158,9 +158,9 @@ function Client() {
             } catch (error) {
                 self.logError(error);
             }
-        } else if (typeof request.function !== 'undefined') {
+        } else if (typeof request["function"] !== 'undefined') {
             try {
-                var _func = eval.call(null, request.function);
+                var _func = eval.call(null, request["function"]);
 
                 if (request.args == null) {
                     result = _func();
