@@ -74,7 +74,21 @@ function main(websocket_url){
 
     RPC.addRoute('AfterEffects.get_items', function (data) {
         log.warn('Server called client route "get_items":', data);
-        return runEvalScript("getItems(" + data.layers + ")")
+        return runEvalScript("getItems("  + data.comps + "," +
+                                            data.folders + "," +
+                                            data.footages + ")")
+            .then(function(result){
+                log.warn("get_items: " + result);
+                return result;
+            });
+    });
+
+    
+    RPC.addRoute('AfterEffects.get_selected_items', function (data) {
+        log.warn('Server called client route "get_selected_items":', data);
+        return runEvalScript("getSelectedItems(" + data.comps + "," +
+                                                   data.folders + "," +
+                                                   data.footages  + ")")
             .then(function(result){
                 log.warn("get_items: " + result);
                 return result;
@@ -85,7 +99,9 @@ function main(websocket_url){
         log.warn('Server called client route "import_file":', data);
         var escapedPath = EscapeStringForJSX(data.path);
         return runEvalScript("importFile('" + escapedPath +"', " +
-                                         "'" + data.item_name + "')")
+                                         "'" + data.item_name + "'," +
+                                         "'" + JSON.stringify(
+                                         data.import_options) + "')")
             .then(function(result){
                 log.warn("open: " + result);
                 return result;
@@ -117,6 +133,16 @@ function main(websocket_url){
         log.warn('Server called client route "imprint":', data);
         var escaped = data.payload.replace(/\n/g, "\\n");
         return runEvalScript("imprint('" + escaped +"')")
+            .then(function(result){
+                log.warn("imprint: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.set_label_color', function (data) {
+        log.warn('Server called client route "set_label_color":', data);
+        return runEvalScript("setLabelColor(" + data.item_id + "," +
+                                                data.color_idx + ")")
             .then(function(result){
                 log.warn("imprint: " + result);
                 return result;
@@ -182,4 +208,3 @@ function runEvalScript(script) {
         csInterface.evalScript(script, resolve);
     });
 }
-    

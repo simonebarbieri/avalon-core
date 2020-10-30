@@ -24,6 +24,9 @@ self.log.setLevel(logging.DEBUG)
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
+    if not self.callback_queue:  # safety
+        self.callback_queue = queue.Queue()
+
     self.callback_queue.put(func_to_call_from_main_thread)
 
 
@@ -114,15 +117,14 @@ def launch(application):
                 break
         except Exception:
             time.sleep(0.5)
-    self.log.debug("tadt:: {}".format(application))
-    # Wait for application launch to show Workfiles.
-    # if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", True):
-    #     if os.getenv("WORKFILES_SAVE_AS"):
-    #         workfiles.shows(ave=False)
-    #     else:
-    #         workfiles.show()
-    self.log.debug("huuuuu:: {}".format(application))
-    # Photoshop could be closed immediately, withou workfile selection
+
+    if os.environ.get("AVALON_AFTEREFFECTS_WORKFILES_ON_LAUNCH", True):
+        if os.getenv("WORKFILES_SAVE_AS"):
+            workfiles.show(save=False)
+        else:
+            workfiles.show()
+
+    # AE could be closed immediately, withou workfile selection
     try:
         if aftereffects.stub():
             api.emit("application.launched")
@@ -137,3 +139,13 @@ def launch(application):
         # Wait on Photoshop to close before closing the websocket server
         process.wait()
         websocket_server.stop()
+
+
+@contextlib.contextmanager
+def maintained_selection():
+    """Maintain selection during context."""
+    selection = stub().get_selected_items(True, False, False)
+    try:
+        yield selection
+    finally:
+        pass

@@ -1,11 +1,11 @@
 from .. import api, pipeline
 from . import lib
 from ..vendor import Qt
-from collections import namedtuple
 
 import pyblish.api
 import logging
 log = logging.getLogger(__name__)
+
 
 def install():
     """Install After Effects-specific functionality of avalon-core.
@@ -34,7 +34,9 @@ def ls():
         return
 
     layers_meta = stub.get_metadata()
-    for layer in stub.get_items(False):
+    for layer in stub.get_items(comps=True,
+                                folders=False,
+                                footages=False):
         data = stub.read(layer, layers_meta)
 
         # Skip non-tagged layers.
@@ -50,8 +52,6 @@ def ls():
 
         yield data
 
-    return []  # TODO
-
 
 class Creator(api.Creator):
     """Creator plugin to create instances in After Effects
@@ -63,8 +63,30 @@ class Creator(api.Creator):
     def process(self):
         # Photoshop can have multiple LayerSets with the same name, which does
         # not work with Avalon.
-        msg = "Instance with name \"{}\" already exists.".format(self.name)
+        txt = "Instance with name \"{}\" already exists.".format(self.name)
         stub = lib.stub()  # only after After Effects is up
+        for layer in stub.get_items(comps=True,
+                                    folders=False,
+                                    footages=False):
+            if self.name.lower() == layer.name.lower():
+                msg = Qt.QtWidgets.QMessageBox()
+                msg.setIcon(Qt.QtWidgets.QMessageBox.Warning)
+                msg.setText(txt)
+                msg.exec_()
+                return False
+
+        if (self.options or {}).get("useSelection"):
+            items = stub.get_selected_items(comps=True,
+                                            folders=False,
+                                            footages=False)
+        else:
+            items = stub.get_items(comps=True,
+                                   folders=False,
+                                   footages=False)
+
+        for item in items:
+            stub.imprint(item, self.data)
+
 
 def containerise(name,
                  namespace,
@@ -96,8 +118,7 @@ def containerise(name,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"]),
     }
-    print("containerize::")
-    log.debug("containerize::")
+
     stub = lib.stub()
     stub.imprint(comp, data)
 

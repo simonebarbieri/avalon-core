@@ -24,6 +24,7 @@ from .lib import (
     launch,
     stub,
     show,
+    maintained_selection,
     execute_in_main_thread
 )
 
@@ -46,5 +47,6 @@ __all__ = [
     "launch",
     "stub",
     "show",
+    "maintained_selection",
     "execute_in_main_thread"
 ]

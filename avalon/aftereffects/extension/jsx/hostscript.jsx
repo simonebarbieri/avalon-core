@@ -6,7 +6,6 @@ indent: 4, maxerr: 50 */
 app.preferences.savePrefAsBool("General Section", "Show Welcome Screen", false) ;
 
 
-
 function sayHello(){
     alert("hello from ExtendScript");
 }
@@ -100,42 +99,91 @@ function getActiveDocumentFullName(){
     return null;
 }
 
-function getItems(collectLayers){
+function getItems(comps, folders, footages){
     /**
      * Returns JSON representation of compositions and
      * if 'collectLayers' then layers in comps too.
      * 
      * Args:
-     *     collectLayers (bool): return layers too
+     *     comps (bool): return selected compositions
+     *     folders (bool): return folders
+     *     footages (bool): return FootageItem
      * Returns:
-     *    (array) of JSON
-     */
-    var items = [];
-    //loop through comps and layers: 
-    for (i = 1; i <= app.project.numItems; ++i) {  
-        var currentComp = app.project.item(i);
-        var item = {"name": currentComp.name, 
-                    "id": currentComp.id,
-                    "type": "comp"};
-        var parent_id = currentComp.id; 
-        items.push(JSON.stringify(item));
-        
-        if (collectLayers && currentComp instanceof CompItem) { 
-            var layers = currentComp.layers;
-            for (j = 1; j <= layers.length; ++j){
-                var layer = layers[j];
-                var item = {"name": layer.name,
-                            "id": layer.id,
-                            "parrent_id": parent_id,
-                            "type": "layer"};
-                items.push(JSON.stringify(item));
-            }          
+     *     (list) of JSON items
+     */    
+    var items = []
+    for (i = 1; i <= app.project.items.length; ++i){
+        var item = app.project.items[i];
+        if (!item){
+            continue;
+        }
+        var ret = _getItem(item, comps, folders, footages);
+        if (ret){
+            items.push(ret);
+        }
+    }
+    return '[' + items.join() + ']';
+
+}
+
+function getSelectedItems(comps, folders, footages){
+    /**
+     * Returns list of selected items from Project menu
+     * 
+     * Args:
+     *     comps (bool): return selected compositions
+     *     folders (bool): return folders
+     *     footages (bool): return FootageItem
+     * Returns:
+     *     (list) of JSON items
+     */    
+    var items = []
+    for (i = 0; i < app.project.selection.length; ++i){
+        var item = app.project.selection[i];
+        if (!item){
+            continue;
+        }
+        var ret = _getItem(item, comps, folders, footages);
+        if (ret){
+            items.push(ret);
         }
     }
     return '[' + items.join() + ']';
 }
 
-function importFile(path, item_name){
+function _getItem(item, comps, folders, footages){
+    /**
+     * Auxiliary function as project items and selections 
+     * are indexed in different way :/
+     * Refactor 
+     */
+    var item_type = '';
+    if (item instanceof FolderItem){
+        item_type = 'folder';
+        if (!folders){
+            return null;
+        }
+    }
+    if (item instanceof FootageItem){
+        item_type = 'footage';
+        if (!footages){
+            return null;
+        }
+    }
+    if (item instanceof CompItem){
+        item_type = 'comp';
+        if (!comps){
+            return null;
+        }
+    }
+        
+    var item = {"name": item.name,
+                "id": item.id,
+                "type": item_type};
+    return JSON.stringify(item);
+}
+
+function importFile(path, item_name, import_options){
     /**
      * Imports file (image tested for now) as a FootageItem.
      * Creates new composition
@@ -147,13 +195,47 @@ function importFile(path, item_name){
      *    JSON {name, id}
      */
     var comp;
-    var ret = {}
+    var ret = {};
+    try{
+        import_options = JSON.parse(import_options);
+    } catch (e){
+        alert("Couldn't parse import options " + import_options);
+    }
+
     app.beginUndoGroup("Import File");
     fp = new File(path);
     if (fp.exists){
         try { 
-            comp = app.project.importFile(new ImportOptions(fp));
+            im_opt = new ImportOptions(fp);
+            importAsType = import_options["ImportAsType"];
+
+            if ('ImportAsType' in import_options){ // refactor
+                if (importAsType.indexOf('COMP') > 0){
+                    im_opt.importAs = ImportAsType.COMP;
+                }
+                if (importAsType.indexOf('FOOTAGE') > 0){
+                    im_opt.importAs = ImportAsType.FOOTAGE;
+                }
+                if (importAsType.indexOf('COMP_CROPPED_LAYERS') > 0){
+                    im_opt.importAs = ImportAsType.COMP_CROPPED_LAYERS;
+                }
+                if (importAsType.indexOf('PROJECT') > 0){
+                    im_opt.importAs = ImportAsType.PROJECT;
+                }  
+                             
+            }
+            if ('sequence' in import_options){
+                im_opt.sequence = true;
+            }
+            
+            comp = app.project.importFile(im_opt);
+
+            if (app.project.selection.length == 2 &&
+                app.project.selection[0] instanceof FolderItem){
+                 comp.parentFolder = app.project.selection[0]
+            }
         } catch (error) {
+            $.writeln(error);
             alert(error.toString() + importOptions.file.fsName, scriptName);
         } finally {
             fp.close();
@@ -161,12 +243,29 @@ function importFile(path, item_name){
     }
     if (comp){
         comp.name = item_name;
+        comp.label = 9; // Green
         $.writeln(comp.id);
         ret = {"name": comp.name, "id": comp.id}
     }
     app.endUndoGroup();
 
     return JSON.stringify(ret);
+}
+
+function setLabelColor(item_id, color_idx){
+    /**
+     * Set item_id label to 'color_idx' color
+     * Args:
+     *     item_id (int): item id
+     *     color_idx (int): 0-16 index from Label
+     */
+    for (var i = app.project.numItems; i >= 1; i--) {
+        var curItem = app.project.item(i);
+        if (curItem.id == item_id){
+            curItem.label = color_idx;
+            break;
+        }
+    }
 }
 
 function replaceItem(comp_id, path, item_name){
@@ -225,11 +324,23 @@ function saveAs(path){
     return app.project.save(fp = new File(path));
 }
 
-var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
-var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
+// // var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
+//  var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
+//var mov = 'c:\\Users\\petrk\\Downloads\\Samples\\sample_iTunes.mov';
+// // var wav = 'c:\\Users\\petrk\\Downloads\\Samples\\africa-toto.wav';
 
-//importFile(psd, "new_psd"); // should be able to import PSD and all its layers
-
+// var inop = JSON.stringify({sequence: true});
+// $.writeln(inop);
+// importFile(mov, "mov", inop); // should be able to import PSD and all its layers
+//importFile(mov, "new_wav", '{}');
+// $.writeln(app.project.selection);
+// for (i = 1; i <= app.project.selection.length; ++i){
+//     var sel = app.project.selection[i];
+//     $.writeln(sel);
+//     $.writeln(app.project.selection[0] instanceof FolderItem);
+//}
+//$.writeln(getItems(true, false, false));
+//importFile(mov, "new_wav", "{}");
 
 
 
