@@ -10,9 +10,10 @@ import time
 import struct
 from datetime import datetime
 from . import lib
+import threading
 
 
-class Server(object):
+class Server(threading.Thread):
     """Class for communication with Toon Boon Harmony.
 
     Attributes:
@@ -26,6 +27,8 @@ class Server(object):
 
     def __init__(self, port):
         """Constructor."""
+        super(Server, self).__init__()
+        self.daemon = True
         self.connection = None
         self.received = ""
         self.port = port
@@ -118,9 +121,10 @@ class Server(object):
 
             try:
                 request = json.loads(self.received)
-            except json.decoder.JSONDecodeError:
+            except json.decoder.JSONDecodeError as e:
                 self.log.error(f"[{self.timestamp()}] "
-                               "Invalid message received.")
+                               f"Invalid message received.\n{e}",
+                               exc_info=True)
 
             self.received = ""
             if request is None:
@@ -148,7 +152,7 @@ class Server(object):
                 self.log.debug(f"[{self.timestamp()}] "
                                "received data was just a reply.")
 
-    def start(self):
+    def run(self):
         """Entry method for server.
 
         Waits for a connection on `self.port` before going into listen mode.

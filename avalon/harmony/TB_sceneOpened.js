@@ -363,7 +363,7 @@ function start() {
     if (app.avalonMenu == null) {
         menu = menuBar.addMenu('Avalon');
     }
-    menu = menuBar.addMenu('Avalon');
+    // menu = menuBar.addMenu('Avalon');
 
     /**
      * Show creator

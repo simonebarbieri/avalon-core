@@ -14,6 +14,7 @@ import contextlib
 import json
 import signal
 import time
+from uuid import uuid4
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
@@ -31,6 +32,18 @@ self.port = None
 # Setup logging.
 self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
+
+
+def signature(postfix="func") -> str:
+    """Return random ECMA6 compatible function name.
+
+    Args:
+        postfix (str): name to append to random string.
+    Returns:
+        str: random function name.
+
+    """
+    return "f{}_{}".format(str(uuid4()).replace("-", "_"), postfix)
 
 
 class _ZipFile(zipfile.ZipFile):
@@ -151,9 +164,10 @@ def launch_zip_file(filepath):
 
     # Launch Avalon server.
     self.server = Server(self.port)
-    thread = threading.Thread(target=self.server.start)
-    thread.daemon = True
-    thread.start()
+    self.server.start()
+    # thread = threading.Thread(target=self.server.start)
+    # thread.daemon = True
+    # thread.start()
 
     # Save workfile path for later.
     self.workfile_path = filepath
