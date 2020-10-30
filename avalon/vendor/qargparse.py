@@ -515,10 +515,16 @@ class Button(QArgument):
 
         if isinstance(self, Toggle):
             widget.setCheckable(True)
-            self._read = lambda: widget.checkState()
-            self._write = (
-                lambda value: widget.setCheckState(state[int(value)])
-            )
+            if hasattr(widget, "isChecked"):
+                self._read = lambda: state[int(widget.isChecked())]
+                self._write = (
+                    lambda value: widget.setChecked(value)
+                )
+            else:
+                self._read = lambda: widget.checkState()
+                self._write = (
+                    lambda value: widget.setCheckState(state[int(value)])
+                )
         else:
             self._read = lambda: "clicked"
             self._write = lambda value: None
