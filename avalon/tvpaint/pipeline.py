@@ -31,5 +31,14 @@ def uninstall():
     pyblish.deregister_host("tvpaint")
 
 
+@contextlib.contextmanager
+def maintained_selection():
+    # TODO implement logic
+    try:
+        yield
+    finally:
+        pass
+
+
 def ls():
     return []
