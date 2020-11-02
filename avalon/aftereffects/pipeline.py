@@ -36,7 +36,7 @@ def ls():
     layers_meta = stub.get_metadata()
     for layer in stub.get_items(comps=True,
                                 folders=False,
-                                footages=False):
+                                footages=True):
         data = stub.read(layer, layers_meta)
 
         # Skip non-tagged layers.
