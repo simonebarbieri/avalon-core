@@ -3,7 +3,10 @@ from . import launch_script
 from .pipeline import (
     install,
     uninstall,
-    ls
+    maintained_selection,
+    ls,
+    TVPaintCreator,
+    TVPaintLoader
 )
 
 from .workio import (
@@ -22,7 +25,10 @@ __all__ = (
 
     "install",
     "uninstall",
+    "maintained_selection",
     "ls",
+    "TVPaintCreator",
+    "TVPaintLoader",
 
     # Workfiles API
     "open_file",
