@@ -9,7 +9,7 @@ import logging
 
 import avalon
 from avalon import style
-from avalon.tvpaint.communication_server import CommunicatorWrapper
+from avalon.tvpaint.communication_server import CommunicationWrapper
 from avalon import tvpaint, api
 from avalon.vendor.Qt import QtWidgets, QtCore, QtGui
 
@@ -73,7 +73,7 @@ def main(launch_args):
 
     # Create Communicator object and trigger launch
     # - this must be done before anything is processed
-    communicator = CommunicatorWrapper.create_communicator(qt_app)
+    communicator = CommunicationWrapper.create_communicator(qt_app)
     communicator.launch(launch_args)
 
     # Start thread to check callbacks from websocket server to be done

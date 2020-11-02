@@ -39,12 +39,12 @@ log.setLevel(logging.DEBUG)
 LOCALIZATION_FILENAME = "avalon.loc"
 
 
-class CommunicatorWrapper:
+class CommunicationWrapper:
     # TODO add logs and exceptions
     communicator = None
     _connected_client = None
 
-    log = logging.getLogger("CommunicatorWrapper")
+    log = logging.getLogger("CommunicationWrapper")
 
     # Variable which can be modified to register localization file from
     # config
@@ -93,7 +93,7 @@ class CommunicatorWrapper:
     @classmethod
     def execute_george(cls, george_script):
         """Execute passed goerge script in TVPaint."""
-        return CommunicatorWrapper.send_request(
+        return CommunicationWrapper.send_request(
             "execute_george", [george_script]
         )
 
@@ -115,7 +115,7 @@ class CommunicatorWrapper:
         )
         temporary_file.write(george_script)
         temporary_file.close()
-        CommunicatorWrapper.execute_george(
+        CommunicationWrapper.execute_george(
             "tv_runscript {}".format(
                 temporary_file.name.replace("\\", "/")
             )
@@ -143,7 +143,7 @@ def register_localization_file(filepath):
     Args:
         filepath (str): Full path to `.loc` file.
     """
-    CommunicatorWrapper.localization_file = filepath
+    CommunicationWrapper.localization_file = filepath
 
 
 class WebSocketServer:
@@ -635,7 +635,7 @@ class Communicator:
                 to_copy.append((src_full_path, dst_full_path))
 
         # Add localization file is there is any
-        localization_file_src = CommunicatorWrapper.localization_file
+        localization_file_src = CommunicationWrapper.localization_file
         if localization_file_src and os.path.exists(localization_file_src):
             localization_file_dst = os.path.join(
                 host_plugins_path, LOCALIZATION_FILENAME
