@@ -44,6 +44,8 @@ class CommunicatorWrapper:
     communicator = None
     _connected_client = None
 
+    log = logging.getLogger("CommunicatorWrapper")
+
     # Variable which can be modified to register localization file from
     # config
     localization_file = None
@@ -57,17 +59,17 @@ class CommunicatorWrapper:
     @classmethod
     def _client(cls):
         if not cls.communicator:
-            log.warning("Communicator object was not created yet.")
+            cls.log.warning("Communicator object was not created yet.")
             return None
 
         if not cls.communicator.websocket_rpc:
-            log.warning("Communicator's server did not start yet.")
+            cls.log.warning("Communicator's server did not start yet.")
             return None
 
         for client in cls.communicator.websocket_rpc.clients:
             if not client.ws.closed:
                 return client
-        log.warning("Client is not yet connected to Communicator.")
+        cls.log.warning("Client is not yet connected to Communicator.")
         return None
 
     @classmethod
