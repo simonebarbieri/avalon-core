@@ -134,6 +134,100 @@ class CommunicationWrapper:
             client, method, params
         )
 
+    @classmethod
+    def layers_data(cls):
+        output_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        )
+        output_file.close()
+
+        output_filepath = output_file.name.replace("\\", "/")
+        george_script_lines = (
+            # Variable containing full path to output file
+            "output_path = \"{}\"".format(output_filepath),
+            # Get Current Layer ID
+            "tv_LayerCurrentID",
+            "current_layer_id = result",
+            # Layer loop variables
+            "loop = 1",
+            "idx = 0",
+            # Layers loop
+            "WHILE loop",
+            "tv_LayerGetID idx",
+            "layer_id = result",
+            "idx = idx + 1",
+            # Stop loop if layer_id is "NONE"
+            "IF CMP(layer_id, \"NONE\")==1",
+            "loop = 0",
+            "ELSE",
+            # Get information about layer's group
+            "tv_layercolor \"get\" layer_id",
+            "group_id = result",
+            "tv_LayerInfo layer_id",
+            (
+                "PARSE result visible position opacity name"
+                " type startFrame endFrame prelighttable postlighttable"
+                " selected editable sencilState"
+            ),
+            # Check if layer ID match `tv_LayerCurrentID`
+            "IF CMP(current_layer_id, layer_id)==1",
+            # - mark layer as selected if layer id match to current layer id
+            "selected=1",
+            "END",
+            # Prepare line with data separated by "|"
+            (
+                "line = layer_id'|'group_id'|'visible'|'position'|'opacity'|'"
+                "name'|'type'|'startFrame'|'endFrame'|'prelighttable'|'"
+                "postlighttable'|'selected'|'editable'|'sencilState"
+            ),
+            # Write data to output file
+            "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' line",
+            "END",
+            "END"
+        )
+        george_script = "\n".join(george_script_lines)
+        cls.execute_george_through_file(george_script)
+
+        with open(output_filepath, "r") as stream:
+            data = stream.read()
+
+        layers_data = cls.parse_layers_data(data)
+        os.remove(output_filepath)
+        return layers_data
+
+    @staticmethod
+    def parse_layers_data(data):
+        layers = []
+        layers_raw = data.split("\n")
+        for layer_raw in layers_raw:
+            layer_raw = layer_raw.strip()
+            if not layer_raw:
+                continue
+            (
+                layer_id, group_id, visible, position, opacity, name,
+                layer_type,
+                frame_start, frame_end, prelighttable, postlighttable,
+                selected, editable, sencil_state
+            ) = layer_raw.split("|")
+            layer = {
+                "id": int(layer_id),
+                "group_id": int(group_id),
+                "visible": visible == "ON",
+                "position": int(position),
+                "opacity": int(opacity),
+                "name": name,
+                "type": layer_type,
+                "frame_start": int(frame_start),
+                "frame_end": int(frame_end),
+                "prelighttable": prelighttable == "1",
+                "postlighttable": postlighttable == "1",
+                "selected": selected == "1",
+                "editable": editable == "1",
+                "sencil_state": sencil_state
+            }
+            layers.append(layer)
+        return layers
+
 
 def register_localization_file(filepath):
     """Register localization file to be copied with TVPaint plugins.
@@ -263,6 +357,7 @@ class WebsocketServerThread(threading.Thread):
             await asyncio.sleep(0.5)
 
         log.debug("## Server shutdown started")
+        
         await self.site.stop()
         log.debug("# Site stopped")
         await self.runner.cleanup()
