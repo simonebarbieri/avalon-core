@@ -38,6 +38,17 @@ def uninstall():
     pyblish.api.deregister_host("tvpaint")
 
 
+def containerise(name, namespace, nodes, context, loader):
+    data = {
+        "schema": "avalon-core:container-2.0",
+        "name": name,
+        "namespace": namespace,
+        "loader": str(loader),
+        "representation": str(context["representation"]["_id"])
+    }
+    return json.dumps(data)
+
+
 @contextlib.contextmanager
 def maintained_selection():
     # TODO implement logic
