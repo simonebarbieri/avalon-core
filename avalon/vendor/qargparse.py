@@ -8,6 +8,7 @@ import logging
 
 from collections import OrderedDict as odict
 from .Qt import QtCore, QtWidgets, QtGui
+from . import qtawesome
 
 __version__ = "0.5.2"
 _log = logging.getLogger(__name__)
@@ -135,7 +136,8 @@ class QArgumentParser(QtWidgets.QWidget):
             else QtWidgets.QLabel()
         )
         widget = arg.create()
-        reset = QtWidgets.QPushButton("")  # default
+        icon = qtawesome.icon("fa.refresh", color="white")
+        reset = QtWidgets.QPushButton(icon, "")  # default
         reset.setToolTip("Reset")
         reset.setProperty("type", "reset")
         reset.clicked.connect(lambda: self.on_reset(arg))
