@@ -818,7 +818,24 @@ class Communicator:
                 break
             time.sleep(0.5)
 
+        self._initial_textfile_write()
+
         api.emit("application.launched")
+
+    def _initial_textfile_write(self):
+        """Show popup about Write to file at start of TVPaint."""
+        tmp_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        )
+        tmp_file.close()
+        tmp_filepath = tmp_file.name.replace("\\", "/")
+        george_script = (
+            "tv_writetextfile \"strict\" \"append\" \"{}\" \"empty\""
+        ).format(tmp_filepath)
+        result = CommunicationWrapper.execute_george(george_script)
+
+        if result.lower() == "forbidden":
+            log.warning("User didn't confirm saving files.")
 
     def stop(self):
         """Stop communication and currently running python process."""
