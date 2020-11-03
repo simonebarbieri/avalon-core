@@ -120,10 +120,13 @@ def ls():
 
 
 class TVPaintCreator(api.Creator):
+    def write_instances(self, data):
+        return write_project_metadata(SECTION_NAME_INSTANCES, data)
+
     def process(self):
         data = list_instances()
         data.append(self.data)
-        write_project_metadata(SECTION_NAME_INSTANCES, data)
+        self.write_instances(data)
 
 
 class TVPaintLoader(api.Loader):
