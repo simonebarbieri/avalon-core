@@ -359,6 +359,7 @@ jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann:
         if (iter != Data.responses.end()) {
             //element found == was found response
             response = iter->second;
+            Data.responses.erase(request_id);
             found = true;
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
