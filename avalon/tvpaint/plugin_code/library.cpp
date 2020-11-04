@@ -371,19 +371,17 @@ jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann:
 void Communicator::process_requests() {
     if (!use_avalon || !is_connected() || Data.messages.empty()) {return;}
 
-    while (!Data.messages.empty()) {
-        std::string msg = Data.messages.front();
-        Data.messages.pop();
-        std::cout << "Parsing: " << msg << std::endl;
-        auto response = parser.parse(msg);
-        if (response->is_response()) {
-            endpoint.send_response(response);
-        } else {
-            jsonrpcpp::request_ptr request = std::dynamic_pointer_cast<jsonrpcpp::Request>(response);
-            jsonrpcpp::Error error("Method \"" + request->method() + "\" not found", -32601);
-            jsonrpcpp::Response _response(request->id(), error);
-            endpoint.send_response(&_response);
-        }
+    std::string msg = Data.messages.front();
+    Data.messages.pop();
+    std::cout << "Parsing: " << msg << std::endl;
+    auto response = parser.parse(msg);
+    if (response->is_response()) {
+        endpoint.send_response(response);
+    } else {
+        jsonrpcpp::request_ptr request = std::dynamic_pointer_cast<jsonrpcpp::Request>(response);
+        jsonrpcpp::Error error("Method \"" + request->method() + "\" not found", -32601);
+        jsonrpcpp::Response _response(request->id(), error);
+        endpoint.send_response(&_response);
     }
 }
 
