@@ -4,7 +4,7 @@ import contextlib
 
 import pyblish.api
 from .. import api, io
-from . import CommunicationWrapper
+from . import lib
 
 
 METADATA_SECTION = "avalon"
@@ -72,7 +72,7 @@ def project_metadata(metadata_key):
     george_script = (
         "tv_readprojectstring \"{}\" \"{}\" \"[]\""
     ).format(METADATA_SECTION, metadata_key)
-    json_string = CommunicationWrapper.execute_george(george_script)
+    json_string = lib.execute_george(george_script)
     if json_string:
         data = json.loads(json_string)
     else:
@@ -108,7 +108,7 @@ def write_project_metadata(metadata_key, value):
     george_script = (
         "tv_writeprojectstring \"{}\" \"{}\" \"{}\""
     ).format(METADATA_SECTION, metadata_key, value)
-    return CommunicationWrapper.execute_george_through_file(george_script)
+    return lib.execute_george_through_file(george_script)
 
 
 def list_instances():
