@@ -58,7 +58,7 @@ def maintained_selection():
         pass
 
 
-def project_metadata(metadata_key):
+def workfile_metadata(metadata_key):
     """Read metadata for specific key from current project workfile.
 
     Pipeline use function to store loaded and created instances within keys
@@ -80,7 +80,7 @@ def project_metadata(metadata_key):
     return data
 
 
-def write_project_metadata(metadata_key, value):
+def write_workfile_metadata(metadata_key, value):
     """Write metadata for specific key into current project workfile.
 
     George script has specific way how to work with quotes which should be
@@ -112,16 +112,16 @@ def write_project_metadata(metadata_key, value):
 
 
 def list_instances():
-    return project_metadata(SECTION_NAME_INSTANCES)
+    return workfile_metadata(SECTION_NAME_INSTANCES)
 
 
 def ls():
-    return project_metadata(SECTION_NAME_CONTAINERS)
+    return workfile_metadata(SECTION_NAME_CONTAINERS)
 
 
 class TVPaintCreator(api.Creator):
     def write_instances(self, data):
-        return write_project_metadata(SECTION_NAME_INSTANCES, data)
+        return write_workfile_metadata(SECTION_NAME_INSTANCES, data)
 
     def process(self):
         data = list_instances()
