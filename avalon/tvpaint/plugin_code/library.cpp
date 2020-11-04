@@ -388,24 +388,24 @@ void Communicator::process_requests() {
 
 jsonrpcpp::response_ptr execute_george(const jsonrpcpp::Id &id, const jsonrpcpp::Parameter &params) {
     const char *george_script;
-    char output[1024] = {0};
+    char cmd_output[1024] = {0};
     char empty_char = {0};
-    std::string _george_script;
-    std::string _output;
+    std::string std_george_script;
+    std::string output;
 
     nlohmann::json json_params = params.to_json();
-    _george_script = json_params[0];
-    george_script = _george_script.c_str();
+    std_george_script = json_params[0];
+    george_script = std_george_script.c_str();
 
     // Result of `TVSendCmd` is int with length of output string
-    TVSendCmd(Data.current_filter, george_script, output);
+    TVSendCmd(Data.current_filter, george_script, cmd_output);
 
-    for (int i = 0; i < sizeof(output); i++)
+    for (int i = 0; i < sizeof(cmd_output); i++)
     {
-        if (output[i] == empty_char){
+        if (cmd_output[i] == empty_char){
             break;
         }
-        _output += output[i];
+        output += cmd_output[i];
     }
     return std::make_shared<jsonrpcpp::Response>(id, output);
 }
