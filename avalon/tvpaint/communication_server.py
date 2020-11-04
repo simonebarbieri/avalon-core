@@ -498,10 +498,6 @@ class Communicator:
             return None
         return self.callback_queue.get()
 
-    def localization_file(self):
-        # TODO: return localization file from config or default.
-        return None
-
     def _windows_copy(self, src_dst_mapping):
         """Windows specific copy process asking for admin permissions.
 
