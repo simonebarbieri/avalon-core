@@ -374,6 +374,7 @@ void Communicator::process_requests() {
     std::string msg = Data.messages.front();
     Data.messages.pop();
     std::cout << "Parsing: " << msg << std::endl;
+    // TODO: add try->except block
     auto response = parser.parse(msg);
     if (response->is_response()) {
         endpoint.send_response(response);
@@ -396,6 +397,7 @@ jsonrpcpp::response_ptr execute_george(const jsonrpcpp::Id &id, const jsonrpcpp:
     _george_script = json_params[0];
     george_script = _george_script.c_str();
 
+    // Result of `TVSendCmd` is int with length of output string
     TVSendCmd(Data.current_filter, george_script, output);
 
     for (int i = 0; i < sizeof(output); i++)
