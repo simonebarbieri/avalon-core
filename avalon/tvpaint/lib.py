@@ -122,3 +122,58 @@ def layers_data():
     output = parse_layers_data(data)
     os.remove(output_filepath)
     return output
+
+
+def parse_group_data(data):
+    groups_data = []
+    groups_raw = data.split("\n")
+    for group_raw in groups_raw:
+        group_raw = group_raw.strip()
+        if not group_raw:
+            continue
+
+        parts = group_raw.split(" ")
+        # Check for length and concatenate 2 last items until length match
+        # - this happens if name contain spaces
+        while len(parts) > 6:
+            last_item = parts.pop(-1)
+            parts[-1] = " ".join([parts[-1], last_item])
+        clip_id, group_id, red, green, blue, name = parts
+
+        group = {
+            "id": int(group_id),
+            "name": name,
+            "clip_id": int(clip_id),
+            "red": int(red),
+            "green": int(green),
+            "blue": int(blue),
+        }
+        groups_data.append(group)
+    return groups_data
+
+
+def groups_data():
+    output_file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False
+    )
+    output_file.close()
+
+    output_filepath = output_file.name.replace("\\", "/")
+    george_script_lines = (
+        # Variable containing full path to output file
+        "output_path = \"{}\"".format(output_filepath),
+        "loop = 1",
+        "FOR idx = 1 TO 12",
+        "tv_layercolor \"getcolor\" 0 idx",
+        "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' result",
+        "END"
+    )
+    george_script = "\n".join(george_script_lines)
+    execute_george_through_file(george_script)
+
+    with open(output_filepath, "r") as stream:
+        data = stream.read()
+
+    output = parse_group_data(data)
+    os.remove(output_filepath)
+    return output
