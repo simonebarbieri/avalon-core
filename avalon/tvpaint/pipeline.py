@@ -124,9 +124,9 @@ def ls():
     return workfile_metadata(SECTION_NAME_CONTAINERS)
 
 
-class TVPaintCreator(api.Creator):
+class Creator(api.Creator):
     def __init__(self, *args, **kwargs):
-        super(TVPaintCreator, self).__init__(*args, **kwargs)
+        super(Creator, self).__init__(*args, **kwargs)
         # Replace unimportant `id` value "pyblish.avalon.instance" with
         # unified identifier created with `uuid` module
         # - "pyblish.avalon.instance" is not important as instances are stored
@@ -176,5 +176,5 @@ class TVPaintCreator(api.Creator):
         self.write_instances(data)
 
 
-class TVPaintLoader(api.Loader):
+class Loader(api.Loader):
     hosts = ["tvpaint"]

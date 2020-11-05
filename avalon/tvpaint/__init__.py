@@ -6,8 +6,8 @@ from .pipeline import (
     uninstall,
     maintained_selection,
     ls,
-    TVPaintCreator,
-    TVPaintLoader
+    Creator,
+    Loader
 )
 
 from .workio import (
@@ -30,8 +30,8 @@ __all__ = (
     "uninstall",
     "maintained_selection",
     "ls",
-    "TVPaintCreator",
-    "TVPaintLoader",
+    "Creator",
+    "Loader",
 
     # Workfiles API
     "open_file",
