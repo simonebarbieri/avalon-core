@@ -133,6 +133,34 @@ class TVPaintCreator(api.Creator):
         #   under specific key where nothing else is
         self.data["id"] = str(uuid.uuid4())
 
+    @staticmethod
+    def compare_instances(instance_1, instance_2):
+        """Compare instances before inserting new one.
+
+        During compare are skiped keys that will be 100% sure
+        different on new instance, like "id".
+        """
+        if (
+            not isinstance(instance_1, dict)
+            or not isinstance(instance_2, dict)
+        ):
+            return instance_1 == instance_2
+
+        checked_keys = set()
+        checked_keys.add("id")
+        for key, value in instance_1.items():
+            if key not in checked_keys:
+                if key not in instance_2:
+                    return False
+                if value != instance_2[key]:
+                    return False
+                checked_keys.add(key)
+
+        for key in instance_2.keys():
+            if key not in checked_keys:
+                return False
+        return True
+
     def write_instances(self, data):
         self.log.debug(
             "Storing instance data to workfile. {}".format(str(data))
