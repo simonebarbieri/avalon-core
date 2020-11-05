@@ -20,29 +20,6 @@ def safe_excepthook(*args):
     traceback.print_exception(*args)
 
 
-class MainThreadChecker(QtCore.QThread):
-    to_execute = QtCore.Signal(object)
-
-    def __init__(self, communicator):
-        super(MainThreadChecker, self).__init__()
-        self.communicator = communicator
-        self.is_running = False
-
-    def run(self):
-        self.is_running = True
-        while self.is_running:
-            item = self.communicator.main_thread_listen()
-            if item:
-                self.to_execute.emit(item)
-            else:
-                time.sleep(0.2)
-
-
-def process_in_main_thread(main_thread_item):
-    """Execution of `MainThreadItem`."""
-    main_thread_item.execute()
-
-
 def get_icon_path():
     """Path to avalon icon image.
 
@@ -76,10 +53,16 @@ def main(launch_args):
     communicator = CommunicationWrapper.create_communicator(qt_app)
     communicator.launch(launch_args)
 
-    # Start thread to check callbacks from websocket server to be done
-    main_thread_executor = MainThreadChecker(communicator)
-    main_thread_executor.to_execute.connect(process_in_main_thread)
-    main_thread_executor.start()
+    def process_in_main_thread():
+        """Execution of `MainThreadItem`."""
+        item = communicator.main_thread_listen()
+        if item:
+            item.execute()
+
+    timer = QtCore.QTimer()
+    timer.setInterval(100)
+    timer.timeout.connect(process_in_main_thread)
+    timer.start()
 
     # Register terminal signal handler
     def signal_handler(*_args):
