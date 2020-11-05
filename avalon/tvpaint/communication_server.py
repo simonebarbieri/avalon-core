@@ -306,38 +306,38 @@ class TVPaintRpc(JsonRpc):
     async def workfiles_tool(self):
         log.info("Triggering Workfile tool")
         item = MainThreadItem(workfiles.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        self._execute_in_main_thread(item)
+        return
 
     async def loader_tool(self):
         log.info("Triggering Loader tool")
         item = MainThreadItem(loader.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        self._execute_in_main_thread(item)
+        return
 
     async def creator_tool(self):
         log.info("Triggering Creator tool")
         item = MainThreadItem(creator.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        self._execute_in_main_thread(item)
+        return
 
     async def publish_tool(self):
         log.info("Triggering Publish tool")
         item = MainThreadItem(publish.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        self._execute_in_main_thread(item)
+        return
 
     async def scene_inventory_tool(self):
         log.info("Triggering Scene inventory tool")
         item = MainThreadItem(sceneinventory.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        self._execute_in_main_thread(item)
+        return
 
     async def library_loader_tool(self):
         log.info("Triggering Library loader tool")
         item = MainThreadItem(libraryloader.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        self._execute_in_main_thread(item)
+        return
 
     def _execute_in_main_thread(self, item):
         return self.communication_obj.execute_in_main_thread(item)
