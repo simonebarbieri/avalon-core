@@ -697,9 +697,12 @@ class Communicator:
                 break
             time.sleep(0.5)
 
-        self._initial_textfile_write()
+        self.on_client_connect()
 
         api.emit("application.launched")
+
+    def on_client_connect(self):
+        self._initial_textfile_write()
 
     def _initial_textfile_write(self):
         """Show popup about Write to file at start of TVPaint."""
