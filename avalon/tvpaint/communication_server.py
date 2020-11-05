@@ -343,11 +343,10 @@ class TVPaintRpc(JsonRpc):
         return self.communication_obj.execute_in_main_thread(item)
 
     def send_notification(self, client, method, params=[]):
-        future = asyncio.run_coroutine_threadsafe(
+        asyncio.run_coroutine_threadsafe(
             client.ws.send_str(encode_request(method, params=params)),
             loop=self.loop
         )
-        result = future.result()
 
     def send_request(self, client, method, params=[], timeout=0):
         client_host = client.host
