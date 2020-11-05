@@ -1,6 +1,7 @@
 import os
 import json
 import contextlib
+import uuid
 
 import pyblish.api
 from .. import api, io
@@ -124,6 +125,14 @@ def ls():
 
 
 class TVPaintCreator(api.Creator):
+    def __init__(self, *args, **kwargs):
+        super(TVPaintCreator, self).__init__(*args, **kwargs)
+        # Replace unimportant `id` value "pyblish.avalon.instance" with
+        # unified identifier created with `uuid` module
+        # - "pyblish.avalon.instance" is not important as instances are stored
+        #   under specific key where nothing else is
+        self.data["id"] = str(uuid.uuid4())
+
     def write_instances(self, data):
         self.log.debug(
             "Storing instance data to workfile. {}".format(str(data))
