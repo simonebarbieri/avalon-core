@@ -134,11 +134,14 @@ class TVPaintCreator(api.Creator):
         self.data["id"] = str(uuid.uuid4())
 
     @staticmethod
-    def compare_instances(instance_1, instance_2):
-        """Compare instances before inserting new one.
+    def are_instances_same(instance_1, instance_2):
+        """Compare instances but skip keys with unique values.
 
         During compare are skiped keys that will be 100% sure
         different on new instance, like "id".
+
+        Returns:
+            bool: True if instances are same.
         """
         if (
             not isinstance(instance_1, dict)
