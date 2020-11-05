@@ -1,18 +1,18 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<ExtensionManifest ExtensionBundleId="com.avalon" ExtensionBundleVersion="1.0.2" Version="8.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<ExtensionManifest ExtensionBundleId="com.avalon" ExtensionBundleVersion="1.0.2" Version="7.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.avalon.panel" Version="1.0.2" />
+    <Extension Id="com.avalon.panel" Version="1.0.1" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
-      <Host Name="PHSP" Version="18" />
-      <Host Name="PHXS" Version="18" />
+      <Host Name="PHSP" Version="19" />
+      <Host Name="PHXS" Version="19" />
     </HostList>
     <LocaleList>
       <Locale Code="All" />
     </LocaleList>
     <RequiredRuntimeList>
-      <RequiredRuntime Name="CSXS" Version="8.0" />
+      <RequiredRuntime Name="CSXS" Version="7.0" />
     </RequiredRuntimeList>
   </ExecutionEnvironment>
   <DispatchInfoList>
