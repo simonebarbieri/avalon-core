@@ -115,6 +115,10 @@ def list_instances():
     return workfile_metadata(SECTION_NAME_INSTANCES)
 
 
+def _write_instances(data):
+    return write_workfile_metadata(SECTION_NAME_INSTANCES, data)
+
+
 def ls():
     return workfile_metadata(SECTION_NAME_CONTAINERS)
 
@@ -124,7 +128,7 @@ class TVPaintCreator(api.Creator):
         self.log.debug(
             "Storing instance data to workfile. {}".format(str(data))
         )
-        return write_workfile_metadata(SECTION_NAME_INSTANCES, data)
+        return _write_instances(data)
 
     def process(self):
         data = list_instances()
