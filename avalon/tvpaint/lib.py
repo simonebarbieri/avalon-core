@@ -125,7 +125,7 @@ def layers_data():
 
 
 def parse_group_data(data):
-    groups_data = []
+    output = []
     groups_raw = data.split("\n")
     for group_raw in groups_raw:
         group_raw = group_raw.strip()
@@ -148,8 +148,8 @@ def parse_group_data(data):
             "green": int(green),
             "blue": int(blue),
         }
-        groups_data.append(group)
-    return groups_data
+        output.append(group)
+    return output
 
 
 def groups_data():
