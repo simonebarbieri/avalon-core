@@ -20,6 +20,8 @@ self.callback_queue = None
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
+    if not self.callback_queue:
+        self.callback_queue = queue.Queue()
     self.callback_queue.put(func_to_call_from_main_thread)
 
 
