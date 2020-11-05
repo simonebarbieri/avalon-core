@@ -121,6 +121,9 @@ def ls():
 
 class TVPaintCreator(api.Creator):
     def write_instances(self, data):
+        self.log.debug(
+            "Storing instance data to workfile. {}".format(str(data))
+        )
         return write_workfile_metadata(SECTION_NAME_INSTANCES, data)
 
     def process(self):
