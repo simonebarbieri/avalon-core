@@ -642,10 +642,13 @@ class Communicator:
         if platform.system().lower() == "windows":
             self._prepare_windows_plugin(launch_args)
 
+        flags = (
+            subprocess.DETACHED_PROCESS
+            | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
         kwargs = {
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.PIPE,
-            "env": os.environ
+            "env": os.environ,
+            "creationflags": flags
         }
         self.process = subprocess.Popen(launch_args, **kwargs)
 
