@@ -94,8 +94,19 @@ function getLayers() {
         continue;
       } 
       layers.push(JSON.stringify(layer));
-
     }
+     try{
+        var bck = activeDocument.backgroundLayer;
+        layer.id = bck.id;
+        layer.name = bck.name;
+        layer.group = false;
+        layer.parents = [];
+        layer.type = 'background';
+        layer.visible = bck.visible;
+        layers.push(JSON.stringify(layer));
+    }catch(e){
+        // do nothing, no background layer
+    };
     //log("layers " + layers);
     return '[' + layers + ']';
 }
@@ -160,6 +171,7 @@ function saveAs(output_path, ext, as_copy){
     if (ext == 'png'){
       saveOptions = new PNGSaveOptions();
       saveOptions.interlaced = true;
+      saveOptions.transparency = true;
     }
     if (ext == 'psd'){
         saveOptions = null;
