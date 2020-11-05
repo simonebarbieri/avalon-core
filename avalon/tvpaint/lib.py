@@ -44,7 +44,7 @@ def parse_layers_data(data):
             selected, editable, sencil_state
         ) = layer_raw.split("|")
         layer = {
-            "id": int(layer_id),
+            "layer_id": int(layer_id),
             "group_id": int(group_id),
             "visible": visible == "ON",
             "position": int(position),
@@ -141,7 +141,7 @@ def parse_group_data(data):
         clip_id, group_id, red, green, blue, name = parts
 
         group = {
-            "id": int(group_id),
+            "group_id": int(group_id),
             "name": name,
             "clip_id": int(clip_id),
             "red": int(red),
