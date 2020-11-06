@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import contextlib
 import uuid
@@ -197,7 +198,7 @@ class Creator(api.Creator):
 class Loader(api.Loader):
     hosts = ["tvpaint"]
 
-    def get_unique_layer_name(self, asset_name, subset_name):
+    def get_unique_layer_name(self, asset_name, name):
         """
             Gets all layer names and if 'name' is present in them, increases
             suffix by 1 (eg. creates unique layer name - for Loader)
@@ -207,15 +208,23 @@ class Loader(api.Loader):
         Returns:
             (string): name_00X (without version)
         """
-        name = "{}_{}".format(asset_name, subset_name)
-        names = {}
-        layers = lib.layers_data()
-        for layer in layers:
-            layer_name = re.sub(r"_\d{3}$", "", layer["name"])
-            if layer_name in names.keys():
-                names[layer_name] = names[layer_name] + 1
-            else:
-                names[layer_name] = 1
-        occurrences = names.get(name, 0)
+        layer_name_base = "{}_{}".format(asset_name, name)
 
-        return "{}_{:0>3d}".format(name, occurrences + 1)
+        counter_regex = re.compile(r"_(\d{3})$")
+
+        higher_counter = 0
+        for layer in lib.layers_data():
+            layer_name = layer["name"]
+            if not layer_name.startswith(layer_name_base):
+                continue
+            number_subpart = layer_name[len(layer_name_base):]
+            groups = counter_regex.findall(number_subpart)
+            if len(groups) != 1:
+                continue
+
+            counter = int(groups[0])
+            if counter > higher_counter:
+                higher_counter = counter
+                continue
+
+        return "{}_{:0>3d}".format(layer_name_base, higher_counter + 1)
