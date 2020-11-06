@@ -723,9 +723,14 @@ class Communicator:
         george_script = (
             "tv_writetextfile \"strict\" \"append\" \"{}\" \"empty\""
         ).format(tmp_filepath)
+
         result = CommunicationWrapper.execute_george(george_script)
 
-        if result.lower() == "forbidden":
+        if result is None:
+            log.warning(
+                "Host was probably closed before plugin was initialized."
+            )
+        elif result.lower() == "forbidden":
             log.warning("User didn't confirm saving files.")
 
     def stop(self):
