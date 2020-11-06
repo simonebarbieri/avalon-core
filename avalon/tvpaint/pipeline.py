@@ -226,6 +226,12 @@ class Creator(api.Creator):
 class Loader(api.Loader):
     hosts = ["tvpaint"]
 
+    @staticmethod
+    def layer_ids_from_container(container):
+        layer_ids_str = container["objectName"]
+        layer_ids = [int(layer_id) for layer_id in layer_ids_str.split("|")]
+        return layer_ids
+
     def get_unique_layer_name(self, asset_name, name):
         """Layer name with counter as suffix.
 
