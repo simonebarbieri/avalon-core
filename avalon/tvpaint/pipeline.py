@@ -6,6 +6,7 @@ import uuid
 import pyblish.api
 from .. import api, io
 from . import lib
+from ..pipeline import AVALON_CONTAINER_ID
 
 
 METADATA_SECTION = "avalon"
@@ -39,9 +40,11 @@ def uninstall():
     pyblish.api.deregister_host("tvpaint")
 
 
-def containerise(name, namespace, nodes, context, loader):
+def containerise(name, namespace, layer_id, context, loader):
     data = {
         "schema": "avalon-core:container-2.0",
+        "id": AVALON_CONTAINER_ID,
+        "objectName": layer_id,
         "name": name,
         "namespace": namespace,
         "loader": str(loader),
