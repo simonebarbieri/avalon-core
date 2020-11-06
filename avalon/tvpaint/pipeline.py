@@ -55,6 +55,9 @@ def containerise(
         layer_ids (list): List of layers that are part of loaded container.
         current_containers (list): Preloaded containers. Should be used only
             on update/switch when containers were modified durring the process.
+
+    Returns:
+        dict: Container data stored to workfile metadata.
     """
     object_name = "|".join(layer_ids)
     container_data = {
@@ -71,7 +74,7 @@ def containerise(
         current_containers = ls()
     current_containers.append(new_container)
     write_workfile_metadata(SECTION_NAME_CONTAINERS, current_containers)
-    return new_container
+    return container_data
 
 
 @contextlib.contextmanager
