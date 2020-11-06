@@ -230,9 +230,13 @@ function importFile(path, item_name, import_options){
             
             comp = app.project.importFile(im_opt);
 
-            if (app.project.selection.length == 2 &&
-                app.project.selection[0] instanceof FolderItem){
-                 comp.parentFolder = app.project.selection[0]
+            if (app.project.selection.length >= 2){
+                for (i = 0; i < app.project.selection.length; ++i){
+                    var item = app.project.selection[i];
+                    if (item instanceof FolderItem){
+                        comp.parentFolder = item;
+                    }
+                }
             }
         } catch (error) {
             $.writeln(error);
@@ -240,6 +244,8 @@ function importFile(path, item_name, import_options){
         } finally {
             fp.close();
         }
+    }else{
+        alert("File " + path + " doesn't exist.");
     }
     if (comp){
         comp.name = item_name;
@@ -341,6 +347,9 @@ function saveAs(path){
 //}
 //$.writeln(getItems(true, false, false));
 //importFile(mov, "new_wav", "{}");
+// var inop = JSON.stringify({sequence: true});
+// var seq = "C:/projects/petr_test/assets/locations/Jungle/publish/render/reviewArt/v003/petr_test_Jungle_reviewArt_v003.0001.jpg";
+// importFile(seq, "new_wav", inop);
 
 
 
