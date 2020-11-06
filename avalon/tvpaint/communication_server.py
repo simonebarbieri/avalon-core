@@ -328,9 +328,16 @@ class TVPaintRpc(JsonRpc):
         return
 
     async def scene_inventory_tool(self):
+        """Open Scene Inventory tool.
+
+        Funciton can't confirm if tool was opened becauise one part of
+        SceneInventory initialization is calling websocket request to host but
+        host can't response because is waiting for response from this call.
+        """
         log.info("Triggering Scene inventory tool")
         item = MainThreadItem(sceneinventory.show)
-        self._execute_in_main_thread(item)
+        # Do not wait for result of callback
+        self._execute_in_main_thread(item, wait=False)
         return
 
     async def library_loader_tool(self):
