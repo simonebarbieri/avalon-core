@@ -199,14 +199,19 @@ class Loader(api.Loader):
     hosts = ["tvpaint"]
 
     def get_unique_layer_name(self, asset_name, name):
-        """
-            Gets all layer names and if 'name' is present in them, increases
-            suffix by 1 (eg. creates unique layer name - for Loader)
+        """Layer name with counter as suffix.
+
+        Find higher 3 digit suffix from all layer names in scene matching regex
+        `{asset_name}_{name}_{suffix}`. Higher 3 digit suffix is used
+        as base for next number if scene does not contain layer matching regex
+        `0` is used ase base.
+
         Args:
-            name (string):  in format asset_subset
+            asset_name (str): Name of subset's parent asset document.
+            name (str): Name of loaded subset.
 
         Returns:
-            (string): name_00X (without version)
+            (str): `{asset_name}_{name}_{higher suffix + 1}`
         """
         layer_name_base = "{}_{}".format(asset_name, name)
 
