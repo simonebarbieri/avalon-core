@@ -130,11 +130,8 @@ def ls():
 class Creator(api.Creator):
     def __init__(self, *args, **kwargs):
         super(Creator, self).__init__(*args, **kwargs)
-        # Replace unimportant `id` value "pyblish.avalon.instance" with
-        # unified identifier created with `uuid` module
-        # - "pyblish.avalon.instance" is not important as instances are stored
-        #   under specific key where nothing else is
-        self.data["id"] = str(uuid.uuid4())
+        # Add unified identifier created with `uuid` module
+        self.data["uuid"] = str(uuid.uuid4())
 
     @staticmethod
     def are_instances_same(instance_1, instance_2):
