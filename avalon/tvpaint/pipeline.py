@@ -58,7 +58,10 @@ def containerise(
     Returns:
         dict: Container data stored to workfile metadata.
     """
+    # Convert ids to string
+    layer_ids = [str(layer_id) for layer_id in layer_ids]
     object_name = "|".join(layer_ids)
+
     container_data = {
         "schema": "avalon-core:container-2.0",
         "id": AVALON_CONTAINER_ID,
@@ -68,11 +71,15 @@ def containerise(
         "loader": str(loader),
         "representation": str(context["representation"]["_id"])
     }
-    new_container = json.dumps(container_data)
     if current_containers is None:
         current_containers = ls()
-    current_containers.append(new_container)
+
+    # Add container to containers list
+    current_containers.append(container_data)
+
+    # Store data to metadata
     write_workfile_metadata(SECTION_NAME_CONTAINERS, current_containers)
+
     return container_data
 
 
