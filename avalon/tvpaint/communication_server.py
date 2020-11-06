@@ -339,8 +339,8 @@ class TVPaintRpc(JsonRpc):
         self._execute_in_main_thread(item)
         return
 
-    def _execute_in_main_thread(self, item):
-        return self.communication_obj.execute_in_main_thread(item)
+    def _execute_in_main_thread(self, item, **kwargs):
+        return self.communication_obj.execute_in_main_thread(item, **kwargs)
 
     def send_notification(self, client, method, params=[]):
         asyncio.run_coroutine_threadsafe(
@@ -475,10 +475,12 @@ class Communicator:
         self.websocket_server = None
         self.websocket_rpc = None
 
-    def execute_in_main_thread(self, main_thread_item):
+    def execute_in_main_thread(self, main_thread_item, wait=True):
         """Add `MainThreadItem` to callback queue and wait for result."""
         self.callback_queue.put(main_thread_item)
-        return main_thread_item.wait()
+        if wait:
+            return main_thread_item.wait()
+        return
 
     def main_thread_listen(self):
         """Get last `MainThreadItem` from queue.
