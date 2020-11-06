@@ -52,7 +52,6 @@ def containerise(
         namespace (str): Container namespace.
         layer_ids (list): List of layer that were loaded and belongs to the
             container.
-        layer_ids (list): List of layers that are part of loaded container.
         current_containers (list): Preloaded containers. Should be used only
             on update/switch when containers were modified durring the process.
 
