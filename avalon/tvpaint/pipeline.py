@@ -2,6 +2,7 @@ import os
 import json
 import contextlib
 import uuid
+import tempfile
 
 import pyblish.api
 from .. import api, io
@@ -62,7 +63,7 @@ def maintained_selection():
         pass
 
 
-def workfile_metadata(metadata_key):
+def workfile_metadata(metadata_key, default=None):
     """Read metadata for specific key from current project workfile.
 
     Pipeline use function to store loaded and created instances within keys
@@ -73,15 +74,33 @@ def workfile_metadata(metadata_key):
         metadata_key (str): Key defying which key should read. It is expected
             value contain json serializable string.
     """
+    if default is None:
+        default = []
+    output_file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False
+    )
+    output_file.close()
+
+    output_filepath = output_file.name.replace("\\", "/")
     george_script = (
-        "tv_readprojectstring \"{}\" \"{}\" \"[]\""
-    ).format(METADATA_SECTION, metadata_key)
-    json_string = lib.execute_george(george_script)
+        "output_path = \"{}\"\n"
+        "tv_readprojectstring \"{}\" \"{}\" \"[]\"\n"
+        "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' result"
+    ).format(output_filepath, METADATA_SECTION, metadata_key)
+    lib.execute_george_through_file(george_script)
+
+    with open(output_filepath, "r") as stream:
+        json_string = stream.read()
+    # Replace quotes plaholders with their values
+    json_string = (
+        json_string
+        .replace("{__sq__}", "'")
+        .replace("{__dq__}", "\"")
+    )
+
     if json_string:
-        data = json.loads(json_string)
-    else:
-        data = []
-    return data
+        return json.loads(json_string)
+    return default
 
 
 def write_workfile_metadata(metadata_key, value):
@@ -101,12 +120,11 @@ def write_workfile_metadata(metadata_key, value):
         value = ""
 
     # Handle quotes in dumped json string
+    # - replace single and double quotes with placeholders
     value = (
         value
-        # Replace both quotes with placeholder first
-        .replace("'", "{single_quote}").replace("\"", "{quote}")
-        # Replace plaholders with right values for george script
-        .replace("{single_quote}", "'\"'").replace("{quote}", "\"'\"")
+        .replace("'", "{__sq__}")
+        .replace("\"", "{__dq__}")
     )
 
     george_script = (
