@@ -42,17 +42,36 @@ def uninstall():
     pyblish.api.deregister_host("tvpaint")
 
 
-def containerise(name, namespace, layer_id, context, loader):
-    data = {
+def containerise(
+    name, namespace, layer_ids, context, loader, current_containers=None
+):
+    """Add new container to metadata.
+
+    Args:
+        name (str): Container name.
+        namespace (str): Container namespace.
+        layer_ids (list): List of layer that were loaded and belongs to the
+            container.
+        layer_ids (list): List of layers that are part of loaded container.
+        current_containers (list): Preloaded containers. Should be used only
+            on update/switch when containers were modified durring the process.
+    """
+    object_name = "|".join(layer_ids)
+    container_data = {
         "schema": "avalon-core:container-2.0",
         "id": AVALON_CONTAINER_ID,
-        "objectName": layer_id,
+        "objectName": object_name,
         "name": name,
         "namespace": namespace,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"])
     }
-    return json.dumps(data)
+    new_container = json.dumps(container_data)
+    if current_containers is None:
+        current_containers = ls()
+    current_containers.append(new_container)
+    write_workfile_metadata(SECTION_NAME_CONTAINERS, current_containers)
+    return new_container
 
 
 @contextlib.contextmanager
