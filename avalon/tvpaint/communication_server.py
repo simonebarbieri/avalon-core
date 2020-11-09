@@ -876,6 +876,9 @@ class Communicator:
 
         result = CommunicationWrapper.execute_george(george_script)
 
+        # Remote the file
+        os.remove(tmp_filepath)
+
         if result is None:
             log.warning(
                 "Host was probably closed before plugin was initialized."
