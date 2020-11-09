@@ -193,3 +193,72 @@ def groups_data():
     output = parse_group_data(data)
     os.remove(output_filepath)
     return output
+
+
+def get_exposure_frames(layer_id, first_frame=None, last_frame=None):
+    """Get exposure frames.
+
+    Easily said returns frames where keyframes are. Recognized with george
+    function `tv_exposureinfo` returning "Head".
+
+    Args:
+        layer_id (int): Id of a layer for which exposure frames should
+            look for.
+        first_frame (int): From which frame will look for exposure frames.
+            Used layers first frame if not entered.
+        last_frame (int): Last frame where will look for exposure frames.
+            Used layers last frame if not entered.
+
+    Returns:
+        list: Frames where exposure is set to "Head".
+    """
+    if first_frame is None or last_frame is None:
+        layer = layers_data(layer_id)[0]
+        if first_frame is None:
+            first_frame = layer["frame_start"]
+        if last_frame is None:
+            last_frame = layer["frame_end"]
+
+    tmp_file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False
+    )
+    tmp_file.close()
+    tmp_output_path = tmp_file.name.replace("\\", "/")
+    george_script_lines = [
+        "tv_layerset {}".format(layer_id),
+        "output_path = \"{}\"".format(tmp_output_path),
+        "output = \"\"",
+        "frame = {}".format(first_frame),
+        "WHILE (frame <= {})".format(last_frame),
+        "tv_exposureinfo frame",
+        "exposure = result",
+        "IF (CMP(exposure, \"Head\") == 1)",
+        "IF (CMP(output, \"\") == 1)",
+        "output = output''frame",
+        "ELSE",
+        "output = output'|'frame",
+        "END",
+        "END",
+        "frame = frame + 1",
+        "END",
+        "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' output"
+    ]
+
+    execute_george_through_file("\n".join(george_script_lines))
+
+    with open(tmp_output_path, "r") as stream:
+        data = stream.read()
+
+    os.remove(tmp_output_path)
+
+    lines = []
+    for line in data.split("\n"):
+        line = line.strip()
+        if line:
+            lines.append(line)
+
+    exposure_frames = [
+        int(frame)
+        for frame in lines[0].split("|")
+    ]
+    return exposure_frames
