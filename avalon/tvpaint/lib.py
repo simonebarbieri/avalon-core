@@ -63,31 +63,24 @@ def parse_layers_data(data):
     return layers
 
 
-def layers_data():
+def layers_data(layer_ids=None):
     output_file = tempfile.NamedTemporaryFile(
         mode="w", suffix=".txt", delete=False
     )
     output_file.close()
+    if layer_ids is not None and isinstance(layer_ids, int):
+        layer_ids = [layer_ids]
 
     output_filepath = output_file.name.replace("\\", "/")
-    george_script_lines = (
+    george_script_lines = [
         # Variable containing full path to output file
         "output_path = \"{}\"".format(output_filepath),
         # Get Current Layer ID
         "tv_LayerCurrentID",
-        "current_layer_id = result",
-        # Layer loop variables
-        "loop = 1",
-        "idx = 0",
-        # Layers loop
-        "WHILE loop",
-        "tv_LayerGetID idx",
-        "layer_id = result",
-        "idx = idx + 1",
-        # Stop loop if layer_id is "NONE"
-        "IF CMP(layer_id, \"NONE\")==1",
-        "loop = 0",
-        "ELSE",
+        "current_layer_id = result"
+    ]
+    # Script part for getting and storing layer information to temp
+    layer_data_getter = (
         # Get information about layer's group
         "tv_layercolor \"get\" layer_id",
         "group_id = result",
@@ -110,9 +103,32 @@ def layers_data():
         ),
         # Write data to output file
         "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' line",
-        "END",
-        "END"
     )
+
+    # Collect data for all layers if layers are not specified
+    if layer_ids is None:
+        george_script_lines.extend((
+            # Layer loop variables
+            "loop = 1",
+            "idx = 0",
+            # Layers loop
+            "WHILE loop",
+            "tv_LayerGetID idx",
+            "layer_id = result",
+            "idx = idx + 1",
+            # Stop loop if layer_id is "NONE"
+            "IF CMP(layer_id, \"NONE\")==1",
+            "loop = 0",
+            "ELSE",
+            *layer_data_getter,
+            "END",
+            "END"
+        ))
+    else:
+        for layer_id in layer_ids:
+            george_script_lines.append("layer_id = {}".format(layer_id))
+            george_script_lines.extend(layer_data_getter)
+
     george_script = "\n".join(george_script_lines)
     execute_george_through_file(george_script)
 
