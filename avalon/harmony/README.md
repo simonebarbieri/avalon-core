@@ -32,6 +32,14 @@ Communication with Harmony happens with a server/client relationship where the s
 +------------+
 ```
 
+Server/client now uses stricter protocol to handle communication. This is necessary because of precise control over data passed between server/client. Each message is prepended with 6 bytes:
+```
+| A | H | 0x00 | 0x00 | 0x00 | 0x00 | ...
+
+```
+First two bytes are *magic* bytes stands for **A**valon **H**armony. Next four bytes hold length of the message `...` encoded as 32bit unsigned integer. This way we know how many bytes to read from the socket and if we need more or we need to parse multiple messages.
+
+
 ## Usage
 
 The integration creates an `Avalon` menu entry where all Avalon related tools are located.
@@ -48,6 +56,7 @@ You can show the Workfiles app when Harmony launches by setting environment vari
 
 ## Developing
 
+### Low level messaging
 To send from Python to Harmony you can use the exposed method:
 ```python
 from avalon import harmony
@@ -62,7 +71,7 @@ func = """function %s_hello(person)
 """ % (uuid4(), uuid4())
 print(harmony.send({"function": func, "args": ["Python"]})["result"])
 ```
-NOTE: Its important to declare the function at the end of the function string. You can have multiple functions within your function string, but the function declared at the end is what gets executed.
+**NOTE:** Its important to declare the function at the end of the function string. You can have multiple functions within your function string, but the function declared at the end is what gets executed.
 
 To send a function with multiple arguments its best to declare the arguments within the function:
 ```python
@@ -89,6 +98,83 @@ erratic behavior of Harmony. Avalon is prefixing those function names with [UUID
 See above examples how that works. This will result in function named `38dfcef0_a6d7_4064_8069_51fe99ab276e_hello()`.
 You can find list of Harmony object and function in Harmony documentation.
 
+### Higher level (recommended)
+
+Instead of sending functions directly to Harmony, it is more efficient and safe to just add your code to `js/AvalonHarmony.js` or utilize `{"script": "..."}` method.
+
+#### Extending AvalonHarmony.js
+
+Add your function to `AvalonHarmony.js`. For example:
+
+```javascript
+AvalonHarmony.myAwesomeFunction = function() {
+  someCoolStuff();
+};
+```
+Then you can call that javascript code from your Python like:
+
+```Python
+from avalon import harmony
+
+harmony.send({"function": "AvalonHarmony.myAwesomeFunction"});
+
+```
+
+#### Using Script method
+
+You can also pass whole scripts into harmony and call their functions later as needed.
+
+For example, you have bunch of javascript files:
+
+```javascript
+/* Master.js */
+
+var Master = {
+  Foo = {};
+  Boo = {};
+};
+
+/* FileA.js */
+var Foo = function() {};
+
+Foo.prototype.A = function() {
+  someAStuff();
+}
+
+// This will construct object Foo and add it to Master namespace.
+Master.Foo = new Foo();
+
+/* FileB.js */
+var Boo = function() {};
+
+Boo.prototype.B = function() {
+  someBStuff();
+}
+
+// This will construct object Boo and add it to Master namespace.
+Master.Boo = new Boo();
+```
+
+Now in python, just read all those files and send them to Harmony.
+
+```python
+from pathlib import Path
+from avalon import harmony
+
+path_to_js = Path('/path/to/my/js')
+script_to_send = ""
+
+for file in path_to_js.iterdir():
+  if file.suffix == ".js":
+    script_to_send += file.read_text()
+
+harmony.send({"script": script_to_send})
+
+# and use your code in Harmony
+harmony.send({"function": "Master.Boo.B"})
+
+```
+
 ### Scene Save
 Instead of sending a request to Harmony with `scene.saveAll` please use:
 ```python
@@ -99,9 +185,9 @@ harmony.save_scene()
 <details>
   <summary>Click to expand for details on scene save.</summary>
 
-  Because Avalon tools does not deal well with folders for a single entity like a Harmony scene, this integration has implemented to use zip files to encapsulate the Harmony scene folders. This is done with a background watcher for when the `.xstage` file is changed, at which point a request is sent to zip up the Harmony scene folder and move from the local to remote storage.
-
-  This does come with an edge case where if you send `scene.saveAll` to Harmony, two request will be sent back; the reply to `scene.saveAll` and the request to zip and move the scene folder. To prevent this a boolean has been implemented to the background watcher; `app.avalon_on_file_changed`, enable and disable to zip and move.
+  Because Avalon tools does not deal well with folders for a single entity like a Harmony scene, this integration has implemented to use zip files to encapsulate the Harmony scene folders. Saving scene in Harmony via menu or CTRL+S will not result in producing zip file, only saving it from Workfiles will. This is because
+  zipping process can take some time in which we cannot block user from saving again. If xstage file is changed during zipping process it will produce corrupted zip
+  archive.
 </details>
 
 ### Plugin Examples

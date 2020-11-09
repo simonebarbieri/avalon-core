@@ -83,6 +83,38 @@ def setup_startup_scripts():
         os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = avalon_dcc_dir
 
 
+def check_libs():
+    """Check if `OpenHarmony`_ is available.
+
+    Avalon expects either path in `LIB_OPENHARMONY_PATH` or `openHarmony.js`
+    present in `TOONBOOM_GLOBAL_SCRIPT_LOCATION`.
+
+    Throws:
+        RuntimeError: If openHarmony is not found.
+
+    .. _OpenHarmony:
+        https://github.com/cfourney/OpenHarmony
+
+    """
+    if not os.getenv("LIB_OPENHARMONY_PATH"):
+
+        if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
+            if os.path.exists(
+                os.path.join(
+                    os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"),
+                    "openHarmony.js")):
+
+                os.environ["LIB_OPENHARMONY_PATH"] = \
+                    os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION")
+                return
+
+        else:
+            self.log.error(("Cannot find OpenHarmony library. "
+                            "Please set path to it in LIB_OPENHARMONY_PATH "
+                            "environment variable."))
+            raise RuntimeError("Missing OpenHarmony library.")
+
+
 def launch(application_path, zip_file):
     """Setup for Toon Boom application launch.
 

@@ -52,7 +52,7 @@ __all__ = [
     "save_scene_as",
     "remove",
     "find_node_by_name",
-    "signature"
+    "signature",
 
     # Workfiles API
     "open_file",
