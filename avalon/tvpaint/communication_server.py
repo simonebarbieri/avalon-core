@@ -22,6 +22,7 @@ from ..tools import (
     sceneinventory,
     libraryloader
 )
+from ..vendor.Qt import QtCore
 from avalon import api, tvpaint
 
 from aiohttp import web
@@ -256,6 +257,152 @@ class WebsocketServerThread(threading.Thread):
         self.loop.stop()
 
 
+class AvalonToolsHelper:
+    def __init__(self):
+        self._workfiles_tool = None
+        self._loader_tool = None
+        self._creator_tool = None
+        self._publish_tool = None
+        self._scene_inventory_tool = None
+        self._library_loader_tool = None
+
+    def workfiles_tool(self):
+        if self._workfiles_tool is not None:
+            return self._workfiles_tool
+
+        from ..tools.workfiles.app import (
+            Window, validate_host_requirements
+        )
+        # Host validation
+        host = api.registered_host()
+        validate_host_requirements(host)
+
+        window = Window()
+        window.refresh()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        # window.setStyleSheet(style.load_stylesheet())
+        window.widgets["files"].widgets["save"].setEnabled(True)
+
+        context = {
+            "asset": api.Session["AVALON_ASSET"],
+            "silo": api.Session["AVALON_SILO"],
+            "task": api.Session["AVALON_TASK"]
+        }
+        window.set_context(context)
+
+        self._workfiles_tool = window
+
+        return window
+
+    def show_workfiles_tool(self):
+        workfiles_tool = self.workfiles_tool()
+        workfiles_tool.refresh()
+        workfiles_tool.show()
+        # Pull window to the front.
+        workfiles_tool.raise_()
+        workfiles_tool.activateWindow()
+
+    def loader_tool(self):
+        if self._loader_tool is not None:
+            return self._loader_tool
+
+        from ..tools.loader.app import (
+            Window, lib
+        )
+        lib.refresh_family_config_cache()
+        lib.refresh_group_config_cache()
+
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+        window.show()
+
+        context = {"asset": api.Session["AVALON_ASSET"]}
+        window.set_context(context, refresh=True)
+
+        self._loader_tool = window
+
+        return window
+
+    def show_loader_tool(self):
+        loader_tool = self.loader_tool()
+        loader_tool.raise_()
+        loader_tool.activateWindow()
+        loader_tool.refresh()
+
+    def creator_tool(self):
+        if self._creator_tool is not None:
+            return self._creator_tool
+
+        from ..tools.creator.app import Window
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        self._creator_tool = window
+
+        return window
+
+    def show_creator_tool(self):
+        creator_tool = self.creator_tool()
+        creator_tool.refresh()
+        creator_tool.show()
+
+        # Pull window to the front.
+        creator_tool.raise_()
+        creator_tool.activateWindow()
+
+    def scene_inventory_tool(self):
+        if self._scene_inventory_tool is not None:
+            return self._scene_inventory_tool
+
+        from ..tools.sceneinventory.app import Window
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        self._scene_inventory_tool = window
+
+        return window
+
+    def show_scene_inventory_tool(self):
+        scene_inventory_tool = self.scene_inventory_tool()
+        scene_inventory_tool.show()
+        scene_inventory_tool.refresh()
+
+        # Pull window to the front.
+        scene_inventory_tool.raise_()
+        scene_inventory_tool.activateWindow()
+
+    def library_loader_tool(self):
+        if self._library_loader_tool is not None:
+            return self._library_loader_tool
+
+        from ..tools.libraryloader.app import Window
+
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        self._library_loader_tool = window
+
+        return window
+
+    def show_library_loader_tool(self):
+        library_loader_tool = self.library_loader_tool()
+        library_loader_tool.show()
+        library_loader_tool.raise_()
+        library_loader_tool.activateWindow()
+        library_loader_tool.refresh()
+
+
 class TVPaintRpc(JsonRpc):
     def __init__(self, communication_obj, route_name="", **kwargs):
         super().__init__(**kwargs)
@@ -265,6 +412,9 @@ class TVPaintRpc(JsonRpc):
 
         self.route_name = route_name
         self.communication_obj = communication_obj
+
+        self.tools_helper = AvalonToolsHelper()
+
         # Register methods
         self.add_methods(
             (route_name, self.workfiles_tool),
@@ -305,19 +455,19 @@ class TVPaintRpc(JsonRpc):
     # Panel routes for tools
     async def workfiles_tool(self):
         log.info("Triggering Workfile tool")
-        item = MainThreadItem(workfiles.show)
+        item = MainThreadItem(self.tools_helper.show_workfiles_tool)
         self._execute_in_main_thread(item)
         return
 
     async def loader_tool(self):
         log.info("Triggering Loader tool")
-        item = MainThreadItem(loader.show)
+        item = MainThreadItem(self.tools_helper.show_loader_tool)
         self._execute_in_main_thread(item)
         return
 
     async def creator_tool(self):
         log.info("Triggering Creator tool")
-        item = MainThreadItem(creator.show)
+        item = MainThreadItem(self.tools_helper.show_creator_tool)
         self._execute_in_main_thread(item)
         return
 
@@ -335,14 +485,14 @@ class TVPaintRpc(JsonRpc):
         host can't response because is waiting for response from this call.
         """
         log.info("Triggering Scene inventory tool")
-        item = MainThreadItem(sceneinventory.show)
+        item = MainThreadItem(self.tools_helper.show_scene_inventory_tool)
         # Do not wait for result of callback
         self._execute_in_main_thread(item, wait=False)
         return
 
     async def library_loader_tool(self):
         log.info("Triggering Library loader tool")
-        item = MainThreadItem(libraryloader.show)
+        item = MainThreadItem(self.tools_helper.show_library_loader_tool)
         self._execute_in_main_thread(item)
         return
 
