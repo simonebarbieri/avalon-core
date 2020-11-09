@@ -823,6 +823,31 @@ class Window(QtWidgets.QMainWindow):
         files.refresh()
 
 
+def validate_host_requirements(host):
+    if host is None:
+        raise RuntimeError("No registered host.")
+
+    # Verify the host has implemented the api for Work Files
+    required = [
+        "open_file",
+        "save_file",
+        "current_file",
+        "has_unsaved_changes",
+        "work_root",
+        "file_extensions",
+    ]
+    missing = []
+    for name in required:
+        if not hasattr(host, name):
+            missing.append(name)
+    if missing:
+        raise RuntimeError(
+            "Host is missing required Work Files interfaces: "
+            "%s (host: %s)" % (", ".join(missing), host)
+        )
+    return True
+
+
 def show(root=None, debug=False, parent=None, use_context=True, save=True):
     """Show Work Files GUI"""
     # todo: remove `root` argument to show()
@@ -834,24 +859,7 @@ def show(root=None, debug=False, parent=None, use_context=True, save=True):
         pass
 
     host = api.registered_host()
-    if host is None:
-        raise RuntimeError("No registered host.")
-
-    # Verify the host has implemented the api for Work Files
-    required = ["open_file",
-                "save_file",
-                "current_file",
-                "has_unsaved_changes",
-                "work_root",
-                "file_extensions",
-                ]
-    missing = []
-    for name in required:
-        if not hasattr(host, name):
-            missing.append(name)
-    if missing:
-        raise RuntimeError("Host is missing required Work Files interfaces: "
-                           "%s (host: %s)" % (", ".join(missing), host))
+    validate_host_requirements(host)
 
     if debug:
         api.Session["AVALON_ASSET"] = "Mock"
