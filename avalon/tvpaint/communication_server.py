@@ -14,6 +14,7 @@ import threading
 from queue import Queue
 from contextlib import closing
 
+from ..tools import publish
 from ..vendor.Qt import QtCore
 from avalon import api, tvpaint
 
@@ -254,7 +255,6 @@ class AvalonToolsHelper:
         self._workfiles_tool = None
         self._loader_tool = None
         self._creator_tool = None
-        self._publish_tool = None
         self._scene_inventory_tool = None
         self._library_loader_tool = None
 
