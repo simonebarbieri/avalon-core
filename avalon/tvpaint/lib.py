@@ -257,8 +257,8 @@ def get_exposure_frames(layer_id, first_frame=None, last_frame=None):
         if line:
             lines.append(line)
 
-    exposure_frames = [
-        int(frame)
-        for frame in lines[0].split("|")
-    ]
+    exposure_frames = []
+    for line in lines:
+        for frame in line.split("|"):
+            exposure_frames.append(int(frame))
     return exposure_frames
