@@ -14,14 +14,6 @@ import threading
 from queue import Queue
 from contextlib import closing
 
-from ..tools import (
-    workfiles,
-    creator,
-    loader,
-    publish,
-    sceneinventory,
-    libraryloader
-)
 from ..vendor.Qt import QtCore
 from avalon import api, tvpaint
 
@@ -319,7 +311,6 @@ class AvalonToolsHelper:
         window.setWindowFlags(
             window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
         )
-        window.show()
 
         context = {"asset": api.Session["AVALON_ASSET"]}
         window.set_context(context, refresh=True)
@@ -330,6 +321,7 @@ class AvalonToolsHelper:
 
     def show_loader_tool(self):
         loader_tool = self.loader_tool()
+        loader_tool.show()
         loader_tool.raise_()
         loader_tool.activateWindow()
         loader_tool.refresh()
