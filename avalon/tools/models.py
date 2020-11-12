@@ -339,7 +339,7 @@ class AssetModel(TreeModel):
     subsetColorsRole = QtCore.Qt.UserRole + 4
 
     doc_fetched = QtCore.Signal()
-    refreshed = QtCore.Signal()
+    refreshed = QtCore.Signal(bool)
 
     def __init__(self, dbcon=None, parent=None, asset_projection=NOT_SET):
         super(AssetModel, self).__init__(parent=parent)
@@ -441,22 +441,20 @@ class AssetModel(TreeModel):
         self.beginResetModel()
 
         assets_by_parent = self._doc_payload.get("assets_by_parent")
-        if assets_by_parent is None:
-            self.endResetModel()
-            return
+        if assets_by_parent is not None:
+            silos = self._doc_payload["silos"]
 
-        silos = self._doc_payload["silos"]
-
-        # Build the hierarchical tree items recursively
-        self._add_hierarchy(
-            assets_by_parent,
-            parent=None,
-            silos=silos
-        )
+            # Build the hierarchical tree items recursively
+            self._add_hierarchy(
+                assets_by_parent,
+                parent=None,
+                silos=silos
+            )
 
         self.endResetModel()
+        has_content = bool(assets_by_parent) or bool(silos)
 
-        self.refreshed.emit()
+        self.refreshed.emit(has_content)
 
     def _fetch(self):
         project_doc = self.dbcon.find_one(
