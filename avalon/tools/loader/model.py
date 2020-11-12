@@ -9,6 +9,8 @@ from ..models import TreeModel, Item
 from .. import lib
 from ...lib import MasterVersionType
 
+NOT_SET = object()
+
 
 def is_filtering_recursible():
     """Does Qt binding support recursive filtering for QSortFilterProxyModel?
@@ -67,8 +69,37 @@ class SubsetsModel(TreeModel):
     ]
     not_last_master_brush = QtGui.QBrush(QtGui.QColor(254, 121, 121))
 
-    def __init__(self, grouping=True, parent=None):
+    def __init__(
+        self,
+        grouping=True,
+        parent=None,
+        asset_doc_projection=NOT_SET,
+        subset_doc_projection=NOT_SET
+    ):
         super(SubsetsModel, self).__init__(parent=parent)
+
+        # Projections for Mongo queries
+        # - let ability to modify them if used in tools that require more than
+        #   these
+        if asset_doc_projection is NOT_SET:
+            # Minimum required asset document projection
+            asset_doc_projection = {
+                "name": 1,
+                "label": 1
+            }
+
+        if subset_doc_projection is NOT_SET:
+            # Minimum required subset document projection
+            subset_doc_projection = {
+                "name": 1,
+                "parent": 1,
+                "schema": 1,
+                "families": 1,
+                "data.subsetGroup": 1
+            }
+
+        self.asset_doc_projection = asset_doc_projection
+        self.subset_doc_projection = subset_doc_projection
 
         self.columns_index = dict(
             (key, idx) for idx, key in enumerate(self.Columns)
@@ -96,7 +127,6 @@ class SubsetsModel(TreeModel):
         self.on_doc_fetched()
 
     def setData(self, index, value, role=QtCore.Qt.EditRole):
-
         # Trigger additional edit when `version` column changed
         # because it also updates the information in other columns
         if index.column() == self.columns_index["version"]:
@@ -219,20 +249,27 @@ class SubsetsModel(TreeModel):
         })
 
     def _fetch(self):
-        asset_docs = io.find({
-            "type": "asset",
-            "_id": {"$in": self._asset_ids}
-        })
+        asset_docs = io.find(
+            {
+                "type": "asset",
+                "_id": {"$in": self._asset_ids}
+            },
+            self.asset_doc_projection
+        )
         asset_docs_by_id = {
             asset_doc["_id"]: asset_doc
             for asset_doc in asset_docs
         }
 
         subset_docs_by_id = {}
-        for subset in io.find({
-            "type": "subset",
-            "parent": {"$in": self._asset_ids}
-        }):
+        subset_docs = io.find(
+            {
+                "type": "subset",
+                "parent": {"$in": self._asset_ids}
+            },
+            self.subset_doc_projection
+        )
+        for subset in subset_docs:
             if self._doc_fetching_stop:
                 return
             subset_docs_by_id[subset["_id"]] = subset
