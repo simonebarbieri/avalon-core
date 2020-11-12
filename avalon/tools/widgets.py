@@ -1,4 +1,5 @@
 import logging
+import time
 
 from . import lib
 
@@ -88,13 +89,20 @@ class AssetWidget(QtWidgets.QWidget):
     def _refresh_model(self):
         # Store selection
         self._store_model_selection()
+        time_start = time.time()
 
+        self.set_loading_state(
+            loading=True,
+            empty=True
+        )
         # Refresh model
         self.model.refresh()
 
-        def on_refreshed():
+        def on_refreshed(has_item):
+            self.set_loading_state(loading=False, empty=not has_item)
             self._restore_model_selection()
             self.model.refreshed.disconnect()
+            print("Duration: %.3fs" % (time.time() - time_start))
 
         self.model.refreshed.connect(on_refreshed)
         self.refresh_triggered.emit()
@@ -178,6 +186,18 @@ class AssetWidget(QtWidgets.QWidget):
 
             # Set the currently active index
             self.view.setCurrentIndex(index)
+
+    def set_loading_state(self, loading, empty):
+        if self.view.is_loading != loading:
+            if loading:
+                self.view.spinner.repaintNeeded.connect(
+                    self.view.viewport().update
+                )
+            else:
+                self.view.spinner.repaintNeeded.disconnect()
+
+        self.view.is_loading = loading
+        self.view.is_empty = empty
 
     def _store_model_selection(self):
         expanded = set()
