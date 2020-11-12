@@ -10,8 +10,6 @@ from . import lib
 
 log = logging.getLogger(__name__)
 
-NOT_SET = object()
-
 
 class TreeModel(QtCore.QAbstractItemModel):
 
@@ -341,7 +339,22 @@ class AssetModel(TreeModel):
     doc_fetched = QtCore.Signal()
     refreshed = QtCore.Signal(bool)
 
-    def __init__(self, dbcon=None, parent=None, asset_projection=NOT_SET):
+    # Asset document projection
+    asset_projection = {
+        "type": 1,
+        "schema": 1,
+        "name": 1,
+        "silo": 1,
+        "data.visualParent": 1,
+        "data.label": 1,
+        "data.tags": 1,
+        "data.icon": 1,
+        "data.color": 1,
+        "data.deprecated": 1,
+        "data.tasks": 1
+    }
+
+    def __init__(self, dbcon=None, parent=None, asset_projection=None):
         super(AssetModel, self).__init__(parent=parent)
         if dbcon is None:
             dbcon = io
@@ -350,22 +363,10 @@ class AssetModel(TreeModel):
 
         # Projections for Mongo queries
         # - let ability to modify them if used in tools that require more than
-        #   these
-        if asset_projection is NOT_SET:
-            # Asset document projection
-            asset_projection = {
-                "type": 1,
-                "schema": 1,
-                "name": 1,
-                "silo": 1,
-                "data.visualParent": 1,
-                "data.label": 1,
-                "data.tags": 1,
-                "data.icon": 1,
-                "data.color": 1,
-                "data.deprecated": 1,
-                "data.tasks": 1
-            }
+        #   defaults
+        if asset_projection:
+            self.asset_projection = asset_projection
+
         self.asset_projection = asset_projection
 
         self._doc_fetching_thread = None

@@ -9,8 +9,6 @@ from ..models import TreeModel, Item
 from .. import lib
 from ...lib import MasterVersionType
 
-NOT_SET = object()
-
 
 def is_filtering_recursible():
     """Does Qt binding support recursive filtering for QSortFilterProxyModel?
@@ -69,34 +67,37 @@ class SubsetsModel(TreeModel):
     ]
     not_last_master_brush = QtGui.QBrush(QtGui.QColor(254, 121, 121))
 
+    # Should be minimum of required asset document keys
+    asset_doc_projection = {
+        "name": 1,
+        "label": 1
+    }
+    # Should be minimum of required subset document keys
+    subset_doc_projection = {
+        "name": 1,
+        "parent": 1,
+        "schema": 1,
+        "families": 1,
+        "data.subsetGroup": 1
+    }
+
     def __init__(
         self,
         grouping=True,
         parent=None,
-        asset_doc_projection=NOT_SET,
-        subset_doc_projection=NOT_SET
+        asset_doc_projection=None,
+        subset_doc_projection=None
     ):
         super(SubsetsModel, self).__init__(parent=parent)
 
         # Projections for Mongo queries
         # - let ability to modify them if used in tools that require more than
-        #   these
-        if asset_doc_projection is NOT_SET:
-            # Minimum required asset document projection
-            asset_doc_projection = {
-                "name": 1,
-                "label": 1
-            }
+        #   defaults
+        if asset_doc_projection:
+            self.asset_doc_projection = asset_doc_projection
 
-        if subset_doc_projection is NOT_SET:
-            # Minimum required subset document projection
-            subset_doc_projection = {
-                "name": 1,
-                "parent": 1,
-                "schema": 1,
-                "families": 1,
-                "data.subsetGroup": 1
-            }
+        if subset_doc_projection:
+            self.subset_doc_projection = subset_doc_projection
 
         self.asset_doc_projection = asset_doc_projection
         self.subset_doc_projection = subset_doc_projection
