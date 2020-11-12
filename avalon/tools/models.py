@@ -2,7 +2,7 @@ import re
 import logging
 import collections
 
-from ..vendor.Qt import QtCore, QtGui, QtWidgets
+from ..vendor.Qt import QtCore, QtGui
 from ..vendor import Qt, qtawesome
 from .. import io
 from .. import style
