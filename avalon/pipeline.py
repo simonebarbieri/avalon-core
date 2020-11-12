@@ -1765,11 +1765,21 @@ def is_compatible_loader(Loader, context):
     return has_family and has_representation
 
 
+def loaders_from_repre_context(loaders, repre_context):
+    """Return compatible loaders for by representaiton's context."""
+
+    return [
+        loader
+        for loader in loaders
+        if is_compatible_loader(loader, repre_context)
+    ]
+
+
 def loaders_from_representation(loaders, representation):
     """Return all compatible loaders for a representation."""
 
     context = get_representation_context(representation)
-    return [l for l in loaders if is_compatible_loader(l, context)]
+    return loaders_from_repre_context(loaders, context)
 
 
 def last_workfile_with_version(workdir, file_template, fill_data, extensions):
