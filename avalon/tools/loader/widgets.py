@@ -4,6 +4,7 @@ import datetime
 import pprint
 import inspect
 import traceback
+import collections
 
 from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
 from ...vendor import qtawesome
@@ -218,6 +219,62 @@ class SubsetWidget(QtWidgets.QWidget):
         view.is_loading = loading
         view.is_empty = empty
 
+    def _representation_contexts(self, items):
+        version_docs_by_id = {
+            item["version_document"]["_id"]: item["version_document"]
+            for item in items
+        }
+        version_docs_by_subset_id = collections.defaultdict(list)
+        for item in items:
+            subset_id = item["version_document"]["parent"]
+            version_docs_by_subset_id[subset_id].append(
+                item["version_document"]
+            )
+
+        subset_docs = list(io.find(
+            {
+                "_id": {"$in": list(version_docs_by_subset_id.keys())},
+                "type": "subset"
+            },
+            {
+                "schema": 1,
+                "data.families": 1
+            }
+        ))
+        subset_docs_by_id = {
+            subset_doc["_id"]: subset_doc
+            for subset_doc in subset_docs
+        }
+        version_ids = list(version_docs_by_id.keys())
+        repre_docs_cursor = io.find(
+            # Query all representations for selected versions at once
+            {
+                "type": "representation",
+                "parent": {"$in": version_ids}
+            },
+            # Query only name and parent from representation
+            {
+                "name": 1,
+                "parent": 1
+            }
+        )
+        repre_docs_by_version_id = {
+            version_id: []
+            for version_id in version_ids
+        }
+        repre_context_by_id = {}
+        for repre_doc in repre_docs_cursor:
+            version_id = repre_doc["parent"]
+            repre_docs_by_version_id[version_id].append(repre_doc)
+
+            version_doc = version_docs_by_id[version_id]
+            repre_context_by_id[repre_doc["_id"]] = {
+                "representation": repre_doc,
+                "version": version_doc,
+                "subset": subset_docs_by_id[version_doc["parent"]]
+            }
+        return repre_context_by_id, repre_docs_by_version_id
+
     def on_context_menu(self, point):
         """Shows menu with loader actions on Right-click.
 
@@ -267,32 +324,31 @@ class SubsetWidget(QtWidgets.QWidget):
         found_combinations = None
 
         is_first = True
+        repre_context_by_id, repre_docs_by_version_id = (
+            self._representation_contexts(items)
+        )
         for item in items:
             _found_combinations = []
-
-            version_id = item['version_document']['_id']
-            representations = io.find({
-                "type": "representation",
-                "parent": version_id
-            })
-
-            for representation in representations:
-                for loader in api.loaders_from_representation(
-                        available_loaders,
-                        representation['_id']
+            version_id = item["version_document"]["_id"]
+            repre_docs = repre_docs_by_version_id[version_id]
+            for repre_doc in repre_docs:
+                repre_context = repre_context_by_id[repre_doc["_id"]]
+                for loader in pipeline.loaders_from_repre_context(
+                    available_loaders,
+                    repre_context
                 ):
                     # skip multiple select variant if one is selected
                     if one_item_selected:
-                        loaders.append((representation, loader))
+                        loaders.append((repre_doc, loader))
                         continue
 
                     # store loaders of first subset
                     if is_first:
-                        first_loaders.append((representation, loader))
+                        first_loaders.append((repre_doc, loader))
 
                     # store combinations to compare with other subsets
                     _found_combinations.append(
-                        (representation["name"].lower(), loader)
+                        (repre_doc["name"].lower(), loader)
                     )
 
             # skip multiple select variant if one is selected
