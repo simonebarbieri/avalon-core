@@ -24,7 +24,7 @@ class AssetWidget(QtWidgets.QWidget):
 
     """
 
-    assets_refreshed = QtCore.Signal()   # on model refresh
+    refresh_triggered = QtCore.Signal()   # on model refresh
     selection_changed = QtCore.Signal()  # on view selection change
     current_changed = QtCore.Signal()    # on view current index change
 
@@ -83,13 +83,21 @@ class AssetWidget(QtWidgets.QWidget):
         self.proxy = proxy
         self.view = view
 
-    def _refresh_model(self):
-        with lib.preserve_states(
-            self.view, column=0, role=self.model.ObjectIdRole
-        ):
-            self.model.refresh()
+        self.model_selection = {}
 
-        self.assets_refreshed.emit()
+    def _refresh_model(self):
+        # Store selection
+        self._store_model_selection()
+
+        # Refresh model
+        self.model.refresh()
+
+        def on_refreshed():
+            self._restore_model_selection()
+            self.model.refreshed.disconnect()
+
+        self.model.refreshed.connect(on_refreshed)
+        self.refresh_triggered.emit()
 
     def refresh(self):
         self._refresh_model()
@@ -170,6 +178,60 @@ class AssetWidget(QtWidgets.QWidget):
 
             # Set the currently active index
             self.view.setCurrentIndex(index)
+
+    def _store_model_selection(self):
+        expanded = set()
+        model = self.view.model()
+        for index in lib.iter_model_rows(
+            model, column=0, include_root=False
+        ):
+            if self.view.isExpanded(index):
+                value = index.data(self.model.ObjectIdRole)
+                expanded.add(value)
+
+        selection_model = self.view.selectionModel()
+
+        selected = None
+        selected_rows = selection_model.selectedRows()
+        if selected_rows:
+            selected = set(
+                row.data(self.model.ObjectIdRole)
+                for row in selected_rows
+            )
+
+        self.model_selection = {
+            "expanded": expanded,
+            "selected": selected
+        }
+
+    def _restore_model_selection(self):
+        model = self.view.model()
+        expanded = self.model_selection.pop("expanded", None)
+        selected = self.model_selection.pop("selected", None)
+        if expanded:
+            for index in lib.iter_model_rows(
+                model, column=0, include_root=False
+            ):
+                value = index.data(self.model.ObjectIdRole)
+                is_expanded = value in expanded
+                # skip if new index was created meanwhile
+                if is_expanded is None:
+                    continue
+                self.view.setExpanded(index, is_expanded)
+
+        if selected:
+            selection_model = self.view.selectionModel()
+            flags = selection_model.Select | selection_model.Rows
+            # Go through all indices, select the ones with similar data
+            for index in lib.iter_model_rows(
+                model, column=0, include_root=False
+            ):
+                value = index.data(self.model.ObjectIdRole)
+                state = value in selected
+                if state:
+                    # Ensure item is visible
+                    self.view.scrollTo(index)
+                    selection_model.select(index, flags)
 
 
 class OptionalMenu(QtWidgets.QMenu):
