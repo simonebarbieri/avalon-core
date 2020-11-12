@@ -456,11 +456,20 @@ class AssetModel(TreeModel):
 
         self.refreshed.emit(has_content)
 
+    def fetch(self):
+        self._doc_payload = self._fetch() or {}
+        self.doc_fetched.emit()
+
     def _fetch(self):
+        if not self.dbcon.Session.get("AVALON_PROJECT"):
+            return
+
         project_doc = self.dbcon.find_one(
             {"type": "project"},
             {"config.template"}
         )
+        if not project_doc:
+            return
 
         # Get all assets sorted by name
         db_assets = self.dbcon.find(
@@ -482,11 +491,10 @@ class AssetModel(TreeModel):
                 parent_id = asset.get("silo")
             assets_by_parent[parent_id].append(asset)
 
-        self._doc_payload = {
+        return {
             "assets_by_parent": assets_by_parent,
             "silos": silos
         }
-        self.doc_fetched.emit()
 
     def fetch_documents(self):
         """Query required documents from mongo."""
@@ -496,7 +504,7 @@ class AssetModel(TreeModel):
         # Restart payload
         self._doc_payload = {}
         self._doc_fetching_stop = False
-        self._doc_fetching_thread = lib.create_qthread(self._fetch)
+        self._doc_fetching_thread = lib.create_qthread(self.fetch)
         self._doc_fetching_thread.start()
 
     def stop_fetch_thread(self):
