@@ -156,9 +156,9 @@ class Window(QtWidgets.QDialog):
         project = io.find_one({"type": "project"}, {"type": 1})
         assert project, "Project was not found! This is a bug"
 
-        assets_model = self.data["model"]["assets"]
-        assets_model.refresh()
-        assets_model.setFocus()
+        assets_widget = self.data["model"]["assets"]
+        assets_widget.refresh()
+        assets_widget.setFocus()
 
         families = self.data["widgets"]["families"]
         families.refresh()
