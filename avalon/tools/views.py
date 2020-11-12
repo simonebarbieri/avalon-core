@@ -18,11 +18,11 @@ class DeselectableTreeView(QtWidgets.QTreeView):
         QtWidgets.QTreeView.mousePressEvent(self, event)
 
 
-class TreeViewLoading(QtWidgets.QTreeView):
+class TreeViewSpinner(QtWidgets.QTreeView):
     size = 160
 
     def __init__(self, parent=None):
-        super(TreeViewLoading, self).__init__(parent=parent)
+        super(TreeViewSpinner, self).__init__(parent=parent)
 
         loading_image_path = os.path.join(
             os.path.dirname(os.path.abspath(style.__file__)),
@@ -60,10 +60,10 @@ class TreeViewLoading(QtWidgets.QTreeView):
         elif self.is_empty:
             self.paint_empty(event)
         else:
-            super(TreeViewLoading, self).paintEvent(event)
+            super(TreeViewSpinner, self).paintEvent(event)
 
 
-class AssetsView(TreeViewLoading, DeselectableTreeView):
+class AssetsView(TreeViewSpinner, DeselectableTreeView):
     """Item view.
     This implements a context menu.
     """

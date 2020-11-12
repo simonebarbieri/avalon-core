@@ -17,7 +17,7 @@ from ...lib import MasterVersionType
 from .. import lib as tools_lib
 from ..delegates import VersionDelegate, PrettyTimeDelegate
 from ..widgets import OptionalMenu, OptionalAction, OptionDialog
-from ..views import TreeViewLoading
+from ..views import TreeViewSpinner
 
 from .model import (
     SubsetsModel,
@@ -126,7 +126,7 @@ class SubsetWidget(QtWidgets.QWidget):
         top_bar_layout.addWidget(filter)
         top_bar_layout.addWidget(groupable)
 
-        view = TreeViewLoading()
+        view = TreeViewSpinner()
         view.setObjectName("SubsetView")
         view.setIndentation(20)
         view.setStyleSheet("""
