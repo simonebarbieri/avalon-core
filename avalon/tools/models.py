@@ -216,7 +216,7 @@ class TasksModel(TreeModel):
 
     def _get_task_icons(self):
         # Get the project configured icons from database
-        project = io.find_one({"type": "project"})
+        project = io.find_one({"type": "project"}, {"config.tasks"})
         tasks = project["config"].get("tasks", {})
         for task_name, task in tasks.items():
             icon_name = task.get("icon", None)
@@ -237,9 +237,10 @@ class TasksModel(TreeModel):
         if asset_docs is None and asset_ids is not None:
             # prepare filter query
             _filter = {"type": "asset", "_id": {"$in": asset_ids}}
+            _projection = {"data.tasks"}
 
             # find assets in db by query
-            asset_docs = list(io.find(_filter))
+            asset_docs = list(io.find(_filter, _projection))
             db_assets_ids = [asset["_id"] for asset in asset_docs]
 
             # check if all assets were found

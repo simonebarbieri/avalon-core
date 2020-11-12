@@ -773,10 +773,15 @@ class Window(QtWidgets.QMainWindow):
 
         if "asset" in context:
             asset = context["asset"]
-            asset_document = io.find_one({
-                "name": asset,
-                "type": "asset"
-            })
+            asset_document = io.find_one(
+                {
+                    "name": asset,
+                    "type": "asset"
+                },
+                {
+                    "data.tasks": 1
+                }
+            )
 
             # Select the asset
             self.widgets["assets"].select_assets([asset], expand=True)

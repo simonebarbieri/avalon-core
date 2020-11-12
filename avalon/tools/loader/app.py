@@ -153,7 +153,7 @@ class Window(QtWidgets.QDialog):
         """Load assets from database"""
 
         # Ensure a project is loaded
-        project = io.find_one({"type": "project"})
+        project = io.find_one({"type": "project"}, {"type": 1})
         assert project, "Project was not found! This is a bug"
 
         assets_model = self.data["model"]["assets"]
