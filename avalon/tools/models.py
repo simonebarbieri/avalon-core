@@ -10,6 +10,8 @@ from . import lib
 
 log = logging.getLogger(__name__)
 
+NOT_SET = object()
+
 
 class TreeModel(QtCore.QAbstractItemModel):
 
@@ -336,12 +338,32 @@ class AssetModel(TreeModel):
     ObjectIdRole = QtCore.Qt.UserRole + 3
     subsetColorsRole = QtCore.Qt.UserRole + 4
 
-    def __init__(self, dbcon=None, parent=None):
+    def __init__(self, dbcon=None, parent=None, asset_projection=NOT_SET):
         super(AssetModel, self).__init__(parent=parent)
         if dbcon is None:
             dbcon = io
         self.dbcon = dbcon
         self.asset_colors = {}
+
+        # Projections for Mongo queries
+        # - let ability to modify them if used in tools that require more than
+        #   these
+        if asset_projection is NOT_SET:
+            # Asset document projection
+            asset_projection = {
+                "type": 1,
+                "schema": 1,
+                "name": 1,
+                "silo": 1,
+                "data.visualParent": 1,
+                "data.label": 1,
+                "data.tags": 1,
+                "data.icon": 1,
+                "data.color": 1,
+                "data.deprecated": 1,
+                "data.tasks": 1
+            }
+        self.asset_projection = asset_projection
         self.refresh()
 
     def _add_hierarchy(self, assets, parent=None, silos=None):
@@ -415,8 +437,14 @@ class AssetModel(TreeModel):
         self.beginResetModel()
 
         # Get all assets sorted by name
-        db_assets = self.dbcon.find({"type": "asset"}).sort("name", 1)
-        project_doc = self.dbcon.find_one({"type": "project"})
+        db_assets = self.dbcon.find(
+            {"type": "asset"},
+            self.asset_projection
+        ).sort("name", 1)
+        project_doc = self.dbcon.find_one(
+            {"type": "project"},
+            {"config.template"}
+        )
 
         silos = None
         if lib.project_use_silo(project_doc):
