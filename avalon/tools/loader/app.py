@@ -103,6 +103,7 @@ class Window(QtWidgets.QDialog):
 
         families.active_changed.connect(subsets.set_family_filters)
         assets.selection_changed.connect(self.on_assetschanged)
+        assets.refresh_triggered.connect(self.on_assetschanged)
         assets.view.clicked.connect(self.on_assetview_click)
         subsets.active_changed.connect(self.on_subsetschanged)
         subsets.version_changed.connect(self.on_versionschanged)
