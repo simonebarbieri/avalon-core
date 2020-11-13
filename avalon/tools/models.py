@@ -442,8 +442,8 @@ class AssetModel(TreeModel):
         self.beginResetModel()
 
         assets_by_parent = self._doc_payload.get("assets_by_parent")
+        silos = self._doc_payload.get("silos")
         if assets_by_parent is not None:
-            silos = self._doc_payload["silos"]
 
             # Build the hierarchical tree items recursively
             self._add_hierarchy(
