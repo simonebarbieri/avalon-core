@@ -1446,8 +1446,9 @@ class Window(QtWidgets.QDialog):
         control_layout.addWidget(refresh_button)
 
         # endregion control
+        self.family_config_cache = tools_lib.global_family_cache()
 
-        model = InventoryModel()
+        model = InventoryModel(self.family_config_cache)
         proxy = FilterProxyModel()
         view = View()
         view.setModel(proxy)
@@ -1493,7 +1494,7 @@ class Window(QtWidgets.QDialog):
         self.view.setColumnWidth(3, 150)  # family
         self.view.setColumnWidth(4, 100)  # namespace
 
-        tools_lib.refresh_family_config_cache()
+        self.family_config_cache.refresh()
 
     def keyPressEvent(self, event):
         """Custom keyPressEvent.

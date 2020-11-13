@@ -103,9 +103,9 @@ class TasksModel(tools_models.TasksModel):
 
 
 class SubsetsModel(loader_models.SubsetsModel):
-    def __init__(self, dbcon, grouping=True, parent=None):
+    def __init__(self, dbcon, *args, **kwargs):
         self.dbcon = dbcon
-        super(SubsetsModel, self).__init__(grouping=grouping, parent=parent)
+        super(SubsetsModel, self).__init__(*args, **kwargs)
 
     def setData(self, index, value, role=QtCore.Qt.EditRole):
 
@@ -216,7 +216,7 @@ class SubsetsModel(loader_models.SubsetsModel):
             families = version_data.get("families", [None])
 
         family = families[0]
-        family_config = lib.get_family_cached_config(family)
+        family_config = self.family_config_cache.family_config(family)
 
         item.update({
             "version": version["name"],
@@ -327,9 +327,6 @@ class SubsetsModel(loader_models.SubsetsModel):
         }
         self.doc_fetched.emit()
 
-    def group_config_cache(self):
-        return lib.GROUP_CONFIG_CACHE
-
 
 class FamiliesFilterProxyModel(loader_models.FamiliesFilterProxyModel):
     """Filters to specified families"""
@@ -359,7 +356,7 @@ class FamiliesFilterProxyModel(loader_models.FamiliesFilterProxyModel):
 
         filterable_families = set()
         for name in families:
-            family_config = lib.get_family_cached_config(name)
+            family_config = self.family_config_cache.family_config(name)
             if not family_config.get("hideFilter"):
                 filterable_families.add(name)
 

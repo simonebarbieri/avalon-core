@@ -56,12 +56,22 @@ class Window(QtWidgets.QDialog):
         self.show_projects = show_projects
         self.show_libraries = show_libraries
 
+        # Groups config
+        self.groups_config = tools_lib.GroupsConfig(self.dbcon)
+        self.family_config_cache = tools_lib.FamilyConfigCache(self.dbcon)
+
         assets = AssetWidget(
             multiselection=True, dbcon=self.dbcon, parent=self
         )
-        families = FamilyListWidget(dbcon=self.dbcon, parent=self)
+        families = FamilyListWidget(
+            self.dbcon, self.family_config_cache, parent=self
+        )
         subsets = SubsetWidget(
-            dbcon=self.dbcon, tool_name=self.tool_name, parent=self
+            self.dbcon,
+            self.groups_config,
+            self.family_config_cache,
+            tool_name=self.tool_name,
+            parent=self
         )
         version = VersionWidget(dbcon=self.dbcon, parent=self)
         thumbnail = ThumbnailWidget(dbcon=self.dbcon)
@@ -203,8 +213,8 @@ class Window(QtWidgets.QDialog):
                 "Config `%s` has no function `install`" % _config.__name__
             )
 
-        lib.refresh_family_config_cache(self.dbcon)
-        lib.refresh_group_config_cache(self.dbcon)
+        self.family_config_cache.refresh()
+        self.groups_config.refresh()
 
         self._refresh()
         self._assetschanged()

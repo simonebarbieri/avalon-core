@@ -25,17 +25,24 @@ log = logging.getLogger(__name__)
 class SubsetWidget(loader_widgets.SubsetWidget):
     """A widget that lists the published subsets for an asset"""
 
-    def __init__(self, dbcon, tool_name, enable_grouping=True, parent=None):
+    def __init__(
+        self, dbcon, groups_config, family_config_cache, tool_name,
+        enable_grouping=True, parent=None
+    ):
         self.dbcon = dbcon
         self.tool_name = tool_name
 
         super(loader_widgets.SubsetWidget, self).__init__(parent=parent)
 
         model = SubsetsModel(
-            dbcon=self.dbcon, grouping=enable_grouping, parent=self
+            self.dbcon,
+            groups_config,
+            family_config_cache,
+            grouping=enable_grouping,
+            parent=self
         )
         proxy = SubsetFilterProxyModel()
-        family_proxy = FamiliesFilterProxyModel()
+        family_proxy = FamiliesFilterProxyModel(family_config_cache)
         family_proxy.setSourceModel(proxy)
 
         filter = QtWidgets.QLineEdit()
@@ -519,9 +526,9 @@ class FamilyListWidget(loader_widgets.FamilyListWidget):
     NameRole = QtCore.Qt.UserRole + 1
     active_changed = QtCore.Signal(list)
 
-    def __init__(self, dbcon, parent=None):
+    def __init__(self, dbcon, *args, **kwargs):
         self.dbcon = dbcon
-        super(FamilyListWidget, self).__init__(parent=parent)
+        super(FamilyListWidget, self).__init__(*args, **kwargs)
 
     def refresh(self):
         """Refresh the listed families.
@@ -540,7 +547,7 @@ class FamilyListWidget(loader_widgets.FamilyListWidget):
         self.clear()
         for name in sorted(unique_families):
 
-            family = lib.get_family_cached_config(name)
+            family = self.family_config_cache.family_config(name)
             if family.get("hideFilter"):
                 continue
 

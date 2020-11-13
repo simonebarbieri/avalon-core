@@ -108,12 +108,22 @@ class SubsetWidget(QtWidgets.QWidget):
         ("step", 50)
     )
 
-    def __init__(self, enable_grouping=True, parent=None):
+    def __init__(
+        self,
+        groups_config,
+        family_config_cache,
+        enable_grouping=True,
+        parent=None
+    ):
         super(SubsetWidget, self).__init__(parent=parent)
 
-        model = SubsetsModel(grouping=enable_grouping)
+        model = SubsetsModel(
+            groups_config,
+            family_config_cache,
+            grouping=enable_grouping
+        )
         proxy = SubsetFilterProxyModel()
-        family_proxy = FamiliesFilterProxyModel()
+        family_proxy = FamiliesFilterProxyModel(family_config_cache)
         family_proxy.setSourceModel(proxy)
 
         filter = QtWidgets.QLineEdit()
@@ -839,8 +849,10 @@ class FamilyListWidget(QtWidgets.QListWidget):
     NameRole = QtCore.Qt.UserRole + 1
     active_changed = QtCore.Signal(list)
 
-    def __init__(self, parent=None):
+    def __init__(self, family_config_cache, parent=None):
         super(FamilyListWidget, self).__init__(parent=parent)
+
+        self.family_config_cache = family_config_cache
 
         multi_select = QtWidgets.QAbstractItemView.ExtendedSelection
         self.setSelectionMode(multi_select)
@@ -868,7 +880,7 @@ class FamilyListWidget(QtWidgets.QListWidget):
         self.clear()
         for name in sorted(unique_families):
 
-            family = tools_lib.get_family_cached_config(name)
+            family = self.family_config_cache.family_config(name)
             if family.get("hideFilter"):
                 continue
 

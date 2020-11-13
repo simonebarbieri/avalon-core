@@ -28,6 +28,10 @@ class Window(QtWidgets.QDialog):
             "Asset Loader 2.1 - {}".format(api.Session.get("AVALON_PROJECT"))
         )
 
+        # Groups config
+        self.groups_config = lib.GroupsConfig(io)
+        self.family_config_cache = lib.global_family_cache()
+
         # Enable minimize and maximize for app
         self.setWindowFlags(QtCore.Qt.Window)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
@@ -39,8 +43,12 @@ class Window(QtWidgets.QDialog):
         container = QtWidgets.QWidget()
 
         assets = AssetWidget(multiselection=True, parent=self)
-        families = FamilyListWidget()
-        subsets = SubsetWidget(parent=self)
+        families = FamilyListWidget(self.family_config_cache, self)
+        subsets = SubsetWidget(
+            self.groups_config,
+            self.family_config_cache,
+            parent=self
+        )
         version = VersionWidget()
         thumbnail = ThumbnailWidget()
 
@@ -108,8 +116,8 @@ class Window(QtWidgets.QDialog):
         subsets.active_changed.connect(self.on_subsetschanged)
         subsets.version_changed.connect(self.on_versionschanged)
 
-        lib.refresh_family_config_cache()
-        lib.refresh_group_config_cache()
+        self.family_config_cache.refresh()
+        self.groups_config.refresh()
 
         self._refresh()
         self._assetschanged()
@@ -405,7 +413,9 @@ class Window(QtWidgets.QDialog):
             self.echo("No selected subset.")
             return
 
-        dialog = SubsetGroupingDialog(items=selected, parent=self)
+        dialog = SubsetGroupingDialog(
+            items=selected, groups_config=self.groups_config, parent=self
+        )
         dialog.grouped.connect(self._assetschanged)
         dialog.show()
 
@@ -414,13 +424,14 @@ class SubsetGroupingDialog(QtWidgets.QDialog):
 
     grouped = QtCore.Signal()
 
-    def __init__(self, items, parent=None):
+    def __init__(self, items, groups_config, parent=None):
         super(SubsetGroupingDialog, self).__init__(parent=parent)
         self.setWindowTitle("Grouping Subsets")
         self.setMinimumWidth(250)
         self.setModal(True)
 
         self.items = items
+        self.groups_config = groups_config
         self.subsets = parent.data["model"]["subsets"]
         self.asset_ids = parent.data["state"]["assetIds"]
 
@@ -463,11 +474,7 @@ class SubsetGroupingDialog(QtWidgets.QDialog):
         if group:
             group.deleteLater()
 
-        active_groups = list()
-        for asset_id in self.asset_ids:
-            active_groups.extend(lib.get_active_group_config(
-                asset_id, include_predefined=True
-            ))
+        active_groups = self.groups_config.active_groups(self.asset_ids)
 
         # Build new action group
         group = QtWidgets.QActionGroup(button)
@@ -543,11 +550,6 @@ def show(debug=False, parent=None, use_context=False):
         module.project = any_project["name"]
 
     with lib.application():
-
-        # TODO: Global state, remove these
-        lib.refresh_family_config_cache()
-        lib.refresh_group_config_cache()
-
         window = Window(parent)
         window.setStyleSheet(style.load_stylesheet())
         window.show()

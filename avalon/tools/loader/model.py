@@ -83,6 +83,8 @@ class SubsetsModel(TreeModel):
 
     def __init__(
         self,
+        groups_config,
+        family_config_cache,
         grouping=True,
         parent=None,
         asset_doc_projection=None,
@@ -107,6 +109,8 @@ class SubsetsModel(TreeModel):
         )
         self._asset_ids = None
 
+        self.groups_config = groups_config
+        self.family_config_cache = family_config_cache
         self._sorter = None
         self._grouping = grouping
         self._icons = {
@@ -230,7 +234,7 @@ class SubsetsModel(TreeModel):
             families = version_data.get("families", [None])
 
         family = families[0]
-        family_config = lib.get_family_cached_config(family)
+        family_config = self.family_config_cache.family_config(family)
 
         item.update({
             "version": version["name"],
@@ -401,71 +405,6 @@ class SubsetsModel(TreeModel):
             asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id
         )
 
-    def group_config_cache(self):
-        return lib.GROUP_CONFIG_CACHE
-
-    def split_for_group(self, subset_docs):
-        """Collect all active groups from each subset"""
-        predefineds = self.group_config_cache().copy()
-        default_group_config = predefineds.pop("__default__")
-
-        _orders = set([0])  # default order zero included
-        for config in predefineds.values():
-            _orders.add(config["order"])
-
-        # Remap order to list index
-        orders = sorted(_orders)
-
-        subset_docs_without_group = collections.defaultdict(list)
-        subset_docs_by_group = collections.defaultdict(dict)
-        for subset_doc in subset_docs:
-            subset_name = subset_doc["name"]
-            if self._grouping:
-                group_name = subset_doc["data"].get("subsetGroup")
-                if group_name:
-                    if subset_name not in subset_docs_by_group[group_name]:
-                        subset_docs_by_group[group_name][subset_name] = []
-
-                    subset_docs_by_group[group_name][subset_name].append(
-                        subset_doc
-                    )
-                    continue
-
-            subset_docs_without_group[subset_name].append(subset_doc)
-
-        _groups = list()
-        for name in subset_docs_by_group.keys():
-            # Get group config
-            config = predefineds.get(name, default_group_config)
-            # Base order
-            remapped_order = orders.index(config["order"])
-
-            data = {
-                "name": name,
-                "icon": config["icon"],
-                "_order": remapped_order,
-            }
-
-            _groups.append(data)
-
-        # Sort by tuple (base_order, name)
-        # If there are multiple groups in same order, will sorted by name.
-        ordered_groups = sorted(
-            _groups, key=lambda _group: (_group.pop("_order"), _group["name"])
-        )
-
-        total = len(ordered_groups)
-        order_temp = "%0{}d".format(len(str(total)))
-
-        groups = {}
-        # Update sorted order to config
-        for order, data in enumerate(ordered_groups):
-            # Format orders into fixed length string for groups sorting
-            data["order"] = order_temp % order
-            groups[data["name"]] = data
-
-        return groups, subset_docs_without_group, subset_docs_by_group
-
     def create_multiasset_group(
         self, subset_name, asset_ids, subset_counter, parent_item=None
     ):
@@ -493,12 +432,14 @@ class SubsetsModel(TreeModel):
     def _fill_subset_items(
         self, asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id
     ):
-        groups, subset_docs_without_group, subset_docs_by_group = (
-            self.split_for_group(subset_docs_by_id.values())
+        _groups_tuple = self.groups_config.split_subsets_for_groups(
+            subset_docs_by_id.values(), self._grouping
         )
+        groups, subset_docs_without_group, subset_docs_by_group = _groups_tuple
 
         group_item_by_name = {}
-        for group_name, group_data in groups.items():
+        for group_data in groups:
+            group_name = group_data["name"]
             group_item = Item()
             group_item.update({
                 "subset": group_name,
@@ -720,9 +661,10 @@ class SubsetFilterProxyModel(GroupMemberFilterProxyModel):
 class FamiliesFilterProxyModel(GroupMemberFilterProxyModel):
     """Filters to specified families"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, family_config_cache, *args, **kwargs):
         super(FamiliesFilterProxyModel, self).__init__(*args, **kwargs)
         self._families = set()
+        self.family_config_cache = family_config_cache
 
     def familyFilter(self):
         return self._families
@@ -755,7 +697,7 @@ class FamiliesFilterProxyModel(GroupMemberFilterProxyModel):
 
         filterable_families = set()
         for name in families:
-            family_config = lib.get_family_cached_config(name)
+            family_config = self.family_config_cache.family_config(name)
             if not family_config.get("hideFilter"):
                 filterable_families.add(name)
 
