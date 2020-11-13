@@ -95,14 +95,11 @@ def dummy():
     yield
 
 
-def iter_model_rows(model,
-                    column,
-                    include_root=False):
+def iter_model_rows(model, column, include_root=False):
     """Iterate over all row indices in a model"""
     indices = [QtCore.QModelIndex()]  # start iteration at root
 
     for index in indices:
-
         # Add children to the iterations
         child_rows = model.rowCount(index)
         for child_row in range(child_rows):
@@ -186,9 +183,7 @@ def preserve_states(tree_view,
 
 
 @contextlib.contextmanager
-def preserve_expanded_rows(tree_view,
-                           column=0,
-                           role=QtCore.Qt.DisplayRole):
+def preserve_expanded_rows(tree_view, column=0, role=None):
     """Preserves expanded row in QTreeView by column's data role.
 
     This function is created to maintain the expand vs collapse status of
@@ -205,14 +200,13 @@ def preserve_expanded_rows(tree_view,
         None
 
     """
-
+    if role is None:
+        role = QtCore.Qt.DisplayRole
     model = tree_view.model()
 
     expanded = set()
 
-    for index in iter_model_rows(model,
-                                 column=column,
-                                 include_root=False):
+    for index in iter_model_rows(model, column=column, include_root=False):
         if tree_view.isExpanded(index):
             value = index.data(role)
             expanded.add(value)
@@ -223,9 +217,7 @@ def preserve_expanded_rows(tree_view,
         if not expanded:
             return
 
-        for index in iter_model_rows(model,
-                                     column=column,
-                                     include_root=False):
+        for index in iter_model_rows(model, column=column, include_root=False):
             value = index.data(role)
             state = value in expanded
             if state:
@@ -235,10 +227,7 @@ def preserve_expanded_rows(tree_view,
 
 
 @contextlib.contextmanager
-def preserve_selection(tree_view,
-                       column=0,
-                       role=QtCore.Qt.DisplayRole,
-                       current_index=True):
+def preserve_selection(tree_view, column=0, role=None, current_index=True):
     """Preserves row selection in QTreeView by column's data role.
 
     This function is created to maintain the selection status of
@@ -253,7 +242,8 @@ def preserve_selection(tree_view,
         None
 
     """
-
+    if role is None:
+        role = QtCore.Qt.DisplayRole
     model = tree_view.model()
     selection_model = tree_view.selectionModel()
     flags = selection_model.Select | selection_model.Rows
@@ -276,10 +266,7 @@ def preserve_selection(tree_view,
             return
 
         # Go through all indices, select the ones with similar data
-        for index in iter_model_rows(model,
-                                     column=column,
-                                     include_root=False):
-
+        for index in iter_model_rows(model, column=column, include_root=False):
             value = index.data(role)
             state = value in selected
             if state:
@@ -287,9 +274,9 @@ def preserve_selection(tree_view,
                 selection_model.select(index, flags)
 
             if current_index_value and value == current_index_value:
-                selection_model.setCurrentIndex(index,
-                                                selection_model.NoUpdate)
-
+                selection_model.setCurrentIndex(
+                    index, selection_model.NoUpdate
+                )
 
 FAMILY_ICON_COLOR = "#0091B2"
 FAMILY_CONFIG_CACHE = {}
