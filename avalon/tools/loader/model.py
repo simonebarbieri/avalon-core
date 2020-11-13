@@ -1,5 +1,4 @@
 import copy
-import collections
 
 from ... import io, style
 from ...vendor.Qt import QtCore, QtGui
