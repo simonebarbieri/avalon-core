@@ -1180,6 +1180,91 @@ def create(name, asset, family, options=None, data=None):
     return instance
 
 
+def get_repres_contexts(representation_ids, dbcon=None):
+    """Return parenthood context for representation.
+
+    Args:
+        representation_ids (list): The representation ids.
+        dbcon (AvalonMongoDB): Mongo connection object. `avalon.io` used when
+            not entered.
+
+    Returns:
+        dict: The full representation context by representation id.
+
+    """
+    if not dbcon:
+        dbcon = io
+
+    contexts = {}
+    if not representation_ids:
+        return contexts
+
+    _representation_ids = []
+    for repre_id in representation_ids:
+        if isinstance(repre_id, six.string_types):
+            repre_id = io.ObjectId(repre_id)
+        _representation_ids.append(repre_id)
+
+    repre_docs = dbcon.find({
+        "type": "representation",
+        "_id": {"$in": _representation_ids}
+    })
+    repre_docs_by_id = {}
+    version_ids = set()
+    for repre_doc in repre_docs:
+        version_ids.add(repre_doc["parent"])
+        repre_docs_by_id[repre_doc["_id"]] = repre_doc
+
+    version_docs = dbcon.find({
+        "type": "version",
+        "_id": {"$in": list(version_ids)}
+    })
+    version_docs_by_id = {}
+    subset_ids = set()
+    for version_doc in version_docs:
+        version_docs_by_id[version_doc["_id"]] = version_doc
+        subset_ids.add(version_doc["parent"])
+
+    subset_docs = dbcon.find({
+        "type": "subset",
+        "_id": {"$in": list(subset_ids)}
+    })
+    subset_docs_by_id = {}
+    asset_ids = set()
+    for subset_doc in subset_docs:
+        subset_docs_by_id[subset_doc["_id"]] = subset_doc
+        asset_ids.add(subset_doc["parent"])
+
+    asset_docs = dbcon.find({
+        "type": "asset",
+        "_id": {"$in": list(asset_ids)}
+    })
+    asset_docs_by_id = {
+        asset_doc["_id"]: asset_doc
+        for asset_doc in asset_docs
+    }
+
+    project_doc = dbcon.find_one({"type": "project"})
+
+    for repre_id, repre_doc in repre_docs_by_id.items():
+        version_doc = version_docs_by_id[repre_doc["parent"]]
+        subset_doc = subset_docs_by_id[version_doc["parent"]]
+        asset_doc = asset_docs_by_id[subset_doc["parent"]]
+        context = {
+            "project": {
+                "name": project_doc["name"],
+                "code": project_doc["data"].get("code")
+            },
+            "asset": asset_doc,
+            "subset": subset_doc,
+            "version": version_doc,
+            "representation": repre_doc,
+        }
+        contexts[repre_id] = context
+
+    return contexts
+
+
 def get_representation_context(representation):
     """Return parenthood context for representation.
 
