@@ -490,24 +490,30 @@ class SubsetWidget(QtWidgets.QWidget):
         # same representation available
 
         # Trigger
-        error_info = []
+        repre_ids = []
         for item in items:
-            version_id = item["version_document"]["_id"]
-            representation = self.dbcon.find_one({
-                "type": "representation",
-                "name": representation_name,
-                "parent": version_id
-            })
+            representation = self.dbcon.find_one(
+                {
+                    "type": "representation",
+                    "name": representation_name,
+                    "parent": item["version_document"]["_id"]
+                },
+                {"_id": 1}
+            )
             if not representation:
                 self.echo("Subset '{}' has no representation '{}'".format(
                     item["subset"], representation_name
                 ))
                 continue
+            repre_ids.append(representation["_id"])
 
+        error_info = []
+        repre_contexts = pipeline.get_repres_contexts(repre_ids, self.dbcon)
+        for repre_context in repre_contexts.values():
             try:
-                api.load(
-                    Loader=loader,
-                    representation=representation,
+                pipeline.load_with_repre_context(
+                    loader,
+                    repre_context,
                     options=options
                 )
 
