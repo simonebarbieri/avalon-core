@@ -235,7 +235,7 @@ class SubsetWidget(QtWidgets.QWidget):
         view.is_loading = loading
         view.is_empty = empty
 
-    def _representation_contexts(self, items):
+    def _repre_contexts_for_loaders_filter(self, items):
         version_docs_by_id = {
             item["version_document"]["_id"]: item["version_document"]
             for item in items
@@ -350,7 +350,7 @@ class SubsetWidget(QtWidgets.QWidget):
 
         is_first = True
         repre_context_by_id, repre_docs_by_version_id = (
-            self._representation_contexts(items)
+            self._repre_contexts_for_loaders_filter(items)
         )
         for item in items:
             _found_combinations = []
