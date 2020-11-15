@@ -1454,7 +1454,7 @@ class Window(QtWidgets.QDialog):
         view.setModel(proxy)
 
         # apply delegates
-        version_delegate = VersionDelegate(self)
+        version_delegate = VersionDelegate(io, self)
         column = model.Columns.index("version")
         view.setItemDelegateForColumn(column, version_delegate)
 

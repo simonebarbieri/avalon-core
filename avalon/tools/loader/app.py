@@ -42,15 +42,16 @@ class Window(QtWidgets.QDialog):
 
         container = QtWidgets.QWidget()
 
-        assets = AssetWidget(multiselection=True, parent=self)
-        families = FamilyListWidget(self.family_config_cache, self)
+        assets = AssetWidget(io, multiselection=True, parent=self)
+        families = FamilyListWidget(io, self.family_config_cache, self)
         subsets = SubsetWidget(
+            io,
             self.groups_config,
             self.family_config_cache,
             parent=self
         )
-        version = VersionWidget()
-        thumbnail = ThumbnailWidget()
+        version = VersionWidget(io)
+        thumbnail = ThumbnailWidget(io)
 
         thumb_ver_body = QtWidgets.QWidget()
         thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_body)

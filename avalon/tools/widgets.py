@@ -29,11 +29,9 @@ class AssetWidget(QtWidgets.QWidget):
     selection_changed = QtCore.Signal()  # on view selection change
     current_changed = QtCore.Signal()    # on view current index change
 
-    def __init__(self, multiselection=False, dbcon=None, parent=None):
+    def __init__(self, dbcon, multiselection=False, parent=None):
         super(AssetWidget, self).__init__(parent=parent)
 
-        if dbcon is None:
-            dbcon = io
         self.dbcon = dbcon
 
         self.setContentsMargins(0, 0, 0, 0)

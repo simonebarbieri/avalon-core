@@ -233,7 +233,7 @@ class TasksWidget(QtWidgets.QWidget):
 
         view = QtWidgets.QTreeView()
         view.setIndentation(0)
-        model = TasksModel()
+        model = TasksModel(io)
         view.setModel(model)
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -713,7 +713,7 @@ class Window(QtWidgets.QMainWindow):
         widgets = {
             "pages": QtWidgets.QStackedWidget(),
             "body": QtWidgets.QWidget(),
-            "assets": AssetWidget(),
+            "assets": AssetWidget(io),
             "tasks": TasksWidget(),
             "files": FilesWidget()
         }

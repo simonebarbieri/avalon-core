@@ -4,7 +4,6 @@ import collections
 
 from ..vendor.Qt import QtCore, QtGui
 from ..vendor import Qt, qtawesome
-from .. import io
 from .. import style
 from . import lib
 
@@ -202,8 +201,9 @@ class TasksModel(TreeModel):
 
     Columns = ["name", "count"]
 
-    def __init__(self, parent=None):
+    def __init__(self, dbcon, parent=None):
         super(TasksModel, self).__init__(parent=parent)
+        self.dbcon = dbcon
         self._num_assets = 0
         self._icons = {
             "__default__": qtawesome.icon("fa.male",
@@ -216,7 +216,7 @@ class TasksModel(TreeModel):
 
     def _get_task_icons(self):
         # Get the project configured icons from database
-        project = io.find_one({"type": "project"}, {"config.tasks"})
+        project = self.dbcon.find_one({"type": "project"}, {"config.tasks"})
         tasks = project["config"].get("tasks", {})
         for task_name, task in tasks.items():
             icon_name = task.get("icon", None)
@@ -240,7 +240,7 @@ class TasksModel(TreeModel):
             _projection = {"data.tasks"}
 
             # find assets in db by query
-            asset_docs = list(io.find(_filter, _projection))
+            asset_docs = list(self.dbcon.find(_filter, _projection))
             db_assets_ids = [asset["_id"] for asset in asset_docs]
 
             # check if all assets were found

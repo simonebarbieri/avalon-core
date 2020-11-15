@@ -4,7 +4,6 @@ import logging
 import numbers
 
 from ..vendor.Qt import QtWidgets, QtCore, QtGui
-from .. import io
 from . import lib
 from ..lib import MasterVersionType
 from .models import TreeModel
@@ -18,6 +17,10 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
     version_changed = QtCore.Signal()
     first_run = False
     lock = False
+
+    def __init__(self, dbcon, *args, **kwargs):
+        self.dbcon = dbcon
+        super(VersionDelegate, self).__init__(*args, **kwargs)
 
     def displayText(self, value, locale):
         if isinstance(value, MasterVersionType):
@@ -108,7 +111,7 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
 
         # Add all available versions to the editor
         parent_id = item["version_document"]["parent"]
-        versions = list(io.find(
+        version_docs = list(self.dbcon.find(
             {
                 "type": "version",
                 "parent": parent_id
@@ -116,45 +119,49 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
             sort=[("name", 1)]
         ))
 
-        master_version = io.find_one({
-            "type": "master_version",
-            "parent": parent_id
-        })
+        master_version_doc = self.dbcon.find_one(
+            {
+                "type": "master_version",
+                "parent": parent_id
+            }, {
+                "name": 1,
+                "data.tags": 1
+            }
+        )
 
         doc_for_master_version = None
 
         selected = None
         items = []
-        for version in versions:
-            version_tags = version["data"].get("tags") or []
+        for version_doc in version_docs:
+            version_tags = version_doc["data"].get("tags") or []
             if "deleted" in version_tags:
                 continue
 
             if (
-                master_version
+                master_version_doc
                 and doc_for_master_version is None
-                and master_version["version_id"] == version["_id"]
+                and master_version_doc["version_id"] == version_doc["_id"]
             ):
-                doc_for_master_version = version
+                doc_for_master_version = version_doc
 
-            label = lib.format_version(version["name"])
+            label = lib.format_version(version_doc["name"])
             item = QtGui.QStandardItem(label)
-            item.setData(version, QtCore.Qt.UserRole)
+            item.setData(version_doc, QtCore.Qt.UserRole)
             items.append(item)
 
-            if version["name"] == value:
+            if version_doc["name"] == value:
                 selected = item
 
-        if master_version and doc_for_master_version:
+        if master_version_doc and doc_for_master_version:
             version_name = doc_for_master_version["name"]
             label = lib.format_version(version_name, True)
             if isinstance(value, MasterVersionType):
-                index = len(versions)
-            master_version["data"] = doc_for_master_version["data"]
-            master_version["name"] = MasterVersionType(version_name)
+                index = len(version_docs)
+            master_version_doc["name"] = MasterVersionType(version_name)
 
             item = QtGui.QStandardItem(label)
-            item.setData(master_version, QtCore.Qt.UserRole)
+            item.setData(master_version_doc, QtCore.Qt.UserRole)
             items.append(item)
 
         # Reverse items so latest versions be upper

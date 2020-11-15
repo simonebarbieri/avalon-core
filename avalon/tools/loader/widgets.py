@@ -8,7 +8,6 @@ import collections
 
 from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
 from ...vendor import qtawesome
-from ... import io
 from ... import api
 from ... import pipeline
 from ... import style
@@ -110,6 +109,7 @@ class SubsetWidget(QtWidgets.QWidget):
 
     def __init__(
         self,
+        dbcon,
         groups_config,
         family_config_cache,
         enable_grouping=True,
@@ -117,7 +117,9 @@ class SubsetWidget(QtWidgets.QWidget):
     ):
         super(SubsetWidget, self).__init__(parent=parent)
 
+        self.dbcon = dbcon
         model = SubsetsModel(
+            dbcon,
             groups_config,
             family_config_cache,
             grouping=enable_grouping
@@ -148,7 +150,7 @@ class SubsetWidget(QtWidgets.QWidget):
         view.setAllColumnsShowFocus(True)
 
         # Set view delegates
-        version_delegate = VersionDelegate()
+        version_delegate = VersionDelegate(self.dbcon)
         column = model.Columns.index("version")
         view.setItemDelegateForColumn(column, version_delegate)
 
@@ -242,7 +244,7 @@ class SubsetWidget(QtWidgets.QWidget):
                 item["version_document"]
             )
 
-        subset_docs = list(io.find(
+        subset_docs = list(self.dbcon.find(
             {
                 "_id": {"$in": list(version_docs_by_subset_id.keys())},
                 "type": "subset"
@@ -257,7 +259,7 @@ class SubsetWidget(QtWidgets.QWidget):
             for subset_doc in subset_docs
         }
         version_ids = list(version_docs_by_id.keys())
-        repre_docs_cursor = io.find(
+        repre_docs = self.dbcon.find(
             # Query all representations for selected versions at once
             {
                 "type": "representation",
@@ -479,7 +481,7 @@ class SubsetWidget(QtWidgets.QWidget):
         error_info = []
         for item in items:
             version_id = item["version_document"]["_id"]
-            representation = io.find_one({
+            representation = self.dbcon.find_one({
                 "type": "representation",
                 "name": representation_name,
                 "parent": version_id
@@ -573,7 +575,7 @@ class SubsetWidget(QtWidgets.QWidget):
                 "parent": asset_id,
                 "name": {"$in": subsets},
             }
-            io.update_many(filter, update)
+            self.dbcon.update_many(filter, update)
 
     def echo(self, message):
         print(message)
@@ -587,8 +589,9 @@ class VersionTextEdit(QtWidgets.QTextEdit):
     to clipboard.
 
     """
-    def __init__(self, parent=None):
+    def __init__(self, dbcon, parent=None):
         super(VersionTextEdit, self).__init__(parent=parent)
+        self.dbcon = dbcon
 
         self.data = {
             "source": None,
@@ -614,14 +617,14 @@ class VersionTextEdit(QtWidgets.QTextEdit):
         print("Querying..")
 
         if not version_doc:
-            version_doc = io.find_one({
+            version_doc = self.dbcon.find_one({
                 "_id": version_id,
                 "type": {"$in": ["version", "master_version"]}
             })
             assert version_doc, "Not a valid version id"
 
         if version_doc["type"] == "master_version":
-            _version_doc = io.find_one({
+            _version_doc = self.dbcon.find_one({
                 "_id": version_doc["version_id"],
                 "type": "version"
             })
@@ -630,7 +633,7 @@ class VersionTextEdit(QtWidgets.QTextEdit):
                 _version_doc["name"]
             )
 
-        subset = io.find_one({
+        subset = self.dbcon.find_one({
             "_id": version_doc["parent"],
             "type": "subset"
         })
@@ -728,10 +731,8 @@ class ThumbnailWidget(QtWidgets.QLabel):
     aspect_ratio = (16, 9)
     max_width = 300
 
-    def __init__(self, dbcon=None, parent=None):
+    def __init__(self, dbcon, parent=None):
         super(ThumbnailWidget, self).__init__(parent)
-        if dbcon is None:
-            dbcon = io
         self.dbcon = dbcon
 
         self.current_thumb_id = None
@@ -825,13 +826,13 @@ class ThumbnailWidget(QtWidgets.QLabel):
 
 class VersionWidget(QtWidgets.QWidget):
     """A Widget that display information about a specific version"""
-    def __init__(self, parent=None):
+    def __init__(self, dbcon, parent=None):
         super(VersionWidget, self).__init__(parent=parent)
 
         layout = QtWidgets.QVBoxLayout(self)
 
         label = QtWidgets.QLabel("Version", self)
-        data = VersionTextEdit()
+        data = VersionTextEdit(dbcon, self)
         data.setReadOnly(True)
 
         layout.addWidget(label)
@@ -849,10 +850,11 @@ class FamilyListWidget(QtWidgets.QListWidget):
     NameRole = QtCore.Qt.UserRole + 1
     active_changed = QtCore.Signal(list)
 
-    def __init__(self, family_config_cache, parent=None):
+    def __init__(self, dbcon, family_config_cache, parent=None):
         super(FamilyListWidget, self).__init__(parent=parent)
 
         self.family_config_cache = family_config_cache
+        self.dbcon = dbcon
 
         multi_select = QtWidgets.QAbstractItemView.ExtendedSelection
         self.setSelectionMode(multi_select)
@@ -871,8 +873,8 @@ class FamilyListWidget(QtWidgets.QListWidget):
 
         """
 
-        family = io.distinct("data.family")
-        families = io.distinct("data.families")
+        family = self.dbcon.distinct("data.family")
+        families = self.dbcon.distinct("data.families")
         unique_families = list(set(family + families))
 
         # Rebuild list

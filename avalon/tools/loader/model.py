@@ -1,6 +1,6 @@
 import copy
 
-from ... import io, style
+from ... import style
 from ...vendor.Qt import QtCore, QtGui
 from ...vendor import qtawesome
 
@@ -82,6 +82,7 @@ class SubsetsModel(TreeModel):
 
     def __init__(
         self,
+        dbcon,
         groups_config,
         family_config_cache,
         grouping=True,
@@ -90,6 +91,8 @@ class SubsetsModel(TreeModel):
         subset_doc_projection=None
     ):
         super(SubsetsModel, self).__init__(parent=parent)
+
+        self.dbcon = dbcon
 
         # Projections for Mongo queries
         # - let ability to modify them if used in tools that require more than
@@ -137,7 +140,7 @@ class SubsetsModel(TreeModel):
             item = index.internalPointer()
             parent = item["_id"]
             if isinstance(value, MasterVersionType):
-                versions = list(io.find({
+                versions = list(self.dbcon.find({
                     "type": {"$in": ["version", "master_version"]},
                     "parent": parent
                 }, sort=[("name", -1)]))
@@ -166,7 +169,7 @@ class SubsetsModel(TreeModel):
                 )
 
             else:
-                version = io.find_one({
+                version = self.dbcon.find_one({
                     "name": value,
                     "type": "version",
                     "parent": parent
@@ -253,7 +256,7 @@ class SubsetsModel(TreeModel):
         })
 
     def _fetch(self):
-        asset_docs = io.find(
+        asset_docs = self.dbcon.find(
             {
                 "type": "asset",
                 "_id": {"$in": self._asset_ids}
@@ -266,7 +269,7 @@ class SubsetsModel(TreeModel):
         }
 
         subset_docs_by_id = {}
-        subset_docs = io.find(
+        subset_docs = self.dbcon.find(
             {
                 "type": "subset",
                 "parent": {"$in": self._asset_ids}
@@ -299,14 +302,14 @@ class SubsetsModel(TreeModel):
             }}
         ]
         last_versions_by_subset_id = dict()
-        for doc in io.aggregate(_pipeline):
+        for doc in self.dbcon.aggregate(_pipeline):
             if self._doc_fetching_stop:
                 return
             doc["parent"] = doc["_id"]
             doc["_id"] = doc.pop("_version_id")
             last_versions_by_subset_id[doc["parent"]] = doc
 
-        master_versions = io.find({
+        master_versions = self.dbcon.find({
             "type": "master_version",
             "parent": {"$in": subset_ids}
         })
@@ -318,7 +321,7 @@ class SubsetsModel(TreeModel):
 
         missing_versions_by_id = {}
         if missing_versions:
-            missing_version_docs = io.find({
+            missing_version_docs = self.dbcon.find({
                 "type": "version",
                 "_id": {"$in": missing_versions}
             })
