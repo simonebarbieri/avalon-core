@@ -1383,6 +1383,39 @@ def _make_backwards_compatible_loader(Loader):
     return type(Loader.__name__, (BackwardsCompatibleLoader, Loader), {})
 
 
+def load_with_repre_context(
+    Loader, repre_context, namespace=None, name=None, options=None, **kwargs
+):
+    Loader = _make_backwards_compatible_loader(Loader)
+
+    # Ensure the Loader is compatible for the representation
+    if not is_compatible_loader(Loader, repre_context):
+        raise IncompatibleLoaderError(
+            "Loader {} is incompatible with {}".format(
+                Loader.__name__, repre_context["subset"]["name"]
+            )
+        )
+
+    # Ensure options is a dictionary when no explicit options provided
+    if options is None:
+        options = kwargs.get("data", dict())  # "data" for backward compat
+
+    assert isinstance(options, dict), "Options must be a dictionary"
+
+    # Fallback to subset when name is None
+    if name is None:
+        name = repre_context["subset"]["name"]
+
+    log.info(
+        "Running '%s' on '%s'" % (
+            Loader.__name__, repre_context["asset"]["name"]
+        )
+    )
+
+    loader = Loader(repre_context)
+    return loader.load(repre_context, name, namespace, options)
+
+
 def load(Loader, representation, namespace=None, name=None, options=None,
          **kwargs):
     """Use Loader to load a representation.
@@ -1404,31 +1437,15 @@ def load(Loader, representation, namespace=None, name=None, options=None,
 
     """
 
-    Loader = _make_backwards_compatible_loader(Loader)
     context = get_representation_context(representation)
-
-    # Ensure the Loader is compatible for the representation
-    if not is_compatible_loader(Loader, context):
-        raise IncompatibleLoaderError("Loader {} is incompatible with "
-                                      "{}".format(Loader.__name__,
-                                                  context["subset"]["name"]))
-
-    # Ensure options is a dictionary when no explicit options provided
-    if options is None:
-        options = kwargs.get("data", dict())  # "data" for backward compat
-
-    assert isinstance(options, dict), "Options must be a dictionary"
-
-    # Fallback to subset when name is None
-    if name is None:
-        name = context["subset"]["name"]
-
-    log.info(
-        "Running '%s' on '%s'" % (Loader.__name__, context["asset"]["name"])
+    return load_with_repre_context(
+        Loader,
+        context,
+        namespace=namespace,
+        name=name,
+        options=options,
+        **kwargs
     )
-
-    loader = Loader(context)
-    return loader.load(context, name, namespace, options)
 
 
 def _get_container_loader(container):
