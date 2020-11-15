@@ -227,8 +227,8 @@ class TasksWidget(QtWidgets.QWidget):
 
     task_changed = QtCore.Signal()
 
-    def __init__(self):
-        super(TasksWidget, self).__init__()
+    def __init__(self, parent=None):
+        super(TasksWidget, self).__init__(parent)
         self.setContentsMargins(0, 0, 0, 0)
 
         view = QtWidgets.QTreeView()

@@ -206,23 +206,29 @@ class TasksModel(TreeModel):
         self.dbcon = dbcon
         self._num_assets = 0
         self._icons = {
-            "__default__": qtawesome.icon("fa.male",
-                                          color=style.colors.default),
-            "__no_task__": qtawesome.icon("fa.exclamation-circle",
-                                          color=style.colors.mid)
+            "__default__": qtawesome.icon(
+                "fa.male",
+                color=style.colors.default
+            ),
+            "__no_task__": qtawesome.icon(
+                "fa.exclamation-circle",
+                color=style.colors.mid
+            )
         }
 
-        self._get_task_icons()
+        self._refresh_task_icons()
 
-    def _get_task_icons(self):
+    def _refresh_task_icons(self):
         # Get the project configured icons from database
         project = self.dbcon.find_one({"type": "project"}, {"config.tasks"})
         tasks = project["config"].get("tasks", {})
         for task_name, task in tasks.items():
             icon_name = task.get("icon", None)
             if icon_name:
-                icon = qtawesome.icon("fa.{}".format(icon_name),
-                                      color=style.colors.default)
+                icon = qtawesome.icon(
+                    "fa.{}".format(icon_name),
+                    color=style.colors.default
+                )
                 self._icons[task_name] = icon
 
     def set_assets(self, asset_ids=None, asset_docs=None):
@@ -293,7 +299,6 @@ class TasksModel(TreeModel):
         self.endResetModel()
 
     def headerData(self, section, orientation, role):
-
         # Override header for count column to show amount of assets
         # it is listing the tasks for
         if role == QtCore.Qt.DisplayRole:
@@ -306,7 +311,6 @@ class TasksModel(TreeModel):
         return super(TasksModel, self).headerData(section, orientation, role)
 
     def data(self, index, role):
-
         if not index.isValid():
             return
 

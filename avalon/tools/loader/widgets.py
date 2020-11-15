@@ -279,7 +279,7 @@ class SubsetWidget(QtWidgets.QWidget):
             for version_id in version_ids
         }
         repre_context_by_id = {}
-        for repre_doc in repre_docs_cursor:
+        for repre_doc in repre_docs:
             version_id = repre_doc["parent"]
             repre_docs_by_version_id[version_id].append(repre_doc)
 
@@ -614,6 +614,7 @@ class VersionTextEdit(QtWidgets.QTextEdit):
         self.set_version(None)
 
     def set_version(self, version_doc=None, version_id=None):
+        # TODO expect only filling data (do not query them here!)
         if not version_doc and not version_id:
             # Reset state to empty
             self.data = {

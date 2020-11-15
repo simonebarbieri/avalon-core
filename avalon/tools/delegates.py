@@ -40,41 +40,39 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 fg_color = None
 
-        if fg_color:
-            if option.widget:
-                style = option.widget.style()
-            else:
-                style = QtWidgets.QApplication.style()
+        if not fg_color:
+            return super(VersionDelegate, self).paint(painter, option, index)
 
-            style.drawControl(
-                style.CE_ItemViewItem, option, painter, option.widget
-            )
+        if option.widget:
+            style = option.widget.style()
+        else:
+            style = QtWidgets.QApplication.style()
 
-            painter.save()
+        style.drawControl(
+            style.CE_ItemViewItem, option, painter, option.widget
+        )
 
-            text = self.displayText(
-                index.data(QtCore.Qt.DisplayRole), option.locale
-            )
-            pen = painter.pen()
-            pen.setColor(fg_color)
-            painter.setPen(pen)
+        painter.save()
 
-            text_rect = style.subElementRect(style.SE_ItemViewItemText, option)
-            text_margin = style.proxy().pixelMetric(
-                style.PM_FocusFrameHMargin, option, option.widget
-            ) + 1
+        text = self.displayText(
+            index.data(QtCore.Qt.DisplayRole), option.locale
+        )
+        pen = painter.pen()
+        pen.setColor(fg_color)
+        painter.setPen(pen)
 
-            painter.drawText(
-                text_rect.adjusted(text_margin, 0, - text_margin, 0),
-                option.displayAlignment,
-                text
-            )
+        text_rect = style.subElementRect(style.SE_ItemViewItemText, option)
+        text_margin = style.proxy().pixelMetric(
+            style.PM_FocusFrameHMargin, option, option.widget
+        ) + 1
 
-            painter.restore()
+        painter.drawText(
+            text_rect.adjusted(text_margin, 0, - text_margin, 0),
+            option.displayAlignment,
+            text
+        )
 
-            return
-
-        super(VersionDelegate, self).paint(painter, option, index)
+        painter.restore()
 
     def createEditor(self, parent, option, index):
         item = index.data(TreeModel.ItemRole)
