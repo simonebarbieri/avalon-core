@@ -1,3 +1,4 @@
+import os
 import importlib
 import logging
 from bson.objectid import ObjectId
@@ -15,16 +16,16 @@ log = logging.getLogger(__name__)
 
 
 # `find_config` from `pipeline`
-#     - added 'dbcon' to args
-#         - dbcon.session replaced Session in code
-def find_config(dbcon):
+def find_config():
     log.info("Finding configuration for project..")
 
-    config = dbcon.Session["AVALON_CONFIG"]
+    config = os.environ["AVALON_CONFIG"]
 
     if not config:
-        raise EnvironmentError("No configuration found in "
-                               "the project nor environment")
+        raise EnvironmentError(
+            "No configuration found in "
+            "the project nor environment"
+        )
 
     log.info("Found %s, loading.." % config)
     return importlib.import_module(config)
