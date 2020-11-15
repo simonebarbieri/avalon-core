@@ -113,11 +113,14 @@ class SubsetWidget(QtWidgets.QWidget):
         groups_config,
         family_config_cache,
         enable_grouping=True,
+        tool_name=None,
         parent=None
     ):
         super(SubsetWidget, self).__init__(parent=parent)
 
         self.dbcon = dbcon
+        self.tool_name = tool_name
+
         model = SubsetsModel(
             dbcon,
             groups_config,
@@ -327,6 +330,15 @@ class SubsetWidget(QtWidgets.QWidget):
         # Get all representation->loader combinations available for the
         # index under the cursor, so we can list the user the options.
         available_loaders = api.discover(api.Loader)
+        if self.tool_name:
+            for loader in available_loaders:
+                if hasattr(loader, "tool_names"):
+                    if not (
+                        "*" in loader.tool_names or
+                        self.tool_name in loader.tool_names
+                    ):
+                        available_loaders.remove(loader)
+
         loaders = list()
 
         # Bool if is selected only one subset
