@@ -366,7 +366,7 @@ class SubsetWidget(QtWidgets.QWidget):
                         icon = None
 
                 # Optional action
-                use_option = one_item_selected and hasattr(loader, "options")
+                use_option = hasattr(loader, "options")
                 action = OptionalAction(label, icon, use_option, menu)
                 if use_option:
                     # Add option box tip
