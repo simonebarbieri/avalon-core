@@ -354,8 +354,7 @@ class AssetModel(TreeModel):
         "data.tags": 1,
         "data.icon": 1,
         "data.color": 1,
-        "data.deprecated": 1,
-        "data.tasks": 1
+        "data.deprecated": 1
     }
 
     def __init__(self, dbcon=None, parent=None, asset_projection=None):
