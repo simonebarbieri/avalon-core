@@ -6,9 +6,9 @@ from ...vendor.Qt import QtWidgets, QtCore
 from ... import style
 from .. import lib as tools_lib
 from . import lib
+from .widgets import LibrarySubsetWidget
 from ..loader.widgets import (
     ThumbnailWidget,
-    SubsetWidget,
     VersionWidget,
     FamilyListWidget
 )
@@ -66,7 +66,7 @@ class Window(QtWidgets.QDialog):
         families = FamilyListWidget(
             self.dbcon, self.family_config_cache, parent=self
         )
-        subsets = SubsetWidget(
+        subsets = LibrarySubsetWidget(
             self.dbcon,
             self.groups_config,
             self.family_config_cache,

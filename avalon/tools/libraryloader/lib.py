@@ -35,8 +35,7 @@ class RegisteredRoots:
     roots_per_project = {}
 
     @classmethod
-    def registered_root(cls, dbcon):
-        project_name = dbcon.Session.get("AVALON_PROJECT")
+    def registered_root(cls, project_name):
         if project_name not in cls.roots_per_project:
             cls.roots_per_project[project_name] = Roots(project_name).roots
 
