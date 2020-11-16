@@ -1,16 +1,7 @@
 import os
 import importlib
 import logging
-from bson.objectid import ObjectId
-from ... import api, style
-from ...vendor import qtawesome, six
-from ...pipeline import (
-    is_compatible_loader,
-    _make_backwards_compatible_loader,
-    IncompatibleLoaderError
-)
 from pypeapp import Roots
-
 
 log = logging.getLogger(__name__)
 
