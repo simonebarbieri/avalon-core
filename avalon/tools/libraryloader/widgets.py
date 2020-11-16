@@ -1,6 +1,6 @@
 from .lib import RegisteredRoots
 from ..loader.widgets import SubsetWidget
-from ..vendor.Qt import QtWidgets
+from ...vendor.Qt import QtWidgets
 
 
 class LibrarySubsetWidget(SubsetWidget):
