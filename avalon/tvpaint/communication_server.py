@@ -14,14 +14,8 @@ import threading
 from queue import Queue
 from contextlib import closing
 
-from ..tools import (
-    workfiles,
-    creator,
-    loader,
-    publish,
-    sceneinventory,
-    libraryloader
-)
+from ..tools import publish
+from ..vendor.Qt import QtCore
 from avalon import api, tvpaint
 
 from aiohttp import web
@@ -39,10 +33,12 @@ log.setLevel(logging.DEBUG)
 LOCALIZATION_FILENAME = "avalon.loc"
 
 
-class CommunicatorWrapper:
+class CommunicationWrapper:
     # TODO add logs and exceptions
     communicator = None
     _connected_client = None
+
+    log = logging.getLogger("CommunicationWrapper")
 
     # Variable which can be modified to register localization file from
     # config
@@ -57,17 +53,17 @@ class CommunicatorWrapper:
     @classmethod
     def _client(cls):
         if not cls.communicator:
-            log.warning("Communicator object was not created yet.")
+            cls.log.warning("Communicator object was not created yet.")
             return None
 
         if not cls.communicator.websocket_rpc:
-            log.warning("Communicator's server did not start yet.")
+            cls.log.warning("Communicator's server did not start yet.")
             return None
 
         for client in cls.communicator.websocket_rpc.clients:
             if not client.ws.closed:
                 return client
-        log.warning("Client is not yet connected to Communicator.")
+        cls.log.warning("Client is not yet connected to Communicator.")
         return None
 
     @classmethod
@@ -89,38 +85,6 @@ class CommunicatorWrapper:
         )
 
     @classmethod
-    def execute_george(cls, george_script):
-        """Execute passed goerge script in TVPaint."""
-        return CommunicatorWrapper.send_request(
-            "execute_george", [george_script]
-        )
-
-    @classmethod
-    def execute_george_through_file(cls, george_script):
-        """Execute george script with temp file.
-
-        Allows to execute multiline george script without stopping websocket
-        client.
-
-        On windows make sure script does not contain paths with backwards
-        slashes in paths, TVPaint won't execute properly in that case.
-
-        Args:
-            george_script (str): George script to execute. May be multilined.
-        """
-        temporary_file = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".grg", delete=False
-        )
-        temporary_file.write(george_script)
-        temporary_file.close()
-        CommunicatorWrapper.execute_george(
-            "tv_runscript {}".format(
-                temporary_file.name.replace("\\", "/")
-            )
-        )
-        os.remove(temporary_file.name)
-
-    @classmethod
     def send_notification(cls, method, params=[], client=None):
         if client is None:
             client = cls.client()
@@ -132,6 +96,13 @@ class CommunicatorWrapper:
             client, method, params
         )
 
+    @classmethod
+    def execute_george(cls, george_script):
+        """Execute passed goerge script in TVPaint."""
+        return cls.send_request(
+            "execute_george", [george_script]
+        )
+
 
 def register_localization_file(filepath):
     """Register localization file to be copied with TVPaint plugins.
@@ -141,7 +112,7 @@ def register_localization_file(filepath):
     Args:
         filepath (str): Full path to `.loc` file.
     """
-    CommunicatorWrapper.localization_file = filepath
+    CommunicationWrapper.localization_file = filepath
 
 
 class WebSocketServer:
@@ -261,6 +232,7 @@ class WebsocketServerThread(threading.Thread):
             await asyncio.sleep(0.5)
 
         log.debug("## Server shutdown started")
+
         await self.site.stop()
         log.debug("# Site stopped")
         await self.runner.cleanup()
@@ -278,6 +250,151 @@ class WebsocketServerThread(threading.Thread):
         self.loop.stop()
 
 
+class AvalonToolsHelper:
+    def __init__(self):
+        self._workfiles_tool = None
+        self._loader_tool = None
+        self._creator_tool = None
+        self._scene_inventory_tool = None
+        self._library_loader_tool = None
+
+    def workfiles_tool(self):
+        if self._workfiles_tool is not None:
+            return self._workfiles_tool
+
+        from ..tools.workfiles.app import (
+            Window, validate_host_requirements
+        )
+        # Host validation
+        host = api.registered_host()
+        validate_host_requirements(host)
+
+        window = Window()
+        window.refresh()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        # window.setStyleSheet(style.load_stylesheet())
+        window.widgets["files"].widgets["save"].setEnabled(True)
+
+        context = {
+            "asset": api.Session["AVALON_ASSET"],
+            "silo": api.Session["AVALON_SILO"],
+            "task": api.Session["AVALON_TASK"]
+        }
+        window.set_context(context)
+
+        self._workfiles_tool = window
+
+        return window
+
+    def show_workfiles_tool(self):
+        workfiles_tool = self.workfiles_tool()
+        workfiles_tool.refresh()
+        workfiles_tool.show()
+        # Pull window to the front.
+        workfiles_tool.raise_()
+        workfiles_tool.activateWindow()
+
+    def loader_tool(self):
+        if self._loader_tool is not None:
+            return self._loader_tool
+
+        from ..tools.loader.app import (
+            Window, lib
+        )
+        lib.refresh_family_config_cache()
+        lib.refresh_group_config_cache()
+
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        context = {"asset": api.Session["AVALON_ASSET"]}
+        window.set_context(context, refresh=True)
+
+        self._loader_tool = window
+
+        return window
+
+    def show_loader_tool(self):
+        loader_tool = self.loader_tool()
+        loader_tool.show()
+        loader_tool.raise_()
+        loader_tool.activateWindow()
+        loader_tool.refresh()
+
+    def creator_tool(self):
+        if self._creator_tool is not None:
+            return self._creator_tool
+
+        from ..tools.creator.app import Window
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        self._creator_tool = window
+
+        return window
+
+    def show_creator_tool(self):
+        creator_tool = self.creator_tool()
+        creator_tool.refresh()
+        creator_tool.show()
+
+        # Pull window to the front.
+        creator_tool.raise_()
+        creator_tool.activateWindow()
+
+    def scene_inventory_tool(self):
+        if self._scene_inventory_tool is not None:
+            return self._scene_inventory_tool
+
+        from ..tools.sceneinventory.app import Window
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        self._scene_inventory_tool = window
+
+        return window
+
+    def show_scene_inventory_tool(self):
+        scene_inventory_tool = self.scene_inventory_tool()
+        scene_inventory_tool.show()
+        scene_inventory_tool.refresh()
+
+        # Pull window to the front.
+        scene_inventory_tool.raise_()
+        scene_inventory_tool.activateWindow()
+
+    def library_loader_tool(self):
+        if self._library_loader_tool is not None:
+            return self._library_loader_tool
+
+        from ..tools.libraryloader.app import Window
+
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        self._library_loader_tool = window
+
+        return window
+
+    def show_library_loader_tool(self):
+        library_loader_tool = self.library_loader_tool()
+        library_loader_tool.show()
+        library_loader_tool.raise_()
+        library_loader_tool.activateWindow()
+        library_loader_tool.refresh()
+
+
 class TVPaintRpc(JsonRpc):
     def __init__(self, communication_obj, route_name="", **kwargs):
         super().__init__(**kwargs)
@@ -287,6 +404,9 @@ class TVPaintRpc(JsonRpc):
 
         self.route_name = route_name
         self.communication_obj = communication_obj
+
+        self.tools_helper = AvalonToolsHelper()
+
         # Register methods
         self.add_methods(
             (route_name, self.workfiles_tool),
@@ -327,49 +447,55 @@ class TVPaintRpc(JsonRpc):
     # Panel routes for tools
     async def workfiles_tool(self):
         log.info("Triggering Workfile tool")
-        item = MainThreadItem(workfiles.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        item = MainThreadItem(self.tools_helper.show_workfiles_tool)
+        self._execute_in_main_thread(item)
+        return
 
     async def loader_tool(self):
         log.info("Triggering Loader tool")
-        item = MainThreadItem(loader.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        item = MainThreadItem(self.tools_helper.show_loader_tool)
+        self._execute_in_main_thread(item)
+        return
 
     async def creator_tool(self):
         log.info("Triggering Creator tool")
-        item = MainThreadItem(creator.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        item = MainThreadItem(self.tools_helper.show_creator_tool)
+        self._execute_in_main_thread(item)
+        return
 
     async def publish_tool(self):
         log.info("Triggering Publish tool")
         item = MainThreadItem(publish.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        self._execute_in_main_thread(item)
+        return
 
     async def scene_inventory_tool(self):
+        """Open Scene Inventory tool.
+
+        Funciton can't confirm if tool was opened becauise one part of
+        SceneInventory initialization is calling websocket request to host but
+        host can't response because is waiting for response from this call.
+        """
         log.info("Triggering Scene inventory tool")
-        item = MainThreadItem(sceneinventory.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        item = MainThreadItem(self.tools_helper.show_scene_inventory_tool)
+        # Do not wait for result of callback
+        self._execute_in_main_thread(item, wait=False)
+        return
 
     async def library_loader_tool(self):
         log.info("Triggering Library loader tool")
-        item = MainThreadItem(libraryloader.show)
-        result = self._execute_in_main_thread(item)
-        return result
+        item = MainThreadItem(self.tools_helper.show_library_loader_tool)
+        self._execute_in_main_thread(item)
+        return
 
-    def _execute_in_main_thread(self, item):
-        return self.communication_obj.execute_in_main_thread(item)
+    def _execute_in_main_thread(self, item, **kwargs):
+        return self.communication_obj.execute_in_main_thread(item, **kwargs)
 
     def send_notification(self, client, method, params=[]):
-        future = asyncio.run_coroutine_threadsafe(
+        asyncio.run_coroutine_threadsafe(
             client.ws.send_str(encode_request(method, params=params)),
             loop=self.loop
         )
-        result = future.result()
 
     def send_request(self, client, method, params=[], timeout=0):
         client_host = client.host
@@ -498,10 +624,12 @@ class Communicator:
         self.websocket_server = None
         self.websocket_rpc = None
 
-    def execute_in_main_thread(self, main_thread_item):
+    def execute_in_main_thread(self, main_thread_item, wait=True):
         """Add `MainThreadItem` to callback queue and wait for result."""
         self.callback_queue.put(main_thread_item)
-        return main_thread_item.wait()
+        if wait:
+            return main_thread_item.wait()
+        return
 
     def main_thread_listen(self):
         """Get last `MainThreadItem` from queue.
@@ -519,10 +647,6 @@ class Communicator:
         if self.callback_queue.empty():
             return None
         return self.callback_queue.get()
-
-    def localization_file(self):
-        # TODO: return localization file from config or default.
-        return None
 
     def _windows_copy(self, src_dst_mapping):
         """Windows specific copy process asking for admin permissions.
@@ -633,7 +757,7 @@ class Communicator:
                 to_copy.append((src_full_path, dst_full_path))
 
         # Add localization file is there is any
-        localization_file_src = CommunicatorWrapper.localization_file
+        localization_file_src = CommunicationWrapper.localization_file
         if localization_file_src and os.path.exists(localization_file_src):
             localization_file_dst = os.path.join(
                 host_plugins_path, LOCALIZATION_FILENAME
@@ -669,10 +793,13 @@ class Communicator:
         if platform.system().lower() == "windows":
             self._prepare_windows_plugin(launch_args)
 
+        flags = (
+            subprocess.DETACHED_PROCESS
+            | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
         kwargs = {
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.PIPE,
-            "env": os.environ
+            "env": os.environ,
+            "creationflags": flags
         }
         self.process = subprocess.Popen(launch_args, **kwargs)
 
@@ -721,7 +848,35 @@ class Communicator:
                 break
             time.sleep(0.5)
 
+        self.on_client_connect()
+
         api.emit("application.launched")
+
+    def on_client_connect(self):
+        self._initial_textfile_write()
+
+    def _initial_textfile_write(self):
+        """Show popup about Write to file at start of TVPaint."""
+        tmp_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        )
+        tmp_file.close()
+        tmp_filepath = tmp_file.name.replace("\\", "/")
+        george_script = (
+            "tv_writetextfile \"strict\" \"append\" \"{}\" \"empty\""
+        ).format(tmp_filepath)
+
+        result = CommunicationWrapper.execute_george(george_script)
+
+        # Remote the file
+        os.remove(tmp_filepath)
+
+        if result is None:
+            log.warning(
+                "Host was probably closed before plugin was initialized."
+            )
+        elif result.lower() == "forbidden":
+            log.warning("User didn't confirm saving files.")
 
     def stop(self):
         """Stop communication and currently running python process."""

@@ -1,9 +1,13 @@
-from .communication_server import CommunicatorWrapper
+from .communication_server import CommunicationWrapper
+from . import lib
 from . import launch_script
 from .pipeline import (
     install,
     uninstall,
-    ls
+    maintained_selection,
+    ls,
+    Creator,
+    Loader
 )
 
 from .workio import (
@@ -16,12 +20,18 @@ from .workio import (
 )
 
 __all__ = (
-    "CommunicatorWrapper",
+    "CommunicationWrapper",
+
+    "lib",
+
     "launch_script",
 
     "install",
     "uninstall",
+    "maintained_selection",
     "ls",
+    "Creator",
+    "Loader",
 
     # Workfiles API
     "open_file",

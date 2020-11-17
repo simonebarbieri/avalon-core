@@ -7,25 +7,25 @@
 """
 
 from avalon import api
-from avalon.tvpaint.communication_server import CommunicatorWrapper
+from . import CommunicationWrapper
 
 
 def open_file(filepath):
     """Open the scene file in Blender."""
     george_script = "tv_LoadProject {}".format(filepath.replace("\\", "/"))
-    return CommunicatorWrapper.execute_george(george_script)
+    return CommunicationWrapper.execute_george(george_script)
 
 
 def save_file(filepath):
     """Save the open scene file."""
     george_script = "tv_SaveProject {}".format(filepath.replace("\\", "/"))
-    return CommunicatorWrapper.execute_george(george_script)
+    return CommunicationWrapper.execute_george(george_script)
 
 
 def current_file():
     """Return the path of the open scene file."""
     george_script = "tv_GetProjectName"
-    return CommunicatorWrapper.execute_george(george_script)
+    return CommunicationWrapper.execute_george(george_script)
 
 
 def has_unsaved_changes():
