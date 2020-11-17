@@ -227,13 +227,13 @@ class TasksWidget(QtWidgets.QWidget):
 
     task_changed = QtCore.Signal()
 
-    def __init__(self):
-        super(TasksWidget, self).__init__()
+    def __init__(self, parent=None):
+        super(TasksWidget, self).__init__(parent)
         self.setContentsMargins(0, 0, 0, 0)
 
         view = QtWidgets.QTreeView()
         view.setIndentation(0)
-        model = TasksModel()
+        model = TasksModel(io)
         view.setModel(model)
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -713,7 +713,7 @@ class Window(QtWidgets.QMainWindow):
         widgets = {
             "pages": QtWidgets.QStackedWidget(),
             "body": QtWidgets.QWidget(),
-            "assets": AssetWidget(),
+            "assets": AssetWidget(io),
             "tasks": TasksWidget(),
             "files": FilesWidget()
         }
@@ -773,10 +773,15 @@ class Window(QtWidgets.QMainWindow):
 
         if "asset" in context:
             asset = context["asset"]
-            asset_document = io.find_one({
-                "name": asset,
-                "type": "asset"
-            })
+            asset_document = io.find_one(
+                {
+                    "name": asset,
+                    "type": "asset"
+                },
+                {
+                    "data.tasks": 1
+                }
+            )
 
             # Select the asset
             self.widgets["assets"].select_assets([asset], expand=True)

@@ -1180,6 +1180,91 @@ def create(name, asset, family, options=None, data=None):
     return instance
 
 
+def get_repres_contexts(representation_ids, dbcon=None):
+    """Return parenthood context for representation.
+
+    Args:
+        representation_ids (list): The representation ids.
+        dbcon (AvalonMongoDB): Mongo connection object. `avalon.io` used when
+            not entered.
+
+    Returns:
+        dict: The full representation context by representation id.
+
+    """
+    if not dbcon:
+        dbcon = io
+
+    contexts = {}
+    if not representation_ids:
+        return contexts
+
+    _representation_ids = []
+    for repre_id in representation_ids:
+        if isinstance(repre_id, six.string_types):
+            repre_id = io.ObjectId(repre_id)
+        _representation_ids.append(repre_id)
+
+    repre_docs = dbcon.find({
+        "type": "representation",
+        "_id": {"$in": _representation_ids}
+    })
+    repre_docs_by_id = {}
+    version_ids = set()
+    for repre_doc in repre_docs:
+        version_ids.add(repre_doc["parent"])
+        repre_docs_by_id[repre_doc["_id"]] = repre_doc
+
+    version_docs = dbcon.find({
+        "type": "version",
+        "_id": {"$in": list(version_ids)}
+    })
+    version_docs_by_id = {}
+    subset_ids = set()
+    for version_doc in version_docs:
+        version_docs_by_id[version_doc["_id"]] = version_doc
+        subset_ids.add(version_doc["parent"])
+
+    subset_docs = dbcon.find({
+        "type": "subset",
+        "_id": {"$in": list(subset_ids)}
+    })
+    subset_docs_by_id = {}
+    asset_ids = set()
+    for subset_doc in subset_docs:
+        subset_docs_by_id[subset_doc["_id"]] = subset_doc
+        asset_ids.add(subset_doc["parent"])
+
+    asset_docs = dbcon.find({
+        "type": "asset",
+        "_id": {"$in": list(asset_ids)}
+    })
+    asset_docs_by_id = {
+        asset_doc["_id"]: asset_doc
+        for asset_doc in asset_docs
+    }
+
+    project_doc = dbcon.find_one({"type": "project"})
+
+    for repre_id, repre_doc in repre_docs_by_id.items():
+        version_doc = version_docs_by_id[repre_doc["parent"]]
+        subset_doc = subset_docs_by_id[version_doc["parent"]]
+        asset_doc = asset_docs_by_id[subset_doc["parent"]]
+        context = {
+            "project": {
+                "name": project_doc["name"],
+                "code": project_doc["data"].get("code")
+            },
+            "asset": asset_doc,
+            "subset": subset_doc,
+            "version": version_doc,
+            "representation": repre_doc,
+        }
+        contexts[repre_id] = context
+
+    return contexts
+
+
 def get_representation_context(representation):
     """Return parenthood context for representation.
 
@@ -1383,6 +1468,39 @@ def _make_backwards_compatible_loader(Loader):
     return type(Loader.__name__, (BackwardsCompatibleLoader, Loader), {})
 
 
+def load_with_repre_context(
+    Loader, repre_context, namespace=None, name=None, options=None, **kwargs
+):
+    Loader = _make_backwards_compatible_loader(Loader)
+
+    # Ensure the Loader is compatible for the representation
+    if not is_compatible_loader(Loader, repre_context):
+        raise IncompatibleLoaderError(
+            "Loader {} is incompatible with {}".format(
+                Loader.__name__, repre_context["subset"]["name"]
+            )
+        )
+
+    # Ensure options is a dictionary when no explicit options provided
+    if options is None:
+        options = kwargs.get("data", dict())  # "data" for backward compat
+
+    assert isinstance(options, dict), "Options must be a dictionary"
+
+    # Fallback to subset when name is None
+    if name is None:
+        name = repre_context["subset"]["name"]
+
+    log.info(
+        "Running '%s' on '%s'" % (
+            Loader.__name__, repre_context["asset"]["name"]
+        )
+    )
+
+    loader = Loader(repre_context)
+    return loader.load(repre_context, name, namespace, options)
+
+
 def load(Loader, representation, namespace=None, name=None, options=None,
          **kwargs):
     """Use Loader to load a representation.
@@ -1404,31 +1522,15 @@ def load(Loader, representation, namespace=None, name=None, options=None,
 
     """
 
-    Loader = _make_backwards_compatible_loader(Loader)
     context = get_representation_context(representation)
-
-    # Ensure the Loader is compatible for the representation
-    if not is_compatible_loader(Loader, context):
-        raise IncompatibleLoaderError("Loader {} is incompatible with "
-                                      "{}".format(Loader.__name__,
-                                                  context["subset"]["name"]))
-
-    # Ensure options is a dictionary when no explicit options provided
-    if options is None:
-        options = kwargs.get("data", dict())  # "data" for backward compat
-
-    assert isinstance(options, dict), "Options must be a dictionary"
-
-    # Fallback to subset when name is None
-    if name is None:
-        name = context["subset"]["name"]
-
-    log.info(
-        "Running '%s' on '%s'" % (Loader.__name__, context["asset"]["name"])
+    return load_with_repre_context(
+        Loader,
+        context,
+        namespace=namespace,
+        name=name,
+        options=options,
+        **kwargs
     )
-
-    loader = Loader(context)
-    return loader.load(context, name, namespace, options)
 
 
 def _get_container_loader(container):
@@ -1765,11 +1867,21 @@ def is_compatible_loader(Loader, context):
     return has_family and has_representation
 
 
+def loaders_from_repre_context(loaders, repre_context):
+    """Return compatible loaders for by representaiton's context."""
+
+    return [
+        loader
+        for loader in loaders
+        if is_compatible_loader(loader, repre_context)
+    ]
+
+
 def loaders_from_representation(loaders, representation):
     """Return all compatible loaders for a representation."""
 
     context = get_representation_context(representation)
-    return [l for l in loaders if is_compatible_loader(l, context)]
+    return loaders_from_repre_context(loaders, context)
 
 
 def last_workfile_with_version(workdir, file_template, fill_data, extensions):
