@@ -293,6 +293,7 @@ class Window(QtWidgets.QDialog):
         assert project, "This is a bug"
 
         assets_widget = self.data["widgets"]["assets"]
+        assets_widget.model.stop_fetch_thread()
         assets_widget.refresh()
         assets_widget.setFocus()
 
