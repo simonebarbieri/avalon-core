@@ -226,8 +226,13 @@ class AssetWidget(QtWidgets.QWidget):
 
     def _restore_model_selection(self):
         model = self.view.model()
-        expanded = self.model_selection.pop("expanded", None)
-        selected = self.model_selection.pop("selected", None)
+        not_set = object()
+        expanded = self.model_selection.pop("expanded", not_set)
+        selected = self.model_selection.pop("selected", not_set)
+
+        if expanded is not_set or selected is not_set:
+            return
+
         if expanded:
             for index in lib.iter_model_rows(
                 model, column=0, include_root=False
