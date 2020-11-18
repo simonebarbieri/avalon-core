@@ -452,7 +452,6 @@ class AssetModel(TreeModel):
         assets_by_parent = self._doc_payload.get("assets_by_parent")
         silos = self._doc_payload.get("silos")
         if assets_by_parent is not None:
-
             # Build the hierarchical tree items recursively
             self._add_hierarchy(
                 assets_by_parent,
@@ -461,9 +460,11 @@ class AssetModel(TreeModel):
             )
 
         self.endResetModel()
-        has_content = bool(assets_by_parent) or bool(silos)
 
+        has_content = bool(assets_by_parent) or bool(silos)
         self.refreshed.emit(has_content)
+
+        self.stop_fetch_thread()
 
     def fetch(self):
         self._doc_payload = self._fetch() or {}
@@ -510,6 +511,7 @@ class AssetModel(TreeModel):
             self._doc_fetching_stop = True
             while self._doc_fetching_thread.isRunning():
                 time.sleep(0.001)
+            self._doc_fetching_thread = None
 
     def refresh(self):
         """Refresh the data for the model."""
