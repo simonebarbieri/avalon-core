@@ -1,4 +1,5 @@
 import re
+import time
 import logging
 import collections
 
@@ -504,7 +505,7 @@ class AssetModel(TreeModel):
         if self._doc_fetching_thread is not None:
             self._doc_fetching_stop = True
             while self._doc_fetching_thread.isRunning():
-                pass
+                time.sleep(0.001)
 
     def refresh(self):
         """Refresh the data for the model."""
