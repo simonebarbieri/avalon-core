@@ -341,7 +341,7 @@ class AssetModel(TreeModel):
     ObjectIdRole = QtCore.Qt.UserRole + 3
     subsetColorsRole = QtCore.Qt.UserRole + 4
 
-    doc_fetched = QtCore.Signal()
+    doc_fetched = QtCore.Signal(bool)
     refreshed = QtCore.Signal(bool)
 
     # Asset document projection
@@ -442,7 +442,7 @@ class AssetModel(TreeModel):
 
             self.asset_colors[asset["_id"]] = []
 
-    def on_doc_fetched(self):
+    def on_doc_fetched(self, was_stopped):
         self.beginResetModel()
 
         assets_by_parent = self._doc_payload.get("assets_by_parent")
@@ -463,7 +463,7 @@ class AssetModel(TreeModel):
 
     def fetch(self):
         self._doc_payload = self._fetch() or {}
-        self.doc_fetched.emit()
+        self.doc_fetched.emit(self._doc_fetching_stop)
 
     def _fetch(self):
         if not self.dbcon.Session.get("AVALON_PROJECT"):
