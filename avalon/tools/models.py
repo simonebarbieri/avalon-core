@@ -443,6 +443,10 @@ class AssetModel(TreeModel):
             self.asset_colors[asset["_id"]] = []
 
     def on_doc_fetched(self, was_stopped):
+        if was_stopped:
+            self.stop_fetch_thread()
+            return
+
         self.beginResetModel()
 
         assets_by_parent = self._doc_payload.get("assets_by_parent")
