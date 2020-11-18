@@ -468,6 +468,7 @@ class AssetModel(TreeModel):
 
     def fetch(self):
         self._doc_payload = self._fetch() or {}
+        # Emit doc fetched only if was not stopped
         self.doc_fetched.emit(self._doc_fetching_stop)
 
     def _fetch(self):
@@ -513,14 +514,13 @@ class AssetModel(TreeModel):
                 time.sleep(0.001)
             self._doc_fetching_thread = None
 
-    def refresh(self):
+    def refresh(self, force=False):
         """Refresh the data for the model."""
         # Skip fetch if there is already other thread fetching documents
-        if (
-            self._doc_fetching_thread is not None
-            and self._doc_fetching_thread.isRunning()
-        ):
-            return
+        if self._doc_fetching_thread is not None:
+            if not force:
+                return
+            self.stop_fetch_thread()
 
         # Clear model items
         self.clear()
