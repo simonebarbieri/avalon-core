@@ -293,16 +293,30 @@ def preserve_selection(tree_view, column=0, role=None, current_index=True):
 
 class FamilyConfigCache:
     default_color = "#0091B2"
-    default_icon = qtawesome.icon("fa.folder", color=default_color)
-    default_item = {"icon": default_icon}
+    _default_icon = None
+    _default_item = None
 
     def __init__(self, dbcon):
         self.dbcon = dbcon
         self.family_configs = {}
 
+    @classmethod
+    def default_icon(cls):
+        if cls._default_icon is None:
+            cls._default_icon = qtawesome.icon(
+                "fa.folder", color=cls.default_color
+            )
+        return cls._default_icon
+
+    @classmethod
+    def default_item(cls):
+        if cls._default_item is None:
+            cls._default_item = {"icon": cls.default_icon()}
+        return cls._default_item
+
     def family_config(self, family_name):
         """Get value from config with fallback to default"""
-        return self.family_configs.get(family_name, self.default_item)
+        return self.family_configs.get(family_name, self.default_item())
 
     def refresh(self):
         """Get the family configurations from the database
@@ -360,7 +374,7 @@ class FamilyConfigCache:
                     color=self.default_color
                 )
             else:
-                family["icon"] = self.default_icon
+                family["icon"] = self.default_icon()
 
             # Update state
             if name in toggled:
@@ -376,14 +390,23 @@ class FamilyConfigCache:
 
 class GroupsConfig:
     # Subset group item's default icon and order
-    default_group_config = {
-        "icon": qtawesome.icon("fa.object-group", color=style.colors.default),
-        "order": 0
-    }
+    _default_group_config = None
 
     def __init__(self, dbcon):
         self.dbcon = dbcon
         self.groups = {}
+
+    @classmethod
+    def default_group_config(cls):
+        if cls._default_group_config is None:
+            cls._default_group_config = {
+                "icon": qtawesome.icon(
+                    "fa.object-group",
+                    color=style.colors.default
+                ),
+                "order": 0
+            }
+        return cls._default_group_config
 
     def refresh(self):
         """Get subset group configurations from the database
@@ -435,7 +458,7 @@ class GroupsConfig:
         _groups = list()
         for name in group_names:
             # Get group config
-            config = self.groups.get(name) or self.default_group_config
+            config = self.groups.get(name) or self.default_group_config()
             # Base order
             remapped_order = orders.index(config["order"])
 
