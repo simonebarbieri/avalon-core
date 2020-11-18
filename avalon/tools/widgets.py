@@ -26,6 +26,7 @@ class AssetWidget(QtWidgets.QWidget):
     """
 
     refresh_triggered = QtCore.Signal()   # on model refresh
+    refreshed = QtCore.Signal()
     selection_changed = QtCore.Signal()  # on view selection change
     current_changed = QtCore.Signal()    # on view current index change
 
@@ -100,6 +101,7 @@ class AssetWidget(QtWidgets.QWidget):
             self.set_loading_state(loading=False, empty=not has_item)
             self._restore_model_selection()
             self.model.refreshed.disconnect()
+            self.refreshed.emit()
             print("Duration: %.3fs" % (time.time() - time_start))
 
         self.model.refreshed.connect(on_refreshed)
