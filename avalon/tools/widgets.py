@@ -257,6 +257,10 @@ class AssetWidget(QtWidgets.QWidget):
                     # Ensure item is visible
                     self.view.scrollTo(index)
                     selection_model.select(index, flags)
+        else:
+            asset_name = self.dbcon.Session.get("AVALON_ASSET")
+            if asset_name:
+                self.select_assets([asset_name])
 
 
 class OptionalMenu(QtWidgets.QMenu):
