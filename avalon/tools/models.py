@@ -500,17 +500,6 @@ class AssetModel(TreeModel):
             "silos": silos
         }
 
-    def fetch_documents(self):
-        """Query required documents from mongo."""
-        # Make sure current thread is not alive
-        self.stop_fetch_thread()
-
-        # Restart payload
-        self._doc_payload = {}
-        self._doc_fetching_stop = False
-        self._doc_fetching_thread = lib.create_qthread(self.fetch)
-        self._doc_fetching_thread.start()
-
     def stop_fetch_thread(self):
         if self._doc_fetching_thread is not None:
             self._doc_fetching_stop = True
@@ -519,12 +508,25 @@ class AssetModel(TreeModel):
 
     def refresh(self):
         """Refresh the data for the model."""
+        # Skip fetch if there is already other thread fetching documents
+        if (
+            self._doc_fetching_thread is not None
+            and self._doc_fetching_thread.isRunning()
+        ):
+            return
 
+        # Clear model items
         self.clear()
+
         if not self.dbcon.Session.get("AVALON_PROJECT"):
             return
 
-        self.fetch_documents()
+        # Fetch documents from mongo
+        # Restart payload
+        self._doc_payload = {}
+        self._doc_fetching_stop = False
+        self._doc_fetching_thread = lib.create_qthread(self.fetch)
+        self._doc_fetching_thread.start()
 
     def flags(self, index):
         return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
