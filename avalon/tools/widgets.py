@@ -26,6 +26,7 @@ class AssetWidget(QtWidgets.QWidget):
     """
 
     refresh_triggered = QtCore.Signal()   # on model refresh
+    refreshed = QtCore.Signal()
     selection_changed = QtCore.Signal()  # on view selection change
     current_changed = QtCore.Signal()    # on view current index change
 
@@ -100,6 +101,7 @@ class AssetWidget(QtWidgets.QWidget):
             self.set_loading_state(loading=False, empty=not has_item)
             self._restore_model_selection()
             self.model.refreshed.disconnect()
+            self.refreshed.emit()
             print("Duration: %.3fs" % (time.time() - time_start))
 
         self.model.refreshed.connect(on_refreshed)
@@ -224,8 +226,13 @@ class AssetWidget(QtWidgets.QWidget):
 
     def _restore_model_selection(self):
         model = self.view.model()
-        expanded = self.model_selection.pop("expanded", None)
-        selected = self.model_selection.pop("selected", None)
+        not_set = object()
+        expanded = self.model_selection.pop("expanded", not_set)
+        selected = self.model_selection.pop("selected", not_set)
+
+        if expanded is not_set or selected is not_set:
+            return
+
         if expanded:
             for index in lib.iter_model_rows(
                 model, column=0, include_root=False
@@ -250,6 +257,10 @@ class AssetWidget(QtWidgets.QWidget):
                     # Ensure item is visible
                     self.view.scrollTo(index)
                     selection_model.select(index, flags)
+        else:
+            asset_name = self.dbcon.Session.get("AVALON_ASSET")
+            if asset_name:
+                self.select_assets([asset_name])
 
 
 class OptionalMenu(QtWidgets.QMenu):

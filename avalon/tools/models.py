@@ -1,4 +1,5 @@
 import re
+import time
 import logging
 import collections
 
@@ -340,7 +341,7 @@ class AssetModel(TreeModel):
     ObjectIdRole = QtCore.Qt.UserRole + 3
     subsetColorsRole = QtCore.Qt.UserRole + 4
 
-    doc_fetched = QtCore.Signal()
+    doc_fetched = QtCore.Signal(bool)
     refreshed = QtCore.Signal(bool)
 
     # Asset document projection
@@ -441,13 +442,16 @@ class AssetModel(TreeModel):
 
             self.asset_colors[asset["_id"]] = []
 
-    def on_doc_fetched(self):
+    def on_doc_fetched(self, was_stopped):
+        if was_stopped:
+            self.stop_fetch_thread()
+            return
+
         self.beginResetModel()
 
         assets_by_parent = self._doc_payload.get("assets_by_parent")
         silos = self._doc_payload.get("silos")
         if assets_by_parent is not None:
-
             # Build the hierarchical tree items recursively
             self._add_hierarchy(
                 assets_by_parent,
@@ -456,13 +460,16 @@ class AssetModel(TreeModel):
             )
 
         self.endResetModel()
-        has_content = bool(assets_by_parent) or bool(silos)
 
+        has_content = bool(assets_by_parent) or bool(silos)
         self.refreshed.emit(has_content)
+
+        self.stop_fetch_thread()
 
     def fetch(self):
         self._doc_payload = self._fetch() or {}
-        self.doc_fetched.emit()
+        # Emit doc fetched only if was not stopped
+        self.doc_fetched.emit(self._doc_fetching_stop)
 
     def _fetch(self):
         if not self.dbcon.Session.get("AVALON_PROJECT"):
@@ -504,16 +511,16 @@ class AssetModel(TreeModel):
         if self._doc_fetching_thread is not None:
             self._doc_fetching_stop = True
             while self._doc_fetching_thread.isRunning():
-                pass
+                time.sleep(0.001)
+            self._doc_fetching_thread = None
 
-    def refresh(self):
+    def refresh(self, force=False):
         """Refresh the data for the model."""
         # Skip fetch if there is already other thread fetching documents
-        if (
-            self._doc_fetching_thread is not None
-            and self._doc_fetching_thread.isRunning()
-        ):
-            return
+        if self._doc_fetching_thread is not None:
+            if not force:
+                return
+            self.stop_fetch_thread()
 
         # Clear model items
         self.clear()
