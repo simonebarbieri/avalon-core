@@ -120,6 +120,16 @@ function main(websocket_url){
             });
     });
 
+    RPC.addRoute('AfterEffects.rename_item', function (data) {
+        log.warn('Server called client route "rename_item":', data);
+        return runEvalScript("renameItem(" + data.item_id + ", " +
+                                         "'" + data.item_name + "')")
+            .then(function(result){
+                log.warn("renameItem: " + result);
+                return result;
+            });
+    });
+
     RPC.addRoute('AfterEffects.delete_item', function (data) {
         log.warn('Server called client route "delete_item":', data);
         return runEvalScript("deleteItem(" + data.item_id + "')")
@@ -145,6 +155,27 @@ function main(websocket_url){
                                                 data.color_idx + ")")
             .then(function(result){
                 log.warn("imprint: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.get_work_area', function (data) {
+        log.warn('Server called client route "get_work_area":', data);
+        return runEvalScript("getWorkArea(" + data.item_id + ")")
+            .then(function(result){
+                log.warn("getWorkArea: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.set_work_area', function (data) {
+        log.warn('Server called client route "set_work_area":', data);
+        return runEvalScript("setWorkArea(" + data.item_id + ',' +
+                                              data.start + ',' +
+                                              data.duration + ',' +
+                                              data.frame_rate + ")")
+            .then(function(result){
+                log.warn("getWorkArea: " + result);
                 return result;
             });
     });
