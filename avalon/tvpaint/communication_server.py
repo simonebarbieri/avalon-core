@@ -11,6 +11,7 @@ import platform
 import filecmp
 import tempfile
 import threading
+import shutil
 from queue import Queue
 from contextlib import closing
 
@@ -665,8 +666,22 @@ class Communicator:
         from win32com.shell import shell
         import pythoncom
 
+        # Create temp folder where plugin files are temporary copied
+        # - reason is that copy to TVPaint requires administartion permissions
+        #   but admin may not have access to source folder
+        tmp_dir = os.path.normpath(
+            tempfile.mkdtemp(prefix="tvpaint_copy_")
+        )
+
+        # Copy source to temp folder and create new mapping
         dst_folders = collections.defaultdict(list)
-        for src, dst in src_dst_mapping:
+        new_src_dst_mapping = []
+        for old_src, dst in src_dst_mapping:
+            new_src = os.path.join(tmp_dir, os.path.split(old_src)[1])
+            shutil.copy(old_src, new_src)
+            new_src_dst_mapping.append((new_src, dst))
+
+        for src, dst in new_src_dst_mapping:
             src = os.path.normpath(src)
             dst = os.path.normpath(dst)
             dst_filename = os.path.basename(dst)
@@ -697,6 +712,9 @@ class Communicator:
 
         # commit
         fo.PerformOperations()
+
+        # Remove temp folder
+        shutil.rmtree(tmp_dir)
 
     def _prepare_windows_plugin(self, launch_args):
         """Copy plugin to TVPaint plugins and set PATH to dependencies.
