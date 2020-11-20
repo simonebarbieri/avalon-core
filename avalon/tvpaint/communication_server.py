@@ -558,7 +558,7 @@ class MainThreadItem:
 
     def __init__(self, callback, *args, **kwargs):
         self.done = False
-        self.exc_info = self.not_set
+        self.exception = self.not_set
         self.result = self.not_set
         self.callback = callback
         self.args = args
@@ -584,8 +584,8 @@ class MainThreadItem:
             result = callback(*args, **kwargs)
             self.result = result
 
-        except Exception:
-            self.exc_info = sys.exc_info()
+        except Exception as exc:
+            self.exception = exc
 
         finally:
             self.done = True
@@ -605,9 +605,9 @@ class MainThreadItem:
         while not self.done:
             time.sleep(self.sleep_time)
 
-        if self.exc_info is self.not_set:
+        if self.exception is self.not_set:
             return self.result
-        raise self.exc_info
+        raise self.exception
 
 
 class Communicator:
