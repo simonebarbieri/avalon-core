@@ -200,6 +200,11 @@ class AssetWidget(QtWidgets.QWidget):
         self.view.is_empty = empty
 
     def _store_model_selection(self):
+        index = self.view.currentIndex()
+        current = None
+        if index and index.isValid():
+            current = index.data(self.model.ObjectIdRole)
+
         expanded = set()
         model = self.view.model()
         for index in lib.iter_model_rows(
@@ -221,7 +226,8 @@ class AssetWidget(QtWidgets.QWidget):
 
         self.model_selection = {
             "expanded": expanded,
-            "selected": selected
+            "selected": selected,
+            "current": current
         }
 
     def _restore_model_selection(self):
@@ -229,34 +235,47 @@ class AssetWidget(QtWidgets.QWidget):
         not_set = object()
         expanded = self.model_selection.pop("expanded", not_set)
         selected = self.model_selection.pop("selected", not_set)
+        current = self.model_selection.pop("current", not_set)
 
-        if expanded is not_set or selected is not_set:
+        if (
+            expanded is not_set
+            or selected is not_set
+            or current is not_set
+        ):
             return
 
         if expanded:
             for index in lib.iter_model_rows(
                 model, column=0, include_root=False
             ):
-                value = index.data(self.model.ObjectIdRole)
-                is_expanded = value in expanded
-                # skip if new index was created meanwhile
-                if is_expanded is None:
-                    continue
+                is_expanded = index.data(self.model.ObjectIdRole) in expanded
                 self.view.setExpanded(index, is_expanded)
 
-        if selected:
-            selection_model = self.view.selectionModel()
-            flags = selection_model.Select | selection_model.Rows
+        if selected or current:
+            current_index = None
+            selected_indexes = []
             # Go through all indices, select the ones with similar data
             for index in lib.iter_model_rows(
                 model, column=0, include_root=False
             ):
-                value = index.data(self.model.ObjectIdRole)
-                state = value in selected
-                if state:
-                    # Ensure item is visible
-                    self.view.scrollTo(index)
-                    selection_model.select(index, flags)
+                object_id = index.data(self.model.ObjectIdRole)
+                if object_id in selected:
+                    selected_indexes.append(index)
+
+                if not current_index and object_id == current:
+                    current_index = index
+
+            if current_index:
+                self.view.setCurrentIndex(current_index)
+
+            if not selected_indexes:
+                return
+            selection_model = self.view.selectionModel()
+            flags = selection_model.Select | selection_model.Rows
+            for index in selected_indexes:
+                # Ensure item is visible
+                self.view.scrollTo(index)
+                selection_model.select(index, flags)
         else:
             asset_name = self.dbcon.Session.get("AVALON_ASSET")
             if asset_name:
