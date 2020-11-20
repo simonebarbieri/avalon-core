@@ -301,11 +301,7 @@ class AvalonToolsHelper:
         if self._loader_tool is not None:
             return self._loader_tool
 
-        from ..tools.loader.app import (
-            Window, lib
-        )
-        lib.refresh_family_config_cache()
-        lib.refresh_group_config_cache()
+        from ..tools.loader.app import Window
 
         window = Window()
         window.setWindowFlags(
