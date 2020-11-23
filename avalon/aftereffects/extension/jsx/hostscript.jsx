@@ -230,13 +230,9 @@ function importFile(path, item_name, import_options){
             
             comp = app.project.importFile(im_opt);
 
-            if (app.project.selection.length >= 2){
-                for (i = 0; i < app.project.selection.length; ++i){
-                    var item = app.project.selection[i];
-                    if (item instanceof FolderItem){
-                        comp.parentFolder = item;
-                    }
-                }
+            if (app.project.selection.length == 2 &&
+                app.project.selection[0] instanceof FolderItem){
+                 comp.parentFolder = app.project.selection[0]   
             }
         } catch (error) {
             $.writeln(error);
@@ -244,8 +240,6 @@ function importFile(path, item_name, import_options){
         } finally {
             fp.close();
         }
-    }else{
-        alert("File " + path + " doesn't exist.");
     }
     if (comp){
         comp.name = item_name;
@@ -265,12 +259,11 @@ function setLabelColor(item_id, color_idx){
      *     item_id (int): item id
      *     color_idx (int): 0-16 index from Label
      */
-    for (var i = app.project.numItems; i >= 1; i--) {
-        var curItem = app.project.item(i);
-        if (curItem.id == item_id){
-            curItem.label = color_idx;
-            break;
-        }
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        item.label = color_idx;
+    }else{
+        alert("There is no composition with "+ comp_id);
     }
 }
 
@@ -286,34 +279,71 @@ function replaceItem(comp_id, path, item_name){
     app.beginUndoGroup("Replace File");
     
     fp = new File(path);
-    for (var i = app.project.numItems; i >= 1; i--) {
-        var curItem = app.project.item(i);
-        if (curItem.id == comp_id){
-            try{
-                curItem.replace(fp);
-                curItem.name = item_name;
-            } catch (error) {
-                alert(error.toString() + path, scriptName);
-            } finally {
-                fp.close();
-            }
-            break;
-        } 
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        try{
+            item.replace(fp);
+            item.name = item_name;
+        } catch (error) {
+            alert(error.toString() + path, scriptName);
+        } finally {
+            fp.close();
+        }
+    }else{
+        alert("There is no composition with "+ comp_id);
     }
     app.endUndoGroup();
 }
 
+function renameItem(comp_id, new_name){
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        item.name = new_name;
+    }else{
+        alert("There is no composition with "+ comp_id);
+    }
+}
+
 function deleteItem(comp_id){
-    /**
-     * Deletes by 'comp_id', which is not index of 'items'
-     */
-    for (var i = app.project.numItems; i >= 1; i--) {
-        var curItem = app.project.item(i);
-        if (curItem.id == comp_id){
-            curItem.remove();
-            break;
-        } 
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        item.remove();
+    }else{
+        alert("There is no composition with "+ comp_id);
     }  
+}
+
+function getWorkArea(comp_id){
+    /**
+     * Returns information about workarea - are that will be
+     * rendered. All calculation will be done in Pype, 
+     * easier to modify without redeploy of extension.
+     * 
+     * Returns dict
+     */
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        return JSON.stringify({
+            "workAreaStart": item.displayStartTime, 
+            "workAreaDuration": item.duration,
+            "frameRate": item.frameRate});
+    }else{
+        alert("There is no composition with "+ comp_id);
+    }  
+}
+
+function setWorkArea(comp_id, workAreaStart, workAreaDuration, frameRate){
+    /**
+     * Sets work area info from outside (from Ftrack via Pype)
+     */
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        item.displayStartTime = workAreaStart;
+        item.duration = workAreaDuration;
+        item.frameRate = frameRate;
+    }else{
+        alert("There is no composition with "+ comp_id);
+    } 
 }
 
 function save(){
@@ -332,25 +362,28 @@ function saveAs(path){
 
 // // var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
 //  var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
-//var mov = 'c:\\Users\\petrk\\Downloads\\Samples\\sample_iTunes.mov';
+// var mov = 'c:\\Users\\petrk\\Downloads\\Samples\\sample_iTunes.mov';
 // // var wav = 'c:\\Users\\petrk\\Downloads\\Samples\\africa-toto.wav';
 
 // var inop = JSON.stringify({sequence: true});
 // $.writeln(inop);
 // importFile(mov, "mov", inop); // should be able to import PSD and all its layers
-//importFile(mov, "new_wav", '{}');
+//importFile(mov, "new_wav");
 // $.writeln(app.project.selection);
 // for (i = 1; i <= app.project.selection.length; ++i){
 //     var sel = app.project.selection[i];
 //     $.writeln(sel);
 //     $.writeln(app.project.selection[0] instanceof FolderItem);
 //}
-//$.writeln(getItems(true, false, false));
-//importFile(mov, "new_wav", "{}");
-// var inop = JSON.stringify({sequence: true});
-// var seq = "C:/projects/petr_test/assets/locations/Jungle/publish/render/reviewArt/v003/petr_test_Jungle_reviewArt_v003.0001.jpg";
-// importFile(seq, "new_wav", inop);
 
+//renameItem(2, "new_name");
+//app.project.item(3).displayStartFrame = 20;
+// app.project.selection[0].workAreaStart = 5;
+// app.project.selection[0].workAreaDuration = 10;
+// var sel = app.project.selection[0];
+// $.writeln(app.project.selection[0].workAreaDuration);
+// $.writeln(getFrameRange(60));
+//$.writeln(getWorkArea(60));
 
 
 
