@@ -6,12 +6,12 @@ from ...vendor.Qt import QtWidgets, QtCore
 from ... import style
 from .. import lib as tools_lib
 from . import lib
-from .widgets import (
-    SubsetWidget,
+from .widgets import LibrarySubsetWidget
+from ..loader.widgets import (
+    ThumbnailWidget,
     VersionWidget,
     FamilyListWidget
 )
-from ..loader.widgets import ThumbnailWidget
 from ..widgets import AssetWidget
 from ..models import AssetModel
 
@@ -56,15 +56,25 @@ class Window(QtWidgets.QDialog):
         self.show_projects = show_projects
         self.show_libraries = show_libraries
 
+        # Groups config
+        self.groups_config = tools_lib.GroupsConfig(self.dbcon)
+        self.family_config_cache = tools_lib.FamilyConfigCache(self.dbcon)
+
         assets = AssetWidget(
-            multiselection=True, dbcon=self.dbcon, parent=self
+            self.dbcon, multiselection=True, parent=self
         )
-        families = FamilyListWidget(dbcon=self.dbcon, parent=self)
-        subsets = SubsetWidget(
-            dbcon=self.dbcon, tool_name=self.tool_name, parent=self
+        families = FamilyListWidget(
+            self.dbcon, self.family_config_cache, parent=self
         )
-        version = VersionWidget(dbcon=self.dbcon, parent=self)
-        thumbnail = ThumbnailWidget(dbcon=self.dbcon)
+        subsets = LibrarySubsetWidget(
+            self.dbcon,
+            self.groups_config,
+            self.family_config_cache,
+            tool_name=self.tool_name,
+            parent=self
+        )
+        version = VersionWidget(self.dbcon)
+        thumbnail = ThumbnailWidget(self.dbcon)
 
         thumb_ver_body = QtWidgets.QWidget()
         thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_body)
@@ -126,8 +136,8 @@ class Window(QtWidgets.QDialog):
 
         families.active_changed.connect(subsets.set_family_filters)
         assets.selection_changed.connect(self.on_assetschanged)
+        assets.refresh_triggered.connect(self.on_assetschanged)
         assets.view.clicked.connect(self.on_assetview_click)
-        assets.refreshButton.clicked.connect(self.on_refresh_clicked)
         subsets.active_changed.connect(self.on_subsetschanged)
         subsets.version_changed.connect(self.on_versionschanged)
         self.combo_projects.currentTextChanged.connect(self.on_project_change)
@@ -195,7 +205,7 @@ class Window(QtWidgets.QDialog):
             return
         self.dbcon.Session["AVALON_PROJECT"] = project_name
 
-        _config = lib.find_config(self.dbcon)
+        _config = lib.find_config()
         if hasattr(_config, "install"):
             _config.install()
         else:
@@ -203,8 +213,8 @@ class Window(QtWidgets.QDialog):
                 "Config `%s` has no function `install`" % _config.__name__
             )
 
-        lib.refresh_family_config_cache(self.dbcon)
-        lib.refresh_group_config_cache(self.dbcon)
+        self.family_config_cache.refresh()
+        self.groups_config.refresh()
 
         self._refresh()
         self._assetschanged()
@@ -283,6 +293,7 @@ class Window(QtWidgets.QDialog):
         assert project, "This is a bug"
 
         assets_widget = self.data["widgets"]["assets"]
+        assets_widget.model.stop_fetch_thread()
         assets_widget.refresh()
         assets_widget.setFocus()
 
@@ -311,8 +322,9 @@ class Window(QtWidgets.QDialog):
 
         assets_widget = self.data["widgets"]["assets"]
         subsets_widget = self.data["widgets"]["subsets"]
+        subsets_model = subsets_widget.model
 
-        subsets_widget.model.clear()
+        subsets_model.clear()
         self.clear_assets_underlines()
 
         # filter None docs they are silo
@@ -321,9 +333,23 @@ class Window(QtWidgets.QDialog):
             return
 
         asset_ids = [asset_doc["_id"] for asset_doc in asset_docs]
-        subsets_widget.model.set_assets(asset_ids)
+        # Start loading
+        subsets_widget.set_loading_state(
+            loading=bool(asset_ids),
+            empty=True
+        )
+
+        def on_refreshed(has_item):
+            empty = not has_item
+            subsets_widget.set_loading_state(loading=False, empty=empty)
+            subsets_model.refreshed.disconnect()
+            self.echo("Duration: %.3fs" % (time.time() - t1))
+
+        subsets_model.refreshed.connect(on_refreshed)
+
+        subsets_model.set_assets(asset_ids)
         subsets_widget.view.setColumnHidden(
-            subsets_widget.model.Columns.index("asset"),
+            subsets_model.Columns.index("asset"),
             len(asset_ids) < 2
         )
 
@@ -469,16 +495,6 @@ class Window(QtWidgets.QDialog):
         if shift_pressed:
             print("Force quitted..")
             self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-
-        # Kill on holding SHIFT
-        modifiers = QtWidgets.QApplication.queryKeyboardModifiers()
-        shift_pressed = QtCore.Qt.ShiftModifier & modifiers
-
-        if shift_pressed:
-            print("Force quitted..")
-            self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-
-        # self.dbcon.uninstall()
 
         print("Good bye")
         return super(Window, self).closeEvent(event)
