@@ -302,11 +302,7 @@ class AvalonToolsHelper:
         if self._loader_tool is not None:
             return self._loader_tool
 
-        from ..tools.loader.app import (
-            Window, lib
-        )
-        lib.refresh_family_config_cache()
-        lib.refresh_group_config_cache()
+        from ..tools.loader.app import Window
 
         window = Window()
         window.setWindowFlags(
@@ -563,7 +559,7 @@ class MainThreadItem:
 
     def __init__(self, callback, *args, **kwargs):
         self.done = False
-        self.exc_info = self.not_set
+        self.exception = self.not_set
         self.result = self.not_set
         self.callback = callback
         self.args = args
@@ -589,8 +585,8 @@ class MainThreadItem:
             result = callback(*args, **kwargs)
             self.result = result
 
-        except Exception:
-            self.exc_info = sys.exc_info()
+        except Exception as exc:
+            self.exception = exc
 
         finally:
             self.done = True
@@ -610,9 +606,9 @@ class MainThreadItem:
         while not self.done:
             time.sleep(self.sleep_time)
 
-        if self.exc_info is self.not_set:
+        if self.exception is self.not_set:
             return self.result
-        raise self.exc_info
+        raise self.exception
 
 
 class Communicator:
