@@ -126,7 +126,7 @@ def workfile_metadata(metadata_key, default=None):
         .replace("{__sq__}", "'")
         .replace("{__dq__}", "\"")
     )
-
+    os.remove(output_filepath)
     if json_string:
         return json.loads(json_string)
     return default
