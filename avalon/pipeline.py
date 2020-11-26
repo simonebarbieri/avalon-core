@@ -190,6 +190,9 @@ class Loader(list):
     order = 0
 
     def __init__(self, context):
+        self.fname = self.filepath_from_context(context)
+
+    def filepath_from_context(self, context):
         representation = context['representation']
         project_doc = context.get("project")
         root = None
@@ -198,7 +201,7 @@ class Loader(list):
             anatomy = Anatomy(project_doc["name"])
             root = anatomy.roots_obj
 
-        self.fname = get_representation_path(representation, root)
+        return get_representation_path(representation, root)
 
     def load(self, context, name=None, namespace=None, options=None):
         """Load asset via database
