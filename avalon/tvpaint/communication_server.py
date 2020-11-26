@@ -880,7 +880,7 @@ class Communicator:
     def _initial_textfile_write(self):
         """Show popup about Write to file at start of TVPaint."""
         tmp_file = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
+            mode="w", prefix="a_tvp_", suffix=".txt", delete=False
         )
         tmp_file.close()
         tmp_filepath = tmp_file.name.replace("\\", "/")

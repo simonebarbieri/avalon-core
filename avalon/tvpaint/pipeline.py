@@ -106,7 +106,7 @@ def workfile_metadata(metadata_key, default=None):
     if default is None:
         default = []
     output_file = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False
+        mode="w", prefix="a_tvp_", suffix=".txt", delete=False
     )
     output_file.close()
 
