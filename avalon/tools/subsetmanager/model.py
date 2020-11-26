@@ -9,7 +9,7 @@ class InstanceModel(TreeModel):
     column_label_mapping = {
         "subset": "Subset"
     }
-    Columns = [*column_label_mapping.keys()]
+    Columns = list(column_label_mapping.keys())
 
     def refresh(self):
         self.clear()
@@ -28,8 +28,8 @@ class InstanceModel(TreeModel):
 
         for instance_data in instances:
             item = Item({
-                "subset": item_data["subset"],
-                "instance": item_data
+                "subset": instance_data["subset"],
+                "instance": instance_data
             })
             self.add_child(item)
 
