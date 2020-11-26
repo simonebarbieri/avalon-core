@@ -199,6 +199,15 @@ function main(websocket_url){
                 return result;
             });
     });
+
+    RPC.addRoute('AfterEffects.get_render_info', function (data) {
+        log.warn('Server called client route "get_render_info":', data);
+        return runEvalScript("getRenderInfo()")
+            .then(function(result){
+                log.warn("get_render_info: " + result);
+                return result;
+            });
+    });
 }
 
 /** main entry point **/

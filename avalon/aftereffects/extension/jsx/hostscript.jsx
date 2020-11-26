@@ -360,6 +360,25 @@ function saveAs(path){
     return app.project.save(fp = new File(path));
 }
 
+function getRenderInfo(){
+    /***
+        Get info from render queue.
+        Currently pulls only file name to parse extension and 
+        if it is sequence in Python
+    **/
+    try{
+        var item = app.project.renderQueue.item(1).outputModule(1);
+    } catch (error) {
+        alert("There is no render queue, create one.");
+    }
+    var file_url = item.file.toString();
+
+    return JSON.stringify({
+        "file_name": file_url            
+    })
+}
+
+
 // // var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
 //  var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
 // var mov = 'c:\\Users\\petrk\\Downloads\\Samples\\sample_iTunes.mov';
@@ -384,14 +403,6 @@ function saveAs(path){
 // $.writeln(app.project.selection[0].workAreaDuration);
 // $.writeln(getFrameRange(60));
 //$.writeln(getWorkArea(60));
-
-
-
-
-
-
-
-
 
 
 
