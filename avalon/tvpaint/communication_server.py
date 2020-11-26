@@ -792,7 +792,7 @@ class Communicator:
         try:
             self._windows_copy(to_copy)
         except Exception:
-            pass
+            log.error("Plugin copy failed", exc_info=True)
 
         # Validate copy was done
         invalid = []
@@ -801,12 +801,17 @@ class Communicator:
                 invalid.append((src, dst))
 
         if invalid:
-            raise RuntimeError("Copying of plugin was not successfull")
+            _invalid = []
+            for src, dst in invalid:
+                _invalid.append("\"{}\" -> \"{}\"".format(src, dst))
+
+            raise RuntimeError(
+                "Copy of plugin files failed. Failed files {}".format(
+                    ", ".join(_invalid)
+                )
+            )
 
     def _launch_tv_paint(self, launch_args):
-        if platform.system().lower() == "windows":
-            self._prepare_windows_plugin(launch_args)
-
         flags = (
             subprocess.DETACHED_PROCESS
             | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -825,6 +830,9 @@ class Communicator:
         """
         log.info("Installing TVPaint implementation")
         api.install(tvpaint)
+
+        if platform.system().lower() == "windows":
+            self._prepare_windows_plugin(launch_args)
 
         # Launch TVPaint and the websocket server.
         log.info("Launching TVPaint")
@@ -872,7 +880,7 @@ class Communicator:
     def _initial_textfile_write(self):
         """Show popup about Write to file at start of TVPaint."""
         tmp_file = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
+            mode="w", prefix="a_tvp_", suffix=".txt", delete=False
         )
         tmp_file.close()
         tmp_filepath = tmp_file.name.replace("\\", "/")
