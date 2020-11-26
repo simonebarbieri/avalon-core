@@ -18,8 +18,8 @@ module.window = None
 class Window(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent=parent)
-        self.setWindowTitle("Subset Manger 0.1")
-        self.setObjectName("SubsetManger")
+        self.setWindowTitle("Subset Manager 0.1")
+        self.setObjectName("SubsetManager")
 
         self.resize(780, 430)
 
