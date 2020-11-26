@@ -21,6 +21,9 @@ class Window(QtWidgets.QDialog):
         self.setWindowTitle("Subset Manger 0.1")
         self.setObjectName("SubsetManger")
 
+        self.resize(780, 430)
+
+        # Trigger refresh on first called show
         self._first_show = True
 
         left_side_widget = QtWidgets.QWidget(self)
