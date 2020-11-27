@@ -324,7 +324,7 @@ function getWorkArea(comp_id){
     var item = app.project.itemByID(comp_id);
     if (item){
         return JSON.stringify({
-            "workAreaStart": item.displayStartTime, 
+            "workAreaStart": item.displayStartFrame, 
             "workAreaDuration": item.duration,
             "frameRate": item.frameRate});
     }else{
@@ -419,7 +419,7 @@ function getAudioUrlForComp(comp_id){
 // $.writeln(getFrameRange(60));
 //$.writeln(getWorkArea(60));
 
-$.writeln(getAudioUrlForComp(60));
+$.writeln(getWorkArea(60));
 
 
 
