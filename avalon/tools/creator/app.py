@@ -483,19 +483,16 @@ class Window(QtWidgets.QDialog):
         if item is None:
             return
 
-        Creator = item.data(PluginRole)
         subset_name = result.text()
         asset = asset.text()
         family = item.data(FamilyRole)
         use_selection = self.data["Use Selection Checkbox"].isChecked()
 
         try:
-            api.create(
-                Creator,
-                subset_name,
-                asset,
-                options={"useSelection": use_selection}
-            )
+            api.create(subset_name,
+                       asset,
+                       family,
+                       options={"useSelection": use_selection})
 
         except NameError as e:
             self.echo(e)
