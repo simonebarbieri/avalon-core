@@ -324,7 +324,7 @@ function getWorkArea(comp_id){
     var item = app.project.itemByID(comp_id);
     if (item){
         return JSON.stringify({
-            "workAreaStart": item.displayStartTime, 
+            "workAreaStart": item.displayStartFrame, 
             "workAreaDuration": item.duration,
             "frameRate": item.frameRate});
     }else{
@@ -360,6 +360,40 @@ function saveAs(path){
     return app.project.save(fp = new File(path));
 }
 
+function getRenderInfo(){
+    /***
+        Get info from render queue.
+        Currently pulls only file name to parse extension and 
+        if it is sequence in Python
+    **/
+    try{
+        var item = app.project.renderQueue.item(1).outputModule(1);
+    } catch (error) {
+        alert("There is no render queue, create one.");
+    }
+    var file_url = item.file.toString();
+
+    return JSON.stringify({
+        "file_name": file_url            
+    })
+}
+
+function getAudioUrlForComp(comp_id){
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        for (i = 1; i <= item.numLayers; ++i){
+            var layer = item.layers[i];
+            if (layer instanceof AVLayer){
+                return layer.source.file.fsName.toString();
+            }
+
+        }
+    }else{
+        alert("There is no composition with "+ comp_id);
+    }
+
+}
+
 // // var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
 //  var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
 // var mov = 'c:\\Users\\petrk\\Downloads\\Samples\\sample_iTunes.mov';
@@ -385,7 +419,7 @@ function saveAs(path){
 // $.writeln(getFrameRange(60));
 //$.writeln(getWorkArea(60));
 
-
+$.writeln(getWorkArea(60));
 
 
 
