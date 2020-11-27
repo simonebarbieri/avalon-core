@@ -241,6 +241,16 @@ class Loader(list):
                                   "implemented by subclass")
 
 
+class CreatorError(Exception):
+    """Should be raised when creator failed because of known issue.
+
+    Message of error should be user readable.
+    """
+
+    def __init__(self, message):
+        super(CreatorError, self).__init__(message)
+
+
 @lib.log
 class Creator(object):
     """Determine how assets are created"""
