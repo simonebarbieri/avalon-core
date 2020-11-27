@@ -21,7 +21,7 @@ def execute_george_through_file(george_script):
         george_script (str): George script to execute. May be multilined.
     """
     temporary_file = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".grg", delete=False
+        mode="w", prefix="a_tvp_", suffix=".grg", delete=False
     )
     temporary_file.write(george_script)
     temporary_file.close()
@@ -65,7 +65,7 @@ def parse_layers_data(data):
 
 def layers_data(layer_ids=None):
     output_file = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False
+        mode="w", prefix="a_tvp_", suffix=".txt", delete=False
     )
     output_file.close()
     if layer_ids is not None and isinstance(layer_ids, int):
@@ -170,7 +170,7 @@ def parse_group_data(data):
 
 def groups_data():
     output_file = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False
+        mode="w", prefix="a_tvp_", suffix=".txt", delete=False
     )
     output_file.close()
 
@@ -220,7 +220,7 @@ def get_exposure_frames(layer_id, first_frame=None, last_frame=None):
             last_frame = layer["frame_end"]
 
     tmp_file = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False
+        mode="w", prefix="a_tvp_", suffix=".txt", delete=False
     )
     tmp_file.close()
     tmp_output_path = tmp_file.name.replace("\\", "/")
