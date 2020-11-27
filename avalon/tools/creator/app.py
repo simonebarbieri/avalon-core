@@ -514,7 +514,9 @@ class Window(QtWidgets.QDialog):
             error_info = (str(exc), formatted_traceback)
 
         if error_info:
-            box = CreateErrorMessageBox(family, subset_name, asset, *error_info)
+            box = CreateErrorMessageBox(
+                family, subset_name, asset, *error_info
+            )
             box.show()
 
         self.echo("Created %s .." % subset_name)
