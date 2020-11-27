@@ -378,6 +378,21 @@ function getRenderInfo(){
     })
 }
 
+function getAudioUrlForComp(comp_id){
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        for (i = 1; i <= item.numLayers; ++i){
+            var layer = item.layers[i];
+            if (layer instanceof AVLayer){
+                return layer.source.file.fsName.toString();
+            }
+
+        }
+    }else{
+        alert("There is no composition with "+ comp_id);
+    }
+
+}
 
 // // var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
 //  var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
@@ -403,6 +418,14 @@ function getRenderInfo(){
 // $.writeln(app.project.selection[0].workAreaDuration);
 // $.writeln(getFrameRange(60));
 //$.writeln(getWorkArea(60));
+
+$.writeln(getAudioUrlForComp(60));
+
+
+
+
+
+
 
 
 

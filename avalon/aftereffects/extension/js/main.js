@@ -16,6 +16,14 @@ async function startUp(url){
 
     var res = await promis; 
     log.warn("res: " + res);
+
+    promis = runEvalScript("getEnv('PYPE_DEBUG')");
+    var debug = await promis;
+    log.warn("debug: " + debug);
+    if (debug && debug.toString() == '3'){
+        WSRPC.DEBUG = true;
+        WSRPC.TRACE = true;    
+    }
     // run rest only after resolved promise
     main(res);
 }
@@ -205,6 +213,15 @@ function main(websocket_url){
         return runEvalScript("getRenderInfo()")
             .then(function(result){
                 log.warn("get_render_info: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.get_audio_url', function (data) {
+        log.warn('Server called client route "get_audio_url":', data);
+        return runEvalScript("getAudioUrlForComp(" + data.item_id + ")")
+            .then(function(result){
+                log.warn("getAudioUrlForComp: " + result);
                 return result;
             });
     });
