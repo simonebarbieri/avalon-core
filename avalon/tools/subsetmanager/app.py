@@ -166,9 +166,7 @@ class Window(QtWidgets.QDialog):
         editable = False
         if dev_mode.lower() in ("1", "yes", "true", "on"):
             editable = hasattr(host, "save_instances")
-        self.details_widget.set_editable(
-
-        )
+        self.details_widget.set_editable(editable)
 
     def show(self, *args, **kwargs):
         super(Window, self).show(*args, **kwargs)

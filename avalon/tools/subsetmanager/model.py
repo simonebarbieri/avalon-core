@@ -1,7 +1,5 @@
-import copy
 import uuid
 from ... import api
-from ...vendor import Qt
 from ...vendor.Qt import QtCore
 from ..models import TreeModel, Item
 
