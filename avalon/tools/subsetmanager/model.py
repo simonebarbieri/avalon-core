@@ -7,7 +7,7 @@ InstanceRole = QtCore.Qt.UserRole + 1
 
 class InstanceModel(TreeModel):
     column_label_mapping = {
-        "subset": "Subset"
+        "label": "Instance"
     }
     Columns = list(column_label_mapping.keys())
 
@@ -28,7 +28,7 @@ class InstanceModel(TreeModel):
 
         for instance_data in instances:
             item = Item({
-                "subset": instance_data["subset"],
+                "label": instance_data.get("label") or instance_data["subset"],
                 "instance": instance_data
             })
             self.add_child(item)
