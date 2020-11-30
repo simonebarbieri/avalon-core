@@ -1,8 +1,12 @@
+import copy
+import uuid
 from ... import api
+from ...vendor import Qt
 from ...vendor.Qt import QtCore
 from ..models import TreeModel, Item
 
 InstanceRole = QtCore.Qt.UserRole + 1
+InstanceItemId = QtCore.Qt.UserRole + 2
 
 
 class InstanceModel(TreeModel):
@@ -11,11 +15,16 @@ class InstanceModel(TreeModel):
     }
     Columns = list(column_label_mapping.keys())
 
+    def __init__(self, *args, **kwargs):
+        super(InstanceModel, self).__init__(*args, **kwargs)
+        self.items_by_id = {}
+
     def refresh(self):
         self.clear()
 
-        instances = None
+        self.items_by_id.clear()
 
+        instances = None
         host = api.registered_host()
         list_instances = getattr(host, "list_instances", None)
         if list_instances:
@@ -27,10 +36,13 @@ class InstanceModel(TreeModel):
         self.beginResetModel()
 
         for instance_data in instances:
+            item_id = str(uuid.uuid4())
             item = Item({
+                "item_id": item_id,
                 "label": instance_data.get("label") or instance_data["subset"],
                 "instance": instance_data
             })
+            self.items_by_id[item_id] = item
             self.add_child(item)
 
         self.endResetModel()
@@ -39,9 +51,13 @@ class InstanceModel(TreeModel):
         if not index.isValid():
             return
 
+        if role == InstanceItemId:
+            item = index.internalPointer()
+            return item["item_id"]
+
         if role == InstanceRole:
             item = index.internalPointer()
-            return item.get("instance", None)
+            return item["instance"]
 
         return super(InstanceModel, self).data(index, role)
 

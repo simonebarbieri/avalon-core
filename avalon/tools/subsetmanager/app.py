@@ -7,7 +7,11 @@ from ...vendor.Qt import QtWidgets, QtCore
 
 from .. import lib as tools_lib
 from ..models import RecursiveSortFilterProxyModel
-from .model import InstanceModel, InstanceRole
+from .model import (
+    InstanceModel,
+    InstanceRole,
+    InstanceItemId
+)
 from .widgets import InstanceDetail
 
 
@@ -72,6 +76,7 @@ class Window(QtWidgets.QDialog):
         refresh_btn.clicked.connect(self._on_refresh_clicked)
         view.clicked.connect(self._on_activated)
         view.customContextMenuRequested.connect(self.on_context_menu)
+        details_widget.save_triggered.connect(self._on_save)
 
         self.model = model
         self.proxy = proxy
@@ -83,11 +88,39 @@ class Window(QtWidgets.QDialog):
         self.refresh()
 
     def _on_activated(self, index):
+        container = None
+        item_id = None
         if index.isValid():
             container = index.data(InstanceRole)
-        else:
-            container = None
-        self.details_widget.set_details(container)
+            item_id = index.data(InstanceItemId)
+
+        self.details_widget.set_details(container, item_id)
+
+    def _on_save(self):
+        host = api.registered_host()
+        if not hasattr(host, "save_instances"):
+            print("BUG: Host does not have \"save_instances\" method")
+            return
+
+        current_index = self.view.selectionModel().currentIndex()
+        if not current_index.isValid():
+            return
+
+        item_id = current_index.data(InstanceItemId)
+        if item_id != self.details_widget.item_id():
+            return
+
+        item_data = self.details_widget.instance_data_from_text()
+        new_instances = []
+        for index in tools_lib.iter_model_rows(self.model, 0):
+            _item_id = index.data(InstanceItemId)
+            if _item_id == item_id:
+                instance_data = item_data
+            else:
+                instance_data = index.data(InstanceRole)
+            new_instances.append(instance_data)
+
+        host.save_instances(new_instances)
 
     def on_context_menu(self, point):
         point_index = self.view.indexAt(point)
@@ -124,8 +157,13 @@ class Window(QtWidgets.QDialog):
         self.refresh()
 
     def refresh(self):
-        self.details_widget.set_details(None)
+        self.details_widget.set_details(None, None)
         self.model.refresh()
+
+        host = api.registered_host()
+        self.details_widget.set_editable(
+            hasattr(host, "save_instances")
+        )
 
     def show(self, *args, **kwargs):
         super(Window, self).show(*args, **kwargs)
