@@ -1,3 +1,4 @@
+import os
 import sys
 
 from ... import api, style
@@ -161,8 +162,12 @@ class Window(QtWidgets.QDialog):
         self.model.refresh()
 
         host = api.registered_host()
+        dev_mode = os.environ.get("AVALON_DEVELOP_MODE") or ""
+        editable = False
+        if dev_mode.lower() in ("1", "yes", "true", "on"):
+            editable = hasattr(host, "save_instances")
         self.details_widget.set_editable(
-            hasattr(host, "save_instances")
+
         )
 
     def show(self, *args, **kwargs):

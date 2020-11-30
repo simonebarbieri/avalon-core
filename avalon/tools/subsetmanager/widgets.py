@@ -26,7 +26,7 @@ class InstanceDetail(QtWidgets.QWidget):
         self.details_widget = details_widget
         self.save_btn = save_btn
 
-        self.set_editable(True)
+        self.set_editable(False)
 
     def on_save(self):
         if self.is_valid():
