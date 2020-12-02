@@ -12,6 +12,7 @@ from ..pipeline import AVALON_CONTAINER_ID
 
 
 METADATA_SECTION = "avalon"
+SECTION_NAME_CONTEXT = "context"
 SECTION_NAME_INSTANCES = "instances"
 SECTION_NAME_CONTAINERS = "containers"
 
@@ -92,7 +93,7 @@ def maintained_selection():
         pass
 
 
-def workfile_metadata(metadata_key, default=None):
+def get_workfile_metadata(metadata_key, default=None):
     """Read metadata for specific key from current project workfile.
 
     Pipeline use function to store loaded and created instances within keys
@@ -162,9 +163,19 @@ def write_workfile_metadata(metadata_key, value):
     return lib.execute_george_through_file(george_script)
 
 
+def get_current_workfile_context():
+    """Return context in which was workfile saved."""
+    return get_workfile_metadata(SECTION_NAME_CONTEXT, {})
+
+
+def save_current_workfile_context(context):
+    """Save context which was used to create a workfile."""
+    return write_workfile_metadata(SECTION_NAME_CONTEXT, context)
+
+
 def remove_instance(instance):
     """Remove instance from current workfile metadata."""
-    current_instances = workfile_metadata(SECTION_NAME_INSTANCES)
+    current_instances = get_workfile_metadata(SECTION_NAME_INSTANCES)
     instance_id = instance.get("uuid")
     found_idx = None
     if instance_id:
@@ -181,7 +192,7 @@ def remove_instance(instance):
 
 def list_instances():
     """List all created instances from current workfile."""
-    return workfile_metadata(SECTION_NAME_INSTANCES)
+    return get_workfile_metadata(SECTION_NAME_INSTANCES)
 
 
 def _write_instances(data):
@@ -189,7 +200,7 @@ def _write_instances(data):
 
 
 def ls():
-    return workfile_metadata(SECTION_NAME_CONTAINERS)
+    return get_workfile_metadata(SECTION_NAME_CONTAINERS)
 
 
 class Creator(api.Creator):

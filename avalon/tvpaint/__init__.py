@@ -5,6 +5,7 @@ from .pipeline import (
     install,
     uninstall,
     maintained_selection,
+    get_current_workfile_context,
     remove_instance,
     list_instances,
     ls,
