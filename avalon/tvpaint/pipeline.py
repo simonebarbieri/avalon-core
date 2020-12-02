@@ -173,7 +173,25 @@ def save_current_workfile_context(context):
     return write_workfile_metadata(SECTION_NAME_CONTEXT, context)
 
 
+def remove_instance(instance):
+    """Remove instance from current workfile metadata."""
+    current_instances = get_workfile_metadata(SECTION_NAME_INSTANCES)
+    instance_id = instance.get("uuid")
+    found_idx = None
+    if instance_id:
+        for idx, _inst in enumerate(current_instances):
+            if _inst["uuid"] == instance_id:
+                found_idx = idx
+                break
+
+    if found_idx is None:
+        return
+    current_instances.pop(found_idx)
+    _write_instances(current_instances)
+
+
 def list_instances():
+    """List all created instances from current workfile."""
     return get_workfile_metadata(SECTION_NAME_INSTANCES)
 
 
