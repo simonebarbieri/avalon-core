@@ -30,6 +30,8 @@ __all__ = (
     "install",
     "uninstall",
     "maintained_selection",
+    "remove_instance",
+    "list_instances",
     "ls",
     "Creator",
     "Loader",

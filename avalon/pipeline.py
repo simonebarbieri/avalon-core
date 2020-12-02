@@ -244,6 +244,16 @@ class Loader(list):
                                   "implemented by subclass")
 
 
+class CreatorError(Exception):
+    """Should be raised when creator failed because of known issue.
+
+    Message of error should be user readable.
+    """
+
+    def __init__(self, message):
+        super(CreatorError, self).__init__(message)
+
+
 @lib.log
 class Creator(object):
     """Determine how assets are created"""
@@ -1127,7 +1137,7 @@ def debug_host():
     return host
 
 
-def create(name, asset, family, options=None, data=None):
+def create(Creator, name, asset, options=None, data=None):
     """Create a new instance
 
     Associate nodes with a subset and family. These nodes are later
@@ -1139,9 +1149,9 @@ def create(name, asset, family, options=None, data=None):
     and finally asset browsers to help identify the origin of the asset.
 
     Arguments:
+        Creator (Creator): Class of creator
         name (str): Name of subset
         asset (str): Name of asset
-        family (str): Name of family
         options (dict, optional): Additional options from GUI
         data (dict, optional): Additional data from GUI
 
@@ -1156,30 +1166,11 @@ def create(name, asset, family, options=None, data=None):
     """
 
     host = registered_host()
+    plugin = Creator(name, asset, options, data)
+    with host.maintained_selection():
+        print("Running %s" % plugin)
+        instance = plugin.process()
 
-    plugins = list()
-    for Plugin in discover(Creator):
-        has_family = family == Plugin.family
-
-        if not has_family:
-            continue
-
-        Plugin.log.info(
-            "Creating '%s' with '%s'" % (name, Plugin.__name__)
-        )
-
-        try:
-            plugin = Plugin(name, asset, options, data)
-
-            with host.maintained_selection():
-                print("Running %s" % plugin)
-                instance = plugin.process()
-        except Exception:
-            traceback.print_exception(*sys.exc_info())
-            continue
-        plugins.append(plugin)
-
-    assert plugins, "No Creator plug-ins were run, this is a bug"
     return instance
 
 
