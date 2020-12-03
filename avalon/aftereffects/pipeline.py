@@ -17,11 +17,15 @@ def install():
 
 
 def ls():
-    """Yields containers from active AfterEffects document
+    """Yields containers from active AfterEffects document.
 
     This is the host-equivalent of api.ls(), but instead of listing
-    assets on disk, it lists assets already loaded in Photoshop; once loaded
-    they are called 'containers'
+    assets on disk, it lists assets already loaded in AE; once loaded
+    they are called 'containers'. Used in Manage tool.
+
+    Containers could be on multiple levels, single images/videos/was as a
+    FootageItem, or multiple items - backgrounds (folder with automatically
+    created composition and all imported layers).
 
     Yields:
         dict: container
@@ -34,11 +38,10 @@ def ls():
         return
 
     layers_meta = stub.get_metadata()
-    for layer in stub.get_items(comps=True,
-                                folders=False,
-                                footages=True):
-        data = stub.read(layer, layers_meta)
-
+    for item in stub.get_items(comps=True,
+                               folders=True,
+                               footages=True):
+        data = stub.read(item, layers_meta)
         # Skip non-tagged layers.
         if not data:
             continue
@@ -48,7 +51,7 @@ def ls():
             continue
 
         # Append transient data
-        data["layer"] = layer
+        data["layer"] = item
 
         yield data
 
@@ -94,10 +97,13 @@ def containerise(name,
                  context,
                  loader=None,
                  suffix="_CON"):
-    """Imprint layer with metadata
-
+    """
     Containerisation enables a tracking of version, author and origin
     for loaded assets.
+
+    Creates dictionary payloads that gets saved into file metadata. Each
+    container contains of who loaded (loader) and members (single or multiple
+    in case of background).
 
     Arguments:
         name (str): Name of resulting assembly
@@ -117,6 +123,7 @@ def containerise(name,
         "namespace": namespace,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"]),
+        "members": comp.members or [comp.id]
     }
 
     stub = lib.stub()
