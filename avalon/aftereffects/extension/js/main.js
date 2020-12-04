@@ -22,7 +22,7 @@ async function startUp(url){
     log.warn("debug: " + debug);
     if (debug && debug.toString() == '3'){
         WSRPC.DEBUG = true;
-        WSRPC.TRACE = true;    
+        WSRPC.TRACE = true;
     }
     // run rest only after resolved promise
     main(res);
@@ -140,7 +140,7 @@ function main(websocket_url){
 
     RPC.addRoute('AfterEffects.delete_item', function (data) {
         log.warn('Server called client route "delete_item":', data);
-        return runEvalScript("deleteItem(" + data.item_id + "')")
+        return runEvalScript("deleteItem(" + data.item_id + ")")
             .then(function(result){
                 log.warn("deleteItem: " + result);
                 return result;
@@ -225,6 +225,39 @@ function main(websocket_url){
                 return result;
             });
     });
+
+    RPC.addRoute('AfterEffects.import_background', function (data) {
+        log.warn('Server called client route "import_background":', data);
+        return runEvalScript("importBackground(" + data.comp_id + ", " + 
+                                               "'" + data.comp_name + "', " +
+                                               JSON.stringify(data.files) + ")")
+            .then(function(result){
+                log.warn("importBackground: " + result);
+                return result;
+            });
+    });
+
+    RPC.addRoute('AfterEffects.reload_background', function (data) {
+        log.warn('Server called client route "reload_background":', data);
+        return runEvalScript("reloadBackground(" + data.comp_id + ", " + 
+                                               "'" + data.comp_name + "', " +
+                                               JSON.stringify(data.files) + ")")
+            .then(function(result){
+                log.warn("reloadBackground: " + result);
+                return result;
+            });
+    });
+
+   RPC.addRoute('AfterEffects.add_item_as_layer', function (data) {
+       log.warn('Server called client route "add_item_as_layer":', data);
+       return runEvalScript("addItemAsLayerToComp(" + data.comp_id + ", " +
+                                                  data.item_id + "," +
+                                                  " null )")
+           .then(function(result){
+               log.warn("addItemAsLayerToComp: " + result);
+               return result;
+           });
+   });
 }
 
 /** main entry point **/
