@@ -368,7 +368,9 @@ function getRenderInfo(){
         if it is sequence in Python
     **/
     try{
-        var item = app.project.renderQueue.item(1).outputModule(1);
+        var render_queue = app.project.renderQueue.item(1);
+        render_queue.render = true; // always set render queue to render
+        var item = render_queue.outputModule(1);
     } catch (error) {
         alert("There is no render queue, create one.");
     }
