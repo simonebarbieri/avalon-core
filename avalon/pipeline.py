@@ -408,61 +408,6 @@ def should_start_last_workfile(project_name, host_name, task_name):
         elif env_override in ("false", "no", "0"):
             default_output = False
 
-    try:
-        from pype.api import config
-        startup_presets = (
-            config.get_presets(project_name)
-            .get("tools", {})
-            .get("workfiles", {})
-            .get("last_workfile_on_startup")
-        )
-    except Exception:
-        startup_presets = None
-        log.warning("Couldn't load pype's presets", exc_info=True)
-
-    if not startup_presets:
-        return default_output
-
-    host_name_lowered = host_name.lower()
-    task_name_lowered = task_name.lower()
-
-    max_points = 2
-    matching_points = -1
-    matching_item = None
-    for item in startup_presets:
-        hosts = item.get("hosts") or tuple()
-        tasks = item.get("tasks") or tuple()
-
-        hosts_lowered = tuple(_host_name.lower() for _host_name in hosts)
-        # Skip item if has set hosts and current host is not in
-        if hosts_lowered and host_name_lowered not in hosts_lowered:
-            continue
-
-        tasks_lowered = tuple(_task_name.lower() for _task_name in tasks)
-        # Skip item if has set tasks and current task is not in
-        if tasks_lowered:
-            task_match = False
-            for task_regex in compile_list_of_regexes(tasks_lowered):
-                if re.match(task_regex, task_name_lowered):
-                    task_match = True
-                    break
-
-            if not task_match:
-                continue
-
-        points = int(bool(hosts_lowered)) + int(bool(tasks_lowered))
-        if points > matching_points:
-            matching_item = item
-            matching_points = points
-
-        if matching_points == max_points:
-            break
-
-    if matching_item is not None:
-        output = matching_item.get("enabled")
-        if output is None:
-            output = default_output
-        return output
     return default_output
 
 
