@@ -253,7 +253,7 @@ function importFile(path, item_name, import_options){
     return JSON.stringify(ret);
 }
 
-function setLabelColor(item_id, color_idx){
+function setLabelColor(comp_id, color_idx){
     /**
      * Set item_id label to 'color_idx' color
      * Args:
@@ -368,7 +368,9 @@ function getRenderInfo(){
         if it is sequence in Python
     **/
     try{
-        var item = app.project.renderQueue.item(1).outputModule(1);
+        var render_queue = app.project.renderQueue.item(1);
+        render_queue.render = true; // always set render queue to render
+        var item = render_queue.outputModule(1);
     } catch (error) {
         alert("There is no render queue, create one.");
     }
@@ -547,7 +549,6 @@ function _importItem(file_url){
 //     'C:/projects/petr_test/assets/locations/Jungle/publish/background/backgroundComp/v002/03_FG_02_Layer_2.png'
 // ]
 // reloadBackground(707, 'Jungle_backgroundComp_001', files_to_import);
-
 
 
 
