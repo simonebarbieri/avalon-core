@@ -256,6 +256,7 @@ class AvalonToolsHelper:
         self._workfiles_tool = None
         self._loader_tool = None
         self._creator_tool = None
+        self._subset_manager_tool = None
         self._scene_inventory_tool = None
         self._library_loader_tool = None
 
@@ -346,6 +347,29 @@ class AvalonToolsHelper:
         creator_tool.raise_()
         creator_tool.activateWindow()
 
+    def subset_manager_tool(self):
+        if self._subset_manager_tool is not None:
+            return self._subset_manager_tool
+
+        from ..tools.subsetmanager import Window
+        # from ..tools.sceneinventory.app import Window
+        window = Window()
+        window.setWindowFlags(
+            window.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        )
+
+        self._subset_manager_tool = window
+
+        return window
+
+    def show_subset_manager_tool(self):
+        subset_manager_tool = self.subset_manager_tool()
+        subset_manager_tool.show()
+
+        # Pull window to the front.
+        subset_manager_tool.raise_()
+        subset_manager_tool.activateWindow()
+
     def scene_inventory_tool(self):
         if self._scene_inventory_tool is not None:
             return self._scene_inventory_tool
@@ -409,6 +433,7 @@ class TVPaintRpc(JsonRpc):
             (route_name, self.workfiles_tool),
             (route_name, self.loader_tool),
             (route_name, self.creator_tool),
+            (route_name, self.subset_manager_tool),
             (route_name, self.publish_tool),
             (route_name, self.scene_inventory_tool),
             (route_name, self.library_loader_tool)
@@ -458,6 +483,13 @@ class TVPaintRpc(JsonRpc):
         log.info("Triggering Creator tool")
         item = MainThreadItem(self.tools_helper.show_creator_tool)
         self._execute_in_main_thread(item)
+        return
+
+    async def subset_manager_tool(self):
+        log.info("Triggering Subset Manager tool")
+        item = MainThreadItem(self.tools_helper.show_subset_manager_tool)
+        # Do not wait for result of callback
+        self._execute_in_main_thread(item, wait=False)
         return
 
     async def publish_tool(self):
@@ -792,7 +824,7 @@ class Communicator:
         try:
             self._windows_copy(to_copy)
         except Exception:
-            pass
+            log.error("Plugin copy failed", exc_info=True)
 
         # Validate copy was done
         invalid = []
@@ -801,12 +833,17 @@ class Communicator:
                 invalid.append((src, dst))
 
         if invalid:
-            raise RuntimeError("Copying of plugin was not successfull")
+            _invalid = []
+            for src, dst in invalid:
+                _invalid.append("\"{}\" -> \"{}\"".format(src, dst))
+
+            raise RuntimeError(
+                "Copy of plugin files failed. Failed files {}".format(
+                    ", ".join(_invalid)
+                )
+            )
 
     def _launch_tv_paint(self, launch_args):
-        if platform.system().lower() == "windows":
-            self._prepare_windows_plugin(launch_args)
-
         flags = (
             subprocess.DETACHED_PROCESS
             | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -825,6 +862,9 @@ class Communicator:
         """
         log.info("Installing TVPaint implementation")
         api.install(tvpaint)
+
+        if platform.system().lower() == "windows":
+            self._prepare_windows_plugin(launch_args)
 
         # Launch TVPaint and the websocket server.
         log.info("Launching TVPaint")
@@ -872,7 +912,7 @@ class Communicator:
     def _initial_textfile_write(self):
         """Show popup about Write to file at start of TVPaint."""
         tmp_file = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
+            mode="w", prefix="a_tvp_", suffix=".txt", delete=False
         )
         tmp_file.close()
         tmp_filepath = tmp_file.name.replace("\\", "/")

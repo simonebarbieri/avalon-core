@@ -3,6 +3,7 @@ indent: 4, maxerr: 50 */
 /*global $, Folder*/
 #include "../js/libs/json.js";
 
+
 app.preferences.savePrefAsBool("General Section", "Show Welcome Screen", false) ;
 
 
@@ -252,7 +253,7 @@ function importFile(path, item_name, import_options){
     return JSON.stringify(ret);
 }
 
-function setLabelColor(item_id, color_idx){
+function setLabelColor(comp_id, color_idx){
     /**
      * Set item_id label to 'color_idx' color
      * Args:
@@ -324,7 +325,7 @@ function getWorkArea(comp_id){
     var item = app.project.itemByID(comp_id);
     if (item){
         return JSON.stringify({
-            "workAreaStart": item.displayStartTime, 
+            "workAreaStart": item.displayStartFrame, 
             "workAreaDuration": item.duration,
             "frameRate": item.frameRate});
     }else{
@@ -360,10 +361,173 @@ function saveAs(path){
     return app.project.save(fp = new File(path));
 }
 
-// // var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
-//  var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
+function getRenderInfo(){
+    /***
+        Get info from render queue.
+        Currently pulls only file name to parse extension and 
+        if it is sequence in Python
+    **/
+    try{
+        var render_queue = app.project.renderQueue.item(1);
+        render_queue.render = true; // always set render queue to render
+        var item = render_queue.outputModule(1);
+    } catch (error) {
+        alert("There is no render queue, create one.");
+    }
+    var file_url = item.file.toString();
+
+    return JSON.stringify({
+        "file_name": file_url            
+    })
+}
+
+function getAudioUrlForComp(comp_id){
+    var item = app.project.itemByID(comp_id);
+    if (item){
+        for (i = 1; i <= item.numLayers; ++i){
+            var layer = item.layers[i];
+            if (layer instanceof AVLayer){
+                return layer.source.file.fsName.toString();
+            }
+
+        }
+    }else{
+        alert("There is no composition with "+ comp_id);
+    }
+
+}
+
+function addItemAsLayerToComp(comp_id, item_id, found_comp){
+    /**
+     * Adds already imported FootageItem ('item_id') as a new
+     * layer to composition ('comp_id').
+     * 
+     * Args:
+     *  comp_id (int): id of target composition
+     *  item_id (int): FootageItem.id
+     *  found_comp (CompItem, optional): to limit quering if
+     *      comp already found previously
+     */
+    var comp = found_comp || app.project.itemByID(comp_id);
+    if (comp){
+        item = app.project.itemByID(item_id);
+        if (item){
+            comp.layers.add(item);
+        }else{
+            alert("There is no item with " + item_id);
+        }
+    }else{
+        alert("There is no composition with "+ comp_id);
+    }
+}
+
+function importBackground(comp_id, composition_name, files_to_import){
+    /**
+     * Imports backgrounds images to existing or new composition.
+     * 
+     * If comp_id is not provided, new composition is created, basic
+     * values (width, heights, frameRatio) takes from first imported
+     * image.
+     * 
+     * Args:
+     *   comp_id (int): id of existing composition (null if new)
+     *   composition_name (str): used when new composition 
+     *   files_to_import (list): list of absolute paths to import and
+     *      add as layers
+     * 
+     * Returns:
+     *  (str): json representation (id, name, members)
+     */
+    var comp;
+    var folder;
+    var imported_ids = [];
+    if (comp_id){
+        comp = app.project.itemByID(comp_id);
+        folder = comp.parentFolder;
+    }else{
+        if (app.project.selection.length > 1){
+            alert("Too many items selected, select only target composition!");
+            return false;
+        }else{
+            selected_item = app.project.activeItem;
+            if (selected_item instanceof Folder){
+                comp = selected_item;
+                folder = selected_item;
+            }
+        }
+    }
+       
+    if (files_to_import){
+        for (i = 0; i < files_to_import.length; ++i){
+            item = _importItem(files_to_import[i]);
+            if (!item){
+                alert("No item for " + item_json["id"] + ". Import failed.");
+                return false;
+            }
+            if (!comp){
+                folder = app.project.items.addFolder(composition_name);
+                imported_ids.push(folder.id);
+                comp = app.project.items.addComp(composition_name, item.width, 
+                    item.height, item.pixelAspect, 
+                    1, 26.7);  // hardcode defaults
+                imported_ids.push(comp.id);
+                comp.parentFolder = folder;
+            }
+            imported_ids.push(item.id)
+            item.parentFolder = folder;
+
+            addItemAsLayerToComp(comp.id, item.id, comp);
+        }       
+    }
+    var item = {"name": comp.name,
+                "id": folder.id,
+                "members": imported_ids};
+    return JSON.stringify(item);
+}
+
+function reloadBackground(comp_id, composition_name, files_to_import){
+    /**
+     * Reloads existing composition.
+     * 
+     * It deletes complete composition with encompassing folder, recreates
+     * from scratch via 'importBackground' functionality.
+     * 
+     * Args:
+     *   comp_id (int): id of existing composition (null if new)
+     *   composition_name (str): used when new composition 
+     *   files_to_import (list): list of absolute paths to import and
+     *      add as layers
+     * 
+     * Returns:
+     *  (str): json representation (id, name, members)
+     * 
+     */
+    comp = app.project.itemByID(comp_id);
+    folder = comp.parentFolder;
+    if (folder){
+        folder.remove();
+    }else{
+        comp.remove();
+    }
+    return importBackground(null, composition_name, files_to_import);
+}
+
+function _importItem(file_url){
+    fp = new File(file_url);
+    file_name = fp.name.substring(0, fp.name.lastIndexOf("."));
+    
+    //importFile prepared previously to return json
+    item_json = importFile(file_url, file_name, JSON.stringify({"ImportAsType":"FOOTAGE"}));
+    item_json = JSON.parse(item_json);
+    item = app.project.itemByID(item_json["id"]);
+
+    return item;
+}
+ 
+// var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
+// var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
 // var mov = 'c:\\Users\\petrk\\Downloads\\Samples\\sample_iTunes.mov';
-// // var wav = 'c:\\Users\\petrk\\Downloads\\Samples\\africa-toto.wav';
+// var wav = 'c:\\Users\\petrk\\Downloads\\Samples\\africa-toto.wav';
 
 // var inop = JSON.stringify({sequence: true});
 // $.writeln(inop);
@@ -376,22 +540,15 @@ function saveAs(path){
 //     $.writeln(app.project.selection[0] instanceof FolderItem);
 //}
 
-//renameItem(2, "new_name");
-//app.project.item(3).displayStartFrame = 20;
-// app.project.selection[0].workAreaStart = 5;
-// app.project.selection[0].workAreaDuration = 10;
-// var sel = app.project.selection[0];
-// $.writeln(app.project.selection[0].workAreaDuration);
-// $.writeln(getFrameRange(60));
-//$.writeln(getWorkArea(60));
+//addItemAsLayerToComp(60, 1);
+//$.writeln(importBackground(null, 'New comp', [img]));
 
-
-
-
-
-
-
-
+//deleteItem(600);
+// files_to_import =[
+//     'C:/projects/petr_test/assets/locations/Jungle/publish/background/backgroundComp/v002/03_FG_01_Layer_1.png',
+//     'C:/projects/petr_test/assets/locations/Jungle/publish/background/backgroundComp/v002/03_FG_02_Layer_2.png'
+// ]
+// reloadBackground(707, 'Jungle_backgroundComp_001', files_to_import);
 
 
 

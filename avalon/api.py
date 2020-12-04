@@ -18,6 +18,8 @@ from .pipeline import (
     install,
     uninstall,
 
+    CreatorError,
+
     Loader,
     Creator,
     Action,
@@ -81,6 +83,8 @@ __all__ = [
     "uninstall",
 
     "schema",
+
+    "CreatorError",
 
     "Loader",
     "Creator",
