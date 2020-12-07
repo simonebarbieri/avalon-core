@@ -361,56 +361,6 @@ class InventoryAction(object):
         return True
 
 
-def compile_list_of_regexes(in_list):
-    """Convert strings in entered list to compiled regex objects."""
-    regexes = list()
-    if not in_list:
-        return regexes
-
-    for item in in_list:
-        if item:
-            try:
-                regexes.append(re.compile(item))
-            except TypeError:
-                log.warning((
-                    "Invalid type \"{}\" value \"{}\"."
-                    " Expected string based object. Skipping."
-                ).format(str(type(item)), str(item)))
-    return regexes
-
-
-def should_start_last_workfile(project_name, host_name, task_name):
-    """Define if host should start last version workfile if possible.
-
-    Default output is `False`. Can be overriden with environment variable
-    `AVALON_OPEN_LAST_WORKFILE`, valid values without case sensitivity are
-    `"0", "1", "true", "false", "yes", "no"`.
-
-    Args:
-        project_name (str): Name of project.
-        host_name (str): Name of host which is launched. In avalon's
-            application context it's value stored in app definition under
-            key `"application_dir"`. Is not case sensitive.
-        task_name (str): Name of task which is used for launching the host.
-            Task name is not case sensitive.
-
-    Returns:
-        bool: True if host should start workfile.
-
-    """
-    default_output = False
-
-    env_override = os.environ.get("AVALON_OPEN_LAST_WORKFILE")
-    if env_override is not None:
-        env_override = env_override.lower().strip()
-        if env_override in ("true", "yes", "1"):
-            default_output = True
-        elif env_override in ("false", "no", "0"):
-            default_output = False
-
-    return default_output
-
-
 class Application(Action):
     """Default application launcher
 
