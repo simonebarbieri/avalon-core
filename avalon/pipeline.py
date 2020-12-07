@@ -1271,6 +1271,35 @@ def update_current_task(task=None, asset=None, app=None):
     return changes
 
 
+def _format_work_template(template, session=None):
+    """Return a formatted configuration template with a Session.
+    Note: This *cannot* format the templates for published files since the
+        session does not hold the context for a published file. Instead use
+        `get_representation_path` to parse the full path to a published file.
+    Args:
+        template (str): The template to format.
+        session (dict, Optional): The Session to use. If not provided use the
+            currently active global Session.
+    Returns:
+        str: The fully formatted path.
+    """
+    if session is None:
+        session = Session
+
+    return template.format(**{
+        "root": registered_root(),
+        "project": session["AVALON_PROJECT"],
+        "asset": session["AVALON_ASSET"],
+        "task": session["AVALON_TASK"],
+        "app": session["AVALON_APP"],
+
+        # Optional
+        "silo": session.get("AVALON_SILO"),
+        "user": session.get("AVALON_USER", getpass.getuser()),
+        "hierarchy": session.get("AVALON_HIERARCHY"),
+    })
+
+
 def _make_backwards_compatible_loader(Loader):
     """Convert a old-style Loaders with `process` method to new-style Loader
 
