@@ -25,7 +25,7 @@ def _instance():
                 break
 
     if output_instance is None:
-        _resource['iconic'] = IconicFont(
+        output_instance = IconicFont(
             (
                 'fa',
                 'fontawesome-webfont.ttf',
@@ -37,7 +37,8 @@ def _instance():
                 'elusiveicons-webfont-charmap.json'
             )
         )
-    return _resource['iconic']
+        _resource['iconic'] = output_instance
+    return output_instance
 
 
 def icon(*args, **kwargs):
