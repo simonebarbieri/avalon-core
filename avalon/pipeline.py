@@ -363,16 +363,15 @@ class InventoryAction(object):
 
 class Application(Action):
     """Default application launcher
-
     This is a convenience application Action that when "config" refers to a
     parsed application `.toml` this can launch the application.
-
     """
 
     config = None
 
     def is_compatible(self, session):
-        required = ["AVALON_PROJECT",
+        required = ["AVALON_PROJECTS",
+                    "AVALON_PROJECT",
                     "AVALON_ASSET",
                     "AVALON_TASK"]
         missing = [x for x in required if x not in session]
@@ -385,74 +384,40 @@ class Application(Action):
         """Build application environment"""
 
         session = session.copy()
-        host_name = self.config["application_dir"]
-        session["AVALON_APP"] = host_name
+        session["AVALON_APP"] = self.config["application_dir"]
         session["AVALON_APP_NAME"] = self.name
 
         # Compute work directory
         project = io.find_one({"type": "project"})
-        anatomy = Anatomy(project["name"])
-        template_data = template_data_from_session(session)
-        anatomy_filled = anatomy.format(template_data)
-        session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
+        template = project["config"]["template"]["work"]
+        workdir = _format_work_template(template, session)
+        session["AVALON_WORKDIR"] = os.path.normpath(workdir)
 
-        last_workfile_path = None
-        extensions = HOST_WORKFILE_EXTENSIONS.get(session["AVALON_APP"])
-        if extensions:
-            # Find last workfile
-            file_template = anatomy.templates["work"]["file"]
-            template_data.update({
-                "version": 1,
-                "user": getpass.getuser(),
-                "ext": extensions[0]
-            })
+        # Construct application environment from .toml config
+        app_environment = self.config.get("environment", {})
+        for key, value in app_environment.copy().items():
+            if isinstance(value, list):
+                # Treat list values as paths, e.g. PYTHONPATH=[]
+                app_environment[key] = os.pathsep.join(value)
 
-            last_workfile_path = last_workfile(
-                session["AVALON_WORKDIR"],
-                file_template,
-                template_data,
-                extensions,
-                True
-            )
-
-        start_last_workfile = should_start_last_workfile(
-            project["name"], host_name, session["AVALON_TASK"]
-        )
-        # Store boolean as "0"(False) or "1"(True)
-        session["AVALON_OPEN_LAST_WORKFILE"] = (
-            str(int(bool(start_last_workfile)))
-        )
-
-        if (
-            start_last_workfile
-            and last_workfile_path
-            and os.path.exists(last_workfile_path)
-        ):
-            session["AVALON_LAST_WORKFILE"] = last_workfile_path
-
-        # dynamic environmnets
-        tools_attr = []
-        if session["AVALON_APP"] is not None:
-            tools_attr.append(session["AVALON_APP"])
-        if session["AVALON_APP_NAME"] is not None:
-            tools_attr.append(session["AVALON_APP_NAME"])
-
-        # collect all the 'environment' attributes from parents
-        asset = io.find_one({
-            "type": "asset",
-            "name": session["AVALON_ASSET"]
-        })
-        tools = self.find_tools(asset)
-        tools_attr.extend(tools)
-
-        tools_env = acre.get_tools(tools_attr)
-        dyn_env = acre.compute(tools_env)
-        env = acre.merge(dyn_env, current_env=dict(os.environ))
+            elif isinstance(value, six.string_types):
+                if lib.PY2:
+                    # Protect against unicode in the environment
+                    encoding = sys.getfilesystemencoding()
+                    app_environment[key] = value.encode(encoding)
+                else:
+                    app_environment[key] = value
+            else:
+                log.error(
+                    "%s: Unsupported environment reference in %s for %s"
+                    % (value, self.name, key)
+                )
 
         # Build environment
-        env.update(self.config.get("environment", {}))
-        env.update(anatomy.root_environments())
+        env = os.environ.copy()
         env.update(session)
+        app_environment = self._format(app_environment, **env)
+        env.update(app_environment)
 
         return env
 
