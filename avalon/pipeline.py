@@ -33,7 +33,7 @@ from . import (
 )
 
 from .vendor import six, acre
-from pypeapp import Anatomy
+from pype.api import Anatomy
 
 self = sys.modules[__name__]
 self._is_installed = False
