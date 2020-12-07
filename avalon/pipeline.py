@@ -421,27 +421,6 @@ class Application(Action):
 
         return env
 
-    def find_tools(self, entity):
-        tools = []
-        if ('data' in entity and 'tools_env' in entity['data'] and
-        len(entity['data']['tools_env']) > 0):
-            tools = entity['data']['tools_env']
-
-        elif ('data' in entity and 'visualParent' in entity['data'] and
-        entity['data']['visualParent'] is not None):
-            tmp = io.find_one({
-                "_id": entity['data']['visualParent']
-            })
-            tools = self.find_tools(tmp)
-
-        project = io.find_one({"_id": entity['parent']})
-
-        if ('data' in project and 'tools_env' in project['data'] and
-        len(project['data']['tools_env']) > 0):
-            tools = project['data']['tools_env']
-
-        return tools
-
     def initialize(self, environment):
         """Initialize work directory"""
         # Create working directory
@@ -481,17 +460,8 @@ class Application(Action):
                 self.log.error(" - %s -> %s" % (src, dst))
 
     def launch(self, environment):
-        executable_path = self.config["executable"]
-        pype_config_path = os.environ.get("PYPE_CONFIG")
-        if pype_config_path:
-            # Get platform folder name
-            os_plat = platform.system().lower()
-            # Path to folder with launchers
-            path = os.path.join(pype_config_path, "launchers", os_plat)
-            if os.path.exists(path):
-                executable_path = os.path.join(path, executable_path)
-        executable = lib.which(executable_path)
 
+        executable = lib.which(self.config["executable"])
         if executable is None:
             raise ValueError(
                 "'%s' not found on your PATH\n%s"
