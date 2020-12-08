@@ -1144,7 +1144,13 @@ def template_data_from_session(session):
         {"type": "project"}
     )
     asset_doc = io._database[project_name].find_one(
-        {"type": "asset", "name": session["AVALON_ASSET"]}
+        {
+            "type": "asset",
+            "name": session["AVALON_ASSET"]
+        },
+        {
+            "data.parents": True
+        }
     )
     asset_parents = asset_doc["data"].get("parents") or []
     hierarchy = "/".join(asset_parents)
