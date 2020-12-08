@@ -193,6 +193,7 @@ class NameWindow(QtWidgets.QDialog):
                 extension = extensions[0]
 
         if extension != self.data["ext"]:
+            self.data["ext"] = extension
             index = self.widgets["extensions"].findText(
                 extension, QtCore.Qt.MatchFixedString
             )
