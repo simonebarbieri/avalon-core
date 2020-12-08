@@ -1223,13 +1223,6 @@ def compute_session_changes(session, task=None, asset=None, app=None):
         # Update silo
         changes["AVALON_SILO"] = asset_document.get("silo") or ""
 
-        # Update hierarchy
-        parents = asset_document['data'].get('parents', [])
-        hierarchy = ""
-        if len(parents) > 0:
-            hierarchy = os.path.sep.join(parents)
-        changes['AVALON_HIERARCHY'] = hierarchy
-
     # Compute work directory (with the temporary changed session so far)
     project = io.find_one({"type": "project"})
     _session = session.copy()
