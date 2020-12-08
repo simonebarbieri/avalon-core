@@ -1,7 +1,7 @@
 import os
 import importlib
 import logging
-from pypeapp import Roots
+from pype.api import Anatomy
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +28,6 @@ class RegisteredRoots:
     @classmethod
     def registered_root(cls, project_name):
         if project_name not in cls.roots_per_project:
-            cls.roots_per_project[project_name] = Roots(project_name).roots
+            cls.roots_per_project[project_name] = Anatomy(project_name).roots
 
         return cls.roots_per_project[project_name]

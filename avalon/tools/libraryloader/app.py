@@ -15,8 +15,6 @@ from ..loader.widgets import (
 from ..widgets import AssetWidget
 from ..models import AssetModel
 
-from pypeapp import config
-
 module = sys.modules[__name__]
 module.window = None
 

@@ -17,7 +17,7 @@ from ..delegates import PrettyTimeDelegate
 from .model import FilesModel
 from .view import FilesView
 
-from pypeapp import Anatomy
+from pype.api import Anatomy
 
 log = logging.getLogger(__name__)
 
