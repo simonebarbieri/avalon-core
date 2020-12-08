@@ -1140,15 +1140,20 @@ def template_data_from_session(session):
         session = Session
 
     project_name = session["AVALON_PROJECT"]
-    project = io._database[project_name].find_one(
+    project_doc = io._database[project_name].find_one(
         {"type": "project"}
     )
+    asset_doc = io._database[project_name].find_one(
+        {"type": "asset", "name": session["AVALON_ASSET"]}
+    )
+    asset_parents = asset_doc["data"].get("parents") or []
+    hierarchy = "/".join(asset_parents)
 
     return {
         "root": registered_root(),
         "project": {
-            "name": project.get("name", session["AVALON_PROJECT"]),
-            "code": project["data"].get("code", ""),
+            "name": project_doc.get("name", project_name),
+            "code": project_doc["data"].get("code") or "",
         },
         "asset": session["AVALON_ASSET"],
         "task": session["AVALON_TASK"],
@@ -1157,7 +1162,7 @@ def template_data_from_session(session):
         # Optional
         "silo": session.get("AVALON_SILO"),
         "user": session.get("AVALON_USER", getpass.getuser()),
-        "hierarchy": session.get("AVALON_HIERARCHY"),
+        "hierarchy": hierarchy
     }
 
 
