@@ -164,17 +164,6 @@ class NameWindow(QtWidgets.QDialog):
         data = copy.deepcopy(self.data)
         template = template or self.template
 
-        # Define saving file extension
-        current_file = self.host.current_file()
-        if current_file:
-            # Match the extension of current file
-            _, extension = os.path.splitext(current_file)
-        else:
-            # Fall back to the first extension supported for this host.
-            extension = self.host.file_extensions()[0]
-
-        data["ext"] = extension
-
         if not data["comment"]:
             data.pop("comment", None)
 
