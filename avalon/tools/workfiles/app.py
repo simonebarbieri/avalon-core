@@ -59,7 +59,8 @@ class NameWindow(QtWidgets.QDialog):
             "task": session["AVALON_TASK"],
             "version": 1,
             "user": getpass.getuser(),
-            "comment": ""
+            "comment": "",
+            "ext": None
         }
 
         # Define work files template
@@ -72,6 +73,7 @@ class NameWindow(QtWidgets.QDialog):
             "version": QtWidgets.QWidget(),
             "versionValue": QtWidgets.QSpinBox(),
             "versionCheck": QtWidgets.QCheckBox("Next Available Version"),
+            "extensions": QtWidgets.QComboBox(),
             "inputs": QtWidgets.QWidget(),
             "buttons": QtWidgets.QWidget(),
             "okButton": QtWidgets.QPushButton("Ok"),
@@ -96,6 +98,7 @@ class NameWindow(QtWidgets.QDialog):
         layout = QtWidgets.QFormLayout(self.widgets["inputs"])
         layout.addRow("Version:", self.widgets["version"])
         layout.addRow("Comment:", self.widgets["comment"])
+        layout.addRow("Extension:", self.widgets["extensions"])
         layout.addRow("Preview:", self.widgets["preview"])
 
         # Build layout
@@ -103,6 +106,10 @@ class NameWindow(QtWidgets.QDialog):
         layout.addWidget(self.widgets["inputs"])
         layout.addWidget(self.widgets["buttons"])
 
+        # Fill extensions
+        self.widgets["extensions"].addItems(self.host.file_extensions())
+
+        # Register signal callbacks
         self.widgets["versionValue"].valueChanged.connect(
             self.on_version_spinbox_changed
         )
@@ -110,6 +117,9 @@ class NameWindow(QtWidgets.QDialog):
             self.on_version_checkbox_changed
         )
         self.widgets["comment"].textChanged.connect(self.on_comment_changed)
+        self.widgets["extensions"].currentIndexChanged.connect(
+            self.on_extension_changed
+        )
         self.widgets["okButton"].pressed.connect(self.on_ok_pressed)
         self.widgets["cancelButton"].pressed.connect(self.on_cancel_pressed)
 
@@ -142,6 +152,9 @@ class NameWindow(QtWidgets.QDialog):
 
     def get_result(self):
         return self.result
+
+    def on_extension_changed(self):
+        self.refresh()
 
     def get_work_file(self, template=None):
         data = copy.deepcopy(self.data)
