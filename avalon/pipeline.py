@@ -1291,18 +1291,9 @@ def _format_work_template(template, session=None):
     if session is None:
         session = Session
 
-    return template.format(**{
-        "root": registered_root(),
-        "project": session["AVALON_PROJECT"],
-        "asset": session["AVALON_ASSET"],
-        "task": session["AVALON_TASK"],
-        "app": session["AVALON_APP"],
+    fill_data = template_data_from_session(session)
 
-        # Optional
-        "silo": session.get("AVALON_SILO"),
-        "user": session.get("AVALON_USER", getpass.getuser()),
-        "hierarchy": session.get("AVALON_HIERARCHY"),
-    })
+    return template.format(**fill_data)
 
 
 def _make_backwards_compatible_loader(Loader):
