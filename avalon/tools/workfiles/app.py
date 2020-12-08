@@ -154,6 +154,10 @@ class NameWindow(QtWidgets.QDialog):
         return self.result
 
     def on_extension_changed(self):
+        ext = self.widgets["extensions"].currentText()
+        if ext == self.data["ext"]:
+            return
+        self.data["ext"] = ext
         self.refresh()
 
     def get_work_file(self, template=None):
