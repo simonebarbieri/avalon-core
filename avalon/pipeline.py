@@ -32,7 +32,7 @@ from . import (
     _registered_event_handlers,
 )
 
-from .vendor import six, acre
+from .vendor import six
 from pype.api import Anatomy
 
 self = sys.modules[__name__]
