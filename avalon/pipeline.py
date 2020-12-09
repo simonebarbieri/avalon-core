@@ -1140,15 +1140,26 @@ def template_data_from_session(session):
         session = Session
 
     project_name = session["AVALON_PROJECT"]
-    project = io._database[project_name].find_one(
+    project_doc = io._database[project_name].find_one(
         {"type": "project"}
     )
+    asset_doc = io._database[project_name].find_one(
+        {
+            "type": "asset",
+            "name": session["AVALON_ASSET"]
+        },
+        {
+            "data.parents": True
+        }
+    )
+    asset_parents = asset_doc["data"].get("parents") or []
+    hierarchy = "/".join(asset_parents)
 
     return {
         "root": registered_root(),
         "project": {
-            "name": project.get("name", session["AVALON_PROJECT"]),
-            "code": project["data"].get("code", ""),
+            "name": project_doc.get("name", project_name),
+            "code": project_doc["data"].get("code") or "",
         },
         "asset": session["AVALON_ASSET"],
         "task": session["AVALON_TASK"],
@@ -1157,7 +1168,7 @@ def template_data_from_session(session):
         # Optional
         "silo": session.get("AVALON_SILO"),
         "user": session.get("AVALON_USER", getpass.getuser()),
-        "hierarchy": session.get("AVALON_HIERARCHY"),
+        "hierarchy": hierarchy
     }
 
 
@@ -1217,13 +1228,6 @@ def compute_session_changes(session, task=None, asset=None, app=None):
 
         # Update silo
         changes["AVALON_SILO"] = asset_document.get("silo") or ""
-
-        # Update hierarchy
-        parents = asset_document['data'].get('parents', [])
-        hierarchy = ""
-        if len(parents) > 0:
-            hierarchy = os.path.sep.join(parents)
-        changes['AVALON_HIERARCHY'] = hierarchy
 
     # Compute work directory (with the temporary changed session so far)
     project = io.find_one({"type": "project"})
@@ -1286,18 +1290,9 @@ def _format_work_template(template, session=None):
     if session is None:
         session = Session
 
-    return template.format(**{
-        "root": registered_root(),
-        "project": session["AVALON_PROJECT"],
-        "asset": session["AVALON_ASSET"],
-        "task": session["AVALON_TASK"],
-        "app": session["AVALON_APP"],
+    fill_data = template_data_from_session(session)
 
-        # Optional
-        "silo": session.get("AVALON_SILO"),
-        "user": session.get("AVALON_USER", getpass.getuser()),
-        "hierarchy": session.get("AVALON_HIERARCHY"),
-    })
+    return template.format(**fill_data)
 
 
 def _make_backwards_compatible_loader(Loader):

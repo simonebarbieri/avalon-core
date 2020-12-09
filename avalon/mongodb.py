@@ -88,14 +88,7 @@ SESSION_CONTEXT_KEYS = (
     # Path to working directory
     "AVALON_WORKDIR",
     # Optional path to scenes directory (see Work Files API)
-    "AVALON_SCENEDIR",
-    # Optional hierarchy for the current Asset. This can be referenced
-    # as `{hierarchy}` in your file templates.
-    # This will be (re-)computed when you switch the context to another
-    # asset. It is computed by checking asset['data']['parents'] and
-    # joining those together with `os.path.sep`.
-    # E.g.: ['ep101', 'scn0010'] -> 'ep101/scn0010'.
-    "AVALON_HIERARCHY"
+    "AVALON_SCENEDIR"
 )
 
 
