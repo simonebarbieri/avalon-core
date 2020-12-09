@@ -124,7 +124,6 @@ class IconicFont(QtCore.QObject):
         self.painter = CharIconPainter()
         self.painters = {}
         self.fontname = {}
-        self.fontid = {}
         self.charmap = {}
         for fargs in args:
             self.load_font(*fargs)
@@ -170,7 +169,6 @@ class IconicFont(QtCore.QObject):
 
         if(loadedFontFamilies):
             self.fontname[prefix] = loadedFontFamilies[0]
-            self.fontid[prefix] = id_
         else:
             print('Font is empty')
 
