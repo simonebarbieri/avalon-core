@@ -7,12 +7,6 @@ This script implements client communication with Avalon server to bridge
 gap between Python and QtScript.
 
 */
-// include openharmony path
-var LD_OPENHARMONY_PATH = System.getenv('LIB_OPENHARMONY_PATH');
-include(LD_OPENHARMONY_PATH + '/openHarmony.js');
-// this.__proto__["$"] = $;
-
-
 function Client() {
     var self = this;
     /** socket */
@@ -480,7 +474,7 @@ function start() {
 
 function ensureSceneSettings() {
   var app = QCoreApplication.instance();
-  app.avalon_client.send(
+  app.avalonClient.send(
     {
       "module": "pype.hosts.harmony",
       "method": "ensure_scene_settings",
