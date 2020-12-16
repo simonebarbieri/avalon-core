@@ -90,19 +90,8 @@ def maintained_selection():
         pass
 
 
-def get_workfile_metadata(metadata_key, default=None):
-    """Read metadata for specific key from current project workfile.
-
-    Pipeline use function to store loaded and created instances within keys
-    stored in `SECTION_NAME_INSTANCES` and `SECTION_NAME_CONTAINERS`
-    constants.
-
-    Args:
-        metadata_key (str): Key defying which key should read. It is expected
-            value contain json serializable string.
-    """
-    if default is None:
-        default = []
+def get_workfile_metadata_string(metadata_key):
+    """Read metadata for specific key from current project workfile."""
     output_file = tempfile.NamedTemporaryFile(
         mode="w", prefix="a_tvp_", suffix=".txt", delete=False
     )
@@ -125,6 +114,24 @@ def get_workfile_metadata(metadata_key, default=None):
         .replace("{__dq__}", "\"")
     )
     os.remove(output_filepath)
+    return json_string
+
+
+def get_workfile_metadata(metadata_key, default=None):
+    """Read and parse metadata for specific key from current project workfile.
+
+    Pipeline use function to store loaded and created instances within keys
+    stored in `SECTION_NAME_INSTANCES` and `SECTION_NAME_CONTAINERS`
+    constants.
+
+    Args:
+        metadata_key (str): Key defying which key should read. It is expected
+            value contain json serializable string.
+    """
+    if default is None:
+        default = []
+
+    json_string = get_workfile_metadata_string(metadata_key)
     if json_string:
         return json.loads(json_string)
     return default
