@@ -32,8 +32,8 @@ from . import (
     _registered_event_handlers,
 )
 
-from .vendor import six, acre
-from pypeapp import Anatomy
+from .vendor import six
+from pype.api import Anatomy
 
 self = sys.modules[__name__]
 self._is_installed = False
@@ -47,15 +47,18 @@ AVALON_CONTAINER_ID = "pyblish.avalon.container"
 
 HOST_WORKFILE_EXTENSIONS = {
     "blender": [".blend"],
+    "celaction": [".scn"],
+    "tvpaint": [".tvpp"],
     "fusion": [".comp"],
     "harmony": [".zip"],
     "houdini": [".hip", ".hiplc", ".hipnc"],
     "maya": [".ma", ".mb"],
     "nuke": [".nk"],
-    "nukestudio": [".hrox"],
+    "hiero": [".hrox"],
     "photoshop": [".psd"],
     "premiere": [".prproj"],
-    "resolve": [".drp"]
+    "resolve": [".drp"],
+    "aftereffects": [".aep"]
 }
 
 
@@ -187,14 +190,18 @@ class Loader(list):
     order = 0
 
     def __init__(self, context):
+        self.fname = self.filepath_from_context(context)
+
+    def filepath_from_context(self, context):
         representation = context['representation']
         project_doc = context.get("project")
         root = None
-        if project_doc and project_doc["name"] != Session["AVALON_PROJECT"]:
+        session_project = Session.get("AVALON_PROJECT")
+        if project_doc and project_doc["name"] != session_project:
             anatomy = Anatomy(project_doc["name"])
             root = anatomy.roots_obj
 
-        self.fname = get_representation_path(representation, root)
+        return get_representation_path(representation, root)
 
     def load(self, context, name=None, namespace=None, options=None):
         """Load asset via database
@@ -235,6 +242,16 @@ class Loader(list):
 
         raise NotImplementedError("Loader.remove() must be "
                                   "implemented by subclass")
+
+
+class CreatorError(Exception):
+    """Should be raised when creator failed because of known issue.
+
+    Message of error should be user readable.
+    """
+
+    def __init__(self, message):
+        super(CreatorError, self).__init__(message)
 
 
 @lib.log
@@ -344,123 +361,17 @@ class InventoryAction(object):
         return True
 
 
-def compile_list_of_regexes(in_list):
-    """Convert strings in entered list to compiled regex objects."""
-    regexes = list()
-    if not in_list:
-        return regexes
-
-    for item in in_list:
-        if item:
-            try:
-                regexes.append(re.compile(item))
-            except TypeError:
-                log.warning((
-                    "Invalid type \"{}\" value \"{}\"."
-                    " Expected string based object. Skipping."
-                ).format(str(type(item)), str(item)))
-    return regexes
-
-
-def should_start_last_workfile(project_name, host_name, task_name):
-    """Define if host should start last version workfile if possible.
-
-    Default output is `False`. Can be overriden with environment variable
-    `AVALON_OPEN_LAST_WORKFILE`, valid values without case sensitivity are
-    `"0", "1", "true", "false", "yes", "no"`.
-
-    Args:
-        project_name (str): Name of project.
-        host_name (str): Name of host which is launched. In avalon's
-            application context it's value stored in app definition under
-            key `"application_dir"`. Is not case sensitive.
-        task_name (str): Name of task which is used for launching the host.
-            Task name is not case sensitive.
-
-    Returns:
-        bool: True if host should start workfile.
-
-    """
-    default_output = False
-
-    env_override = os.environ.get("AVALON_OPEN_LAST_WORKFILE")
-    if env_override is not None:
-        env_override = env_override.lower().strip()
-        if env_override in ("true", "yes", "1"):
-            default_output = True
-        elif env_override in ("false", "no", "0"):
-            default_output = False
-
-    try:
-        from pype.api import config
-        startup_presets = (
-            config.get_presets(project_name)
-            .get("tools", {})
-            .get("workfiles", {})
-            .get("last_workfile_on_startup")
-        )
-    except Exception:
-        startup_presets = None
-        log.warning("Couldn't load pype's presets", exc_info=True)
-
-    if not startup_presets:
-        return default_output
-
-    host_name_lowered = host_name.lower()
-    task_name_lowered = task_name.lower()
-
-    max_points = 2
-    matching_points = -1
-    matching_item = None
-    for item in startup_presets:
-        hosts = item.get("hosts") or tuple()
-        tasks = item.get("tasks") or tuple()
-
-        hosts_lowered = tuple(_host_name.lower() for _host_name in hosts)
-        # Skip item if has set hosts and current host is not in
-        if hosts_lowered and host_name_lowered not in hosts_lowered:
-            continue
-
-        tasks_lowered = tuple(_task_name.lower() for _task_name in tasks)
-        # Skip item if has set tasks and current task is not in
-        if tasks_lowered:
-            task_match = False
-            for task_regex in compile_list_of_regexes(tasks_lowered):
-                if re.match(task_regex, task_name_lowered):
-                    task_match = True
-                    break
-
-            if not task_match:
-                continue
-
-        points = int(bool(hosts_lowered)) + int(bool(tasks_lowered))
-        if points > matching_points:
-            matching_item = item
-            matching_points = points
-
-        if matching_points == max_points:
-            break
-
-    if matching_item is not None:
-        output = matching_item.get("enabled")
-        if output is None:
-            output = default_output
-        return output
-    return default_output
-
-
 class Application(Action):
     """Default application launcher
-
     This is a convenience application Action that when "config" refers to a
     parsed application `.toml` this can launch the application.
-
     """
 
     config = None
 
     def is_compatible(self, session):
-        required = ["AVALON_PROJECT",
+        required = ["AVALON_PROJECTS",
+                    "AVALON_PROJECT",
                     "AVALON_ASSET",
                     "AVALON_TASK"]
         missing = [x for x in required if x not in session]
@@ -473,97 +384,42 @@ class Application(Action):
         """Build application environment"""
 
         session = session.copy()
-        host_name = self.config["application_dir"]
-        session["AVALON_APP"] = host_name
+        session["AVALON_APP"] = self.config["application_dir"]
         session["AVALON_APP_NAME"] = self.name
 
         # Compute work directory
         project = io.find_one({"type": "project"})
-        anatomy = Anatomy(project["name"])
-        template_data = template_data_from_session(session)
-        anatomy_filled = anatomy.format(template_data)
-        session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
+        template = project["config"]["template"]["work"]
+        workdir = _format_work_template(template, session)
+        session["AVALON_WORKDIR"] = os.path.normpath(workdir)
 
-        last_workfile_path = None
-        extensions = HOST_WORKFILE_EXTENSIONS.get(session["AVALON_APP"])
-        if extensions:
-            # Find last workfile
-            file_template = anatomy.templates["work"]["file"]
-            template_data.update({
-                "version": 1,
-                "user": getpass.getuser(),
-                "ext": extensions[0]
-            })
+        # Construct application environment from .toml config
+        app_environment = self.config.get("environment", {})
+        for key, value in app_environment.copy().items():
+            if isinstance(value, list):
+                # Treat list values as paths, e.g. PYTHONPATH=[]
+                app_environment[key] = os.pathsep.join(value)
 
-            last_workfile_path = last_workfile(
-                session["AVALON_WORKDIR"],
-                file_template,
-                template_data,
-                extensions,
-                True
-            )
-
-        start_last_workfile = should_start_last_workfile(
-            project["name"], host_name, session["AVALON_TASK"]
-        )
-        # Store boolean as "0"(False) or "1"(True)
-        session["AVALON_OPEN_LAST_WORKFILE"] = (
-            str(int(bool(start_last_workfile)))
-        )
-
-        if (
-            start_last_workfile
-            and last_workfile_path
-            and os.path.exists(last_workfile_path)
-        ):
-            session["AVALON_LAST_WORKFILE"] = last_workfile_path
-
-        # dynamic environmnets
-        tools_attr = []
-        if session["AVALON_APP"] is not None:
-            tools_attr.append(session["AVALON_APP"])
-        if session["AVALON_APP_NAME"] is not None:
-            tools_attr.append(session["AVALON_APP_NAME"])
-
-        # collect all the 'environment' attributes from parents
-        asset = io.find_one({
-            "type": "asset",
-            "name": session["AVALON_ASSET"]
-        })
-        tools = self.find_tools(asset)
-        tools_attr.extend(tools)
-
-        tools_env = acre.get_tools(tools_attr)
-        dyn_env = acre.compute(tools_env)
-        env = acre.merge(dyn_env, current_env=dict(os.environ))
+            elif isinstance(value, six.string_types):
+                if lib.PY2:
+                    # Protect against unicode in the environment
+                    encoding = sys.getfilesystemencoding()
+                    app_environment[key] = value.encode(encoding)
+                else:
+                    app_environment[key] = value
+            else:
+                log.error(
+                    "%s: Unsupported environment reference in %s for %s"
+                    % (value, self.name, key)
+                )
 
         # Build environment
-        env.update(self.config.get("environment", {}))
-        env.update(anatomy.root_environments())
+        env = os.environ.copy()
         env.update(session)
+        app_environment = self._format(app_environment, **env)
+        env.update(app_environment)
 
         return env
-
-    def find_tools(self, entity):
-        tools = []
-        if ('data' in entity and 'tools_env' in entity['data'] and
-        len(entity['data']['tools_env']) > 0):
-            tools = entity['data']['tools_env']
-
-        elif ('data' in entity and 'visualParent' in entity['data'] and
-        entity['data']['visualParent'] is not None):
-            tmp = io.find_one({
-                "_id": entity['data']['visualParent']
-            })
-            tools = self.find_tools(tmp)
-
-        project = io.find_one({"_id": entity['parent']})
-
-        if ('data' in project and 'tools_env' in project['data'] and
-        len(project['data']['tools_env']) > 0):
-            tools = project['data']['tools_env']
-
-        return tools
 
     def initialize(self, environment):
         """Initialize work directory"""
@@ -604,17 +460,8 @@ class Application(Action):
                 self.log.error(" - %s -> %s" % (src, dst))
 
     def launch(self, environment):
-        executable_path = self.config["executable"]
-        pype_config_path = os.environ.get("PYPE_CONFIG")
-        if pype_config_path:
-            # Get platform folder name
-            os_plat = platform.system().lower()
-            # Path to folder with launchers
-            path = os.path.join(pype_config_path, "launchers", os_plat)
-            if os.path.exists(path):
-                executable_path = os.path.join(path, executable_path)
-        executable = lib.which(executable_path)
 
+        executable = lib.which(self.config["executable"])
         if executable is None:
             raise ValueError(
                 "'%s' not found on your PATH\n%s"
@@ -1120,7 +967,7 @@ def debug_host():
     return host
 
 
-def create(name, asset, family, options=None, data=None):
+def create(Creator, name, asset, options=None, data=None):
     """Create a new instance
 
     Associate nodes with a subset and family. These nodes are later
@@ -1132,9 +979,9 @@ def create(name, asset, family, options=None, data=None):
     and finally asset browsers to help identify the origin of the asset.
 
     Arguments:
+        Creator (Creator): Class of creator
         name (str): Name of subset
         asset (str): Name of asset
-        family (str): Name of family
         options (dict, optional): Additional options from GUI
         data (dict, optional): Additional data from GUI
 
@@ -1149,31 +996,97 @@ def create(name, asset, family, options=None, data=None):
     """
 
     host = registered_host()
+    plugin = Creator(name, asset, options, data)
+    with host.maintained_selection():
+        print("Running %s" % plugin)
+        instance = plugin.process()
 
-    plugins = list()
-    for Plugin in discover(Creator):
-        has_family = family == Plugin.family
-
-        if not has_family:
-            continue
-
-        Plugin.log.info(
-            "Creating '%s' with '%s'" % (name, Plugin.__name__)
-        )
-
-        try:
-            plugin = Plugin(name, asset, options, data)
-
-            with host.maintained_selection():
-                print("Running %s" % plugin)
-                instance = plugin.process()
-        except Exception:
-            traceback.print_exception(*sys.exc_info())
-            continue
-        plugins.append(plugin)
-
-    assert plugins, "No Creator plug-ins were run, this is a bug"
     return instance
+
+
+def get_repres_contexts(representation_ids, dbcon=None):
+    """Return parenthood context for representation.
+
+    Args:
+        representation_ids (list): The representation ids.
+        dbcon (AvalonMongoDB): Mongo connection object. `avalon.io` used when
+            not entered.
+
+    Returns:
+        dict: The full representation context by representation id.
+
+    """
+    if not dbcon:
+        dbcon = io
+
+    contexts = {}
+    if not representation_ids:
+        return contexts
+
+    _representation_ids = []
+    for repre_id in representation_ids:
+        if isinstance(repre_id, six.string_types):
+            repre_id = io.ObjectId(repre_id)
+        _representation_ids.append(repre_id)
+
+    repre_docs = dbcon.find({
+        "type": "representation",
+        "_id": {"$in": _representation_ids}
+    })
+    repre_docs_by_id = {}
+    version_ids = set()
+    for repre_doc in repre_docs:
+        version_ids.add(repre_doc["parent"])
+        repre_docs_by_id[repre_doc["_id"]] = repre_doc
+
+    version_docs = dbcon.find({
+        "type": "version",
+        "_id": {"$in": list(version_ids)}
+    })
+    version_docs_by_id = {}
+    subset_ids = set()
+    for version_doc in version_docs:
+        version_docs_by_id[version_doc["_id"]] = version_doc
+        subset_ids.add(version_doc["parent"])
+
+    subset_docs = dbcon.find({
+        "type": "subset",
+        "_id": {"$in": list(subset_ids)}
+    })
+    subset_docs_by_id = {}
+    asset_ids = set()
+    for subset_doc in subset_docs:
+        subset_docs_by_id[subset_doc["_id"]] = subset_doc
+        asset_ids.add(subset_doc["parent"])
+
+    asset_docs = dbcon.find({
+        "type": "asset",
+        "_id": {"$in": list(asset_ids)}
+    })
+    asset_docs_by_id = {
+        asset_doc["_id"]: asset_doc
+        for asset_doc in asset_docs
+    }
+
+    project_doc = dbcon.find_one({"type": "project"})
+
+    for repre_id, repre_doc in repre_docs_by_id.items():
+        version_doc = version_docs_by_id[repre_doc["parent"]]
+        subset_doc = subset_docs_by_id[version_doc["parent"]]
+        asset_doc = asset_docs_by_id[subset_doc["parent"]]
+        context = {
+            "project": {
+                "name": project_doc["name"],
+                "code": project_doc["data"].get("code")
+            },
+            "asset": asset_doc,
+            "subset": subset_doc,
+            "version": version_doc,
+            "representation": repre_doc,
+        }
+        contexts[repre_id] = context
+
+    return contexts
 
 
 def get_representation_context(representation):
@@ -1227,15 +1140,26 @@ def template_data_from_session(session):
         session = Session
 
     project_name = session["AVALON_PROJECT"]
-    project = io._database[project_name].find_one(
+    project_doc = io._database[project_name].find_one(
         {"type": "project"}
     )
+    asset_doc = io._database[project_name].find_one(
+        {
+            "type": "asset",
+            "name": session["AVALON_ASSET"]
+        },
+        {
+            "data.parents": True
+        }
+    )
+    asset_parents = asset_doc["data"].get("parents") or []
+    hierarchy = "/".join(asset_parents)
 
     return {
         "root": registered_root(),
         "project": {
-            "name": project.get("name", session["AVALON_PROJECT"]),
-            "code": project["data"].get("code", ""),
+            "name": project_doc.get("name", project_name),
+            "code": project_doc["data"].get("code") or "",
         },
         "asset": session["AVALON_ASSET"],
         "task": session["AVALON_TASK"],
@@ -1244,7 +1168,7 @@ def template_data_from_session(session):
         # Optional
         "silo": session.get("AVALON_SILO"),
         "user": session.get("AVALON_USER", getpass.getuser()),
-        "hierarchy": session.get("AVALON_HIERARCHY"),
+        "hierarchy": hierarchy
     }
 
 
@@ -1305,13 +1229,6 @@ def compute_session_changes(session, task=None, asset=None, app=None):
         # Update silo
         changes["AVALON_SILO"] = asset_document.get("silo") or ""
 
-        # Update hierarchy
-        parents = asset_document['data'].get('parents', [])
-        hierarchy = ""
-        if len(parents) > 0:
-            hierarchy = os.path.sep.join(parents)
-        changes['AVALON_HIERARCHY'] = hierarchy
-
     # Compute work directory (with the temporary changed session so far)
     project = io.find_one({"type": "project"})
     _session = session.copy()
@@ -1358,6 +1275,26 @@ def update_current_task(task=None, asset=None, app=None):
     return changes
 
 
+def _format_work_template(template, session=None):
+    """Return a formatted configuration template with a Session.
+    Note: This *cannot* format the templates for published files since the
+        session does not hold the context for a published file. Instead use
+        `get_representation_path` to parse the full path to a published file.
+    Args:
+        template (str): The template to format.
+        session (dict, Optional): The Session to use. If not provided use the
+            currently active global Session.
+    Returns:
+        str: The fully formatted path.
+    """
+    if session is None:
+        session = Session
+
+    fill_data = template_data_from_session(session)
+
+    return template.format(**fill_data)
+
+
 def _make_backwards_compatible_loader(Loader):
     """Convert a old-style Loaders with `process` method to new-style Loader
 
@@ -1377,6 +1314,39 @@ def _make_backwards_compatible_loader(Loader):
     log.warning("Making loader backwards compatible: %s", Loader.__name__)
     from avalon.maya.compat import BackwardsCompatibleLoader
     return type(Loader.__name__, (BackwardsCompatibleLoader, Loader), {})
+
+
+def load_with_repre_context(
+    Loader, repre_context, namespace=None, name=None, options=None, **kwargs
+):
+    Loader = _make_backwards_compatible_loader(Loader)
+
+    # Ensure the Loader is compatible for the representation
+    if not is_compatible_loader(Loader, repre_context):
+        raise IncompatibleLoaderError(
+            "Loader {} is incompatible with {}".format(
+                Loader.__name__, repre_context["subset"]["name"]
+            )
+        )
+
+    # Ensure options is a dictionary when no explicit options provided
+    if options is None:
+        options = kwargs.get("data", dict())  # "data" for backward compat
+
+    assert isinstance(options, dict), "Options must be a dictionary"
+
+    # Fallback to subset when name is None
+    if name is None:
+        name = repre_context["subset"]["name"]
+
+    log.info(
+        "Running '%s' on '%s'" % (
+            Loader.__name__, repre_context["asset"]["name"]
+        )
+    )
+
+    loader = Loader(repre_context)
+    return loader.load(repre_context, name, namespace, options)
 
 
 def load(Loader, representation, namespace=None, name=None, options=None,
@@ -1400,31 +1370,15 @@ def load(Loader, representation, namespace=None, name=None, options=None,
 
     """
 
-    Loader = _make_backwards_compatible_loader(Loader)
     context = get_representation_context(representation)
-
-    # Ensure the Loader is compatible for the representation
-    if not is_compatible_loader(Loader, context):
-        raise IncompatibleLoaderError("Loader {} is incompatible with "
-                                      "{}".format(Loader.__name__,
-                                                  context["subset"]["name"]))
-
-    # Ensure options is a dictionary when no explicit options provided
-    if options is None:
-        options = kwargs.get("data", dict())  # "data" for backward compat
-
-    assert isinstance(options, dict), "Options must be a dictionary"
-
-    # Fallback to subset when name is None
-    if name is None:
-        name = context["subset"]["name"]
-
-    log.info(
-        "Running '%s' on '%s'" % (Loader.__name__, context["asset"]["name"])
+    return load_with_repre_context(
+        Loader,
+        context,
+        namespace=namespace,
+        name=name,
+        options=options,
+        **kwargs
     )
-
-    loader = Loader(context)
-    return loader.load(context, name, namespace, options)
 
 
 def _get_container_loader(container):
@@ -1761,11 +1715,21 @@ def is_compatible_loader(Loader, context):
     return has_family and has_representation
 
 
+def loaders_from_repre_context(loaders, repre_context):
+    """Return compatible loaders for by representaiton's context."""
+
+    return [
+        loader
+        for loader in loaders
+        if is_compatible_loader(loader, repre_context)
+    ]
+
+
 def loaders_from_representation(loaders, representation):
     """Return all compatible loaders for a representation."""
 
     context = get_representation_context(representation)
-    return [l for l in loaders if is_compatible_loader(l, context)]
+    return loaders_from_repre_context(loaders, context)
 
 
 def last_workfile_with_version(workdir, file_template, fill_data, extensions):
@@ -1793,14 +1757,6 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
 
     # Build template without optionals, version to digits only regex
     # and comment to any definable value.
-    file_template = re.sub("<.*?>", ".*?", file_template)
-    file_template = re.sub("{version.*}", "([0-9]+)", file_template)
-    file_template = re.sub("{comment.*?}", ".+?", file_template)
-    partially_filled = format_template_with_optional_keys(
-        fill_data,
-        file_template
-    )
-
     _ext = []
     for ext in extensions:
         if not ext.startswith("."):
@@ -1808,10 +1764,19 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
         # Escape dot for regex
         ext = "\\" + ext
         _ext.append(ext)
+    ext_expression = "(?:" + "|".join(_ext) + ")"
 
-    # Add or regex expression for extensions
-    partially_filled += "(?:" + "|".join(_ext) + ")"
-    file_template = "^" + partially_filled + "$"
+    # Replace `.{ext}` with `{ext}` so we are sure there is not dot at the end
+    file_template = re.sub(r"\.?{ext}", ext_expression, file_template)
+    # Replace optional keys with optional content regex
+    file_template = re.sub(r"<.*?>", r".*?", file_template)
+    # Replace `{version}` with group regex
+    file_template = re.sub(r"{version.*?}", r"([0-9]+)", file_template)
+    file_template = re.sub(r"{comment.*?}", r".+?", file_template)
+    file_template = format_template_with_optional_keys(
+        fill_data,
+        file_template
+    )
 
     # Match with ignore case on Windows due to the Windows
     # OS not being case-sensitive. This avoids later running
@@ -1822,15 +1787,34 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
         kwargs["flags"] = re.IGNORECASE
 
     # Get highest version among existing matching files
-    output_filename = None
     version = None
+    output_filenames = []
     for filename in sorted(filenames):
         match = re.match(file_template, filename, **kwargs)
-        if match:
-            file_version = int(match.group(1))
-            if version is None or file_version >= version:
-                version = file_version
-                output_filename = filename
+        if not match:
+            continue
+
+        file_version = int(match.group(1))
+        if version is None or file_version > version:
+            output_filenames[:] = []
+            version = file_version
+
+        if file_version == version:
+            output_filenames.append(filename)
+
+    output_filename = None
+    if output_filenames:
+        if len(output_filenames) == 1:
+            output_filename = output_filenames[0]
+        else:
+            last_time = None
+            for _output_filename in output_filenames:
+                full_path = os.path.join(workdir, _output_filename)
+                mod_time = os.path.getmtime(full_path)
+                if last_time is None or last_time < mod_time:
+                    output_filename = _output_filename
+                    last_time = mod_time
+
     return output_filename, version
 
 

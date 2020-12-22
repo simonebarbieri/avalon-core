@@ -1,5 +1,6 @@
 import sys
 import inspect
+import traceback
 import re
 
 from ...vendor.Qt import QtWidgets, QtCore, QtGui
@@ -7,8 +8,9 @@ from ...vendor import qtawesome
 from ...vendor import six
 from ... import api, io, style
 
+from .widgets import CreateErrorMessageBox
 from .. import lib
-from pypeapp import config
+from pype.api import get_current_project_settings
 
 module = sys.modules[__name__]
 module.window = None
@@ -449,12 +451,18 @@ class Window(QtWidgets.QDialog):
             item.setData(QtCore.Qt.ItemIsEnabled, False)
             listing.addItem(item)
 
-        config_data = config.get_presets()["tools"]["creator"]
+        pype_project_setting = (
+            get_current_project_settings()
+            ["global"]
+            ["tools"]
+            ["creator"]
+            ["families_smart_select"]
+        )
         item = None
         family_type = None
         task_name = io.Session.get('AVALON_TASK', None)
         if task_name:
-            for key, value in config_data.items():
+            for key, value in pype_project_setting.items():
                 for t_name in value:
                     if t_name in task_name.lower():
                         family_type = key
@@ -486,21 +494,36 @@ class Window(QtWidgets.QDialog):
         subset_name = result.text()
         asset = asset.text()
         family = item.data(FamilyRole)
+        Creator = item.data(PluginRole)
         use_selection = self.data["Use Selection Checkbox"].isChecked()
 
+        error_info = None
         try:
-            api.create(subset_name,
-                       asset,
-                       family,
-                       options={"useSelection": use_selection})
+            api.create(
+                Creator,
+                subset_name,
+                asset,
+                options={"useSelection": use_selection}
+            )
 
-        except NameError as e:
-            self.echo(e)
-            raise
+        except api.CreatorError as exc:
+            self.echo("Creator error: {}".format(str(exc)))
+            error_info = (str(exc), None)
 
-        except (TypeError, RuntimeError, KeyError, AssertionError) as e:
-            self.echo("Program error: %s" % str(e))
-            raise
+        except Exception as exc:
+            self.echo("Program error: %s" % str(exc))
+
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            formatted_traceback = "".join(traceback.format_exception(
+                exc_type, exc_value, exc_traceback
+            ))
+            error_info = (str(exc), formatted_traceback)
+
+        if error_info:
+            box = CreateErrorMessageBox(
+                family, subset_name, asset, *error_info
+            )
+            box.show()
 
         self.echo("Created %s .." % subset_name)
 

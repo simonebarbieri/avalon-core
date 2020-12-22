@@ -296,24 +296,24 @@ def find_submodule(module, submodule):
         types.ModuleType or None: The module, if found.
 
     """
-    try:
-        name = "{0}.hosts.{1}".format(module.__name__, submodule)
-        return importlib.import_module(name)
-    except ImportError:
-        log_.warning(
-            (
-                "Could not find \"{}\". Trying backwards compatible approach."
-            ).format(name),
-            exc_info=True
-        )
+    templates = (
+        "{0}.hosts.{1}.api",
+        "{0}.hosts.{1}",
+        "{0}.{1}"
+    )
+    for template in templates:
         try:
-            name = "{0}.{1}".format(module.__name__, submodule)
+            name = template.format(module.__name__, submodule)
             return importlib.import_module(name)
-        except ImportError as exc:
-            if str(exc) != "No module name {}".format(name):
-                log_.warning(
-                    "Could not find '%s' in module: %s", submodule, module
-                )
+        except ImportError:
+            log_.warning(
+                "Could not find \"{}\".".format(name),
+                exc_info=True
+            )
+
+    log_.warning(
+        "Could not find '%s' in module: %s", submodule, module
+    )
 
 
 class MasterVersionType(object):

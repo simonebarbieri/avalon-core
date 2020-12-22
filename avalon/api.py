@@ -10,10 +10,15 @@ and likely **unreliable** for use outside of the codebase itself.
 """
 
 from . import schema
-
+from . mongodb import (
+    AvalonMongoDB,
+    session_data_from_environment
+)
 from .pipeline import (
     install,
     uninstall,
+
+    CreatorError,
 
     Loader,
     Creator,
@@ -58,7 +63,6 @@ from .pipeline import (
     deregister_plugin_path,
 
     HOST_WORKFILE_EXTENSIONS,
-    should_start_last_workfile,
     format_template_with_optional_keys,
     last_workfile_with_version,
     last_workfile
@@ -71,10 +75,15 @@ from .lib import (
 
 
 __all__ = [
+    "AvalonMongoDB",
+    "session_data_from_environment",
+
     "install",
     "uninstall",
 
     "schema",
+
+    "CreatorError",
 
     "Loader",
     "Creator",
@@ -117,6 +126,7 @@ __all__ = [
     "deregister_plugin_path",
 
     "HOST_WORKFILE_EXTENSIONS",
+    "should_start_last_workfile",
     "format_template_with_optional_keys",
     "last_workfile_with_version",
     "last_workfile",
