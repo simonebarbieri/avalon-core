@@ -226,6 +226,20 @@ def install():
 
     pyblish.register_host("nuke")
 
+    log.info("config.nuke installed")
+
+
+def get_main_window():
+    """Acquire Nuke's main window"""
+    if self._parent is None:
+        top_widgets = QtWidgets.QApplication.topLevelWidgets()
+        name = "Foundry::UI::DockMainWindow"
+        main_window = next(widget for widget in top_widgets if
+                           widget.inherits("QMainWindow") and
+                           widget.metaObject().className() == name)
+        self._parent = main_window
+    return self._parent
+
 
 def uninstall():
     """Uninstall all that was previously installed
@@ -252,18 +266,9 @@ def _install_menu():
         publish,
         workfiles,
         loader,
-        sceneinventory,
-        libraryloader
+        sceneinventory
     )
-    from ..vendor.Qt import QtWidgets
 
-    main_window = None
-    for widget in QtWidgets.QApplication.topLevelWidgets():
-        if widget.isWindow():
-            if widget.parentWidget() is None:
-                if widget.windowTitle() != '':
-                    main_window = widget
-                    break
     # Create menu
     menubar = nuke.menu("Nuke")
     menu = menubar.addMenu(api.Session["AVALON_LABEL"])
@@ -275,24 +280,22 @@ def _install_menu():
     context_action.setEnabled(False)
 
     menu.addSeparator()
+    menu.addCommand("Create...",
+                    lambda: creator.show(parent=get_main_window()))
+    menu.addCommand("Load...",
+                    lambda: loader.show(parent=get_main_window(),
+                                        use_context=True))
+    menu.addCommand("Publish...",
+                    lambda: publish.show(parent=get_main_window()))
+    menu.addCommand("Manage...",
+                    lambda: sceneinventory.show(parent=get_main_window()))
+
+    menu.addSeparator()
     menu.addCommand("Work Files...",
                     lambda: workfiles.show(
                         os.environ["AVALON_WORKDIR"],
                         parent=get_main_window())
                     )
-                    )
-    menu.addSeparator()
-    menu.addCommand("Create...", creator.show)
-    menu.addCommand(
-        "Load...", command=lambda *args:
-        loader.show(use_context=True)
-    )
-    menu.addCommand(
-        "Publish...",
-        lambda *args: publish.show(parent=main_window)
-    )
-    menu.addCommand("Manage...", sceneinventory.show)
-    menu.addCommand("Library...", libraryloader.show)
 
     menu.addSeparator()
     menu.addCommand("Reset Frame Range", command.reset_frame_range)

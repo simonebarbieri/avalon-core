@@ -418,7 +418,7 @@ def add_write_node(name, **kwarg):
         log.info([k, v])
         try:
             w[k].setValue(v)
-        except (KeyError, NameError) as e:
+        except KeyError as e:
             log.debug(e)
             continue
 
