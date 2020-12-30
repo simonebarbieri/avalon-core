@@ -216,7 +216,7 @@ class Window(QtWidgets.QDialog):
         self.family_config_cache.refresh()
         self.groups_config.refresh()
 
-        self._refresh()
+        self._refresh_assets()
         self._assetschanged()
 
         project_name = self.dbcon.active_project() or "No project selected"
@@ -285,6 +285,7 @@ class Window(QtWidgets.QDialog):
     # ------------------------------
 
     def _refresh(self):
+    def _refresh_assets(self):
         """Load assets from database"""
         if self.current_project is None:
             return
@@ -474,7 +475,7 @@ class Window(QtWidgets.QDialog):
             # displaying the silo tabs. Calling `window.refresh()` and directly
             # `window.set_context()` the `set_context()` seems to override the
             # scheduled refresh and the silo tabs are not shown.
-            self._refresh()
+            self._refresh_assets()
 
         asset_widget = self.data["widgets"]["assets"]
         asset_widget.select_assets(asset)
