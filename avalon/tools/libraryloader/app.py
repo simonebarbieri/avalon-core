@@ -258,8 +258,10 @@ class Window(QtWidgets.QDialog):
         )
 
     # ------------------------------
-
     def _refresh(self):
+        project_name = self.combo_projects.currentText()
+        self._set_projects(bool(not project_name))
+
     def _refresh_assets(self):
         """Load assets from database"""
         if self.current_project is None:
