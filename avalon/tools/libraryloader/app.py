@@ -152,13 +152,6 @@ class Window(QtWidgets.QDialog):
         if selection_model.selectedIndexes():
             selection_model.clearSelection()
 
-    def on_refresh_clicked(self):
-        assets_widget = self.data["widgets"]["assets"]
-        with tools_lib.preserve_states(
-            assets_widget.view, column=0, role=assets_widget.model.ObjectIdRole
-        ):
-            self._set_projects()
-
     def _set_projects(self, default=False):
         projects = self.get_filtered_projects()
 
