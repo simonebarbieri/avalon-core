@@ -145,9 +145,6 @@ class Window(QtWidgets.QDialog):
         # Set default thumbnail on start
         thumbnail.set_thumbnail(None)
 
-        # Try set default project
-        self._set_projects(True)
-
         # Defaults
         self.resize(1330, 700)
 
