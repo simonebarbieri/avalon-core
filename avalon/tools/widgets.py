@@ -90,10 +90,11 @@ class AssetWidget(QtWidgets.QWidget):
         self._store_model_selection()
         time_start = time.time()
 
-        self.set_loading_state(
-            loading=True,
-            empty=True
-        )
+        if self.dbcon.Session["AVALON_PROJECT"]:
+            self.set_loading_state(
+                loading=True,
+                empty=True
+            )
 
         def on_refreshed(has_item):
             self.set_loading_state(loading=False, empty=not has_item)
