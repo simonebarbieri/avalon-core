@@ -78,7 +78,6 @@ class AssetWidget(QtWidgets.QWidget):
         selection.currentChanged.connect(self.current_changed)
         refresh.clicked.connect(self.refresh)
 
-        self.refreshButton = refresh
         self.model = model
         self.proxy = proxy
         self.view = view
