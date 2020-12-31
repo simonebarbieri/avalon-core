@@ -896,9 +896,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         self.fill_check = False
 
-        asset_ok = True
-        subset_ok = True
-        repre_ok = True
         if init_refresh:
             asset_values = self._get_asset_box_values()
             self._fill_combobox(asset_values, "asset")
@@ -907,9 +904,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         # Set other comboboxes to empty if any document is missing or any asset
         # of loaded representations is archived.
-        asset_ok = self._is_asset_ok()
-
-        if asset_ok:
+        self._is_asset_ok(validation_state)
+        if validation_state.asset_ok:
             subset_values = self._get_subset_box_values()
             self._fill_combobox(subset_values, "subset")
             if not subset_values:
@@ -1149,14 +1145,13 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         return list(output_repres or list())
 
-    def _is_asset_ok(self):
+    def _is_asset_ok(self, validation_state):
         selected_asset = self._assets_box.get_valid_value()
         if (
             selected_asset is None
             and (self.missing_docs or self.archived_assets)
         ):
-            return False
-        return True
+            validation_state.asset_ok = False
 
     def _is_subset_ok(self, subset_values):
         selected_asset = self._assets_box.get_valid_value()
