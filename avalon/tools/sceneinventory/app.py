@@ -1153,33 +1153,40 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         ):
             validation_state.asset_ok = False
 
-    def _is_subset_ok(self, subset_values):
+    def _is_subset_ok(self, validation_state):
         selected_asset = self._assets_box.get_valid_value()
         selected_subset = self._subsets_box.get_valid_value()
 
+        # [?] [x] [?]
         # If subset is selected then must be ok
         if selected_subset is not None:
-            return True
+            return
 
-        if self.missing_docs:
-            return False
+        # [ ] [ ] [?]
+        if selected_asset is None:
+            # If there were archived subsets and asset is not selected
+            if self.archived_subsets:
+                validation_state.subset_ok = False
+            return
 
-        if self.archived_subsets:
-            if selected_asset is None:
-                return False
+        # [x] [ ] [?]
+        asset_doc = io.find_one(
+            {"type": "asset", "name": selected_asset},
+            {"_id": 1}
+        )
+        subset_docs = io.find(
+            {"type": "subset", "parent": asset_doc["_id"]},
+            {"name": 1}
+        )
+        subset_names = set(
+            subset_doc["name"]
+            for subset_doc in subset_docs
+        )
 
-            asset_doc = io.find_one({
-                "type": "asset",
-                "name": selected_asset
-            })
-            subset_docs = io.find({
-                "type": "subset",
-                "parent": asset_doc["_id"]
-            })
-            for subset in subset_docs:
-                if subset["name"] not in subset_values:
-                    return False
-        return True
+        for subset_doc in self.content_subsets.values():
+            if subset_doc["name"] not in subset_names:
+                validation_state.subset_ok = False
+                break
 
     def _is_repre_ok(self, repre_values):
         selected_asset = self._assets_box.get_valid_value()
