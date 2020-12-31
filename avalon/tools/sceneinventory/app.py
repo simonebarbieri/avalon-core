@@ -1489,7 +1489,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             repre_names = (
                 repres_by_asset_id.get(asset_id) or []
             )
-            if repre_doc["name"] not in repres_by_asset_id:
+            if repre_doc["name"] not in repre_names:
                 validation_state.repre_ok = False
                 break
 
