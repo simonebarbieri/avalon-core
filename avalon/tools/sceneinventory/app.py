@@ -908,10 +908,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         if validation_state.asset_ok:
             subset_values = self._get_subset_box_values()
             self._fill_combobox(subset_values, "subset")
-            if not subset_values:
-                asset_ok = False
-            else:
-                subset_ok = self._is_subset_ok(subset_values)
+            self._is_subset_ok(validation_state)
 
         if asset_ok and subset_ok:
             repre_values = sorted(self._representations_box_values())
