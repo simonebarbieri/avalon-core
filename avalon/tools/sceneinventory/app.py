@@ -1069,12 +1069,19 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         selected_subset = self._subsets_box.currentText()
 
         # If nothing is selected
+        # [ ] [ ] [?]
         if not selected_asset and not selected_subset:
             # Find all representations of selection's subsets
-            possible_repres = list(io.find({
-                "type": "representation",
-                "parent": {"$in": list(self.content_versions.keys())}
-            }))
+            possible_repres = list(io.find(
+                {
+                    "type": "representation",
+                    "parent": {"$in": list(self.content_versions.keys())}
+                },
+                {
+                    "parent": 1,
+                    "name": 1
+                }
+            ))
 
             possible_repres_by_parent = collections.defaultdict(set)
             for repre in possible_repres:
@@ -1092,64 +1099,161 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
             return list(output_repres or list())
 
+        # [x] [x] [?]
+        if selected_asset and selected_subset:
+            asset_doc = io.find_one(
+                {"type": "asset", "name": selected_asset},
+                {"_id": 1}
+            )
+            subset_doc = io.find_one(
+                {
+                    "type": "subset",
+                    "name": selected_subset,
+                    "parent": asset_doc["_id"]
+                },
+                {"_id": 1}
+            )
+            subset_id = subset_doc["_id"]
+            last_versions_by_subset_id = self.find_last_versions([subset_id])
+            version_doc = last_versions_by_subset_id.get(subset_id)
+            repre_docs = io.find(
+                {
+                    "type": "representation",
+                    "parent": version_doc["_id"]
+                },
+                {
+                    "name": 1
+                }
+            )
+            return [
+                repre_doc["name"]
+                for repre_doc in repre_docs
+            ]
+
+        # [x] [ ] [?]
+        # If asset only is selected
         if selected_asset:
-            # If asset only is selected
-            asset = io.find_one({"type": "asset", "name": selected_asset})
-            asset_ids = [asset["_id"]]
-        else:
-            # If only subset is selected
-            asset_ids = list(self.content_assets.keys())
+            asset_doc = io.find_one(
+                {"type": "asset", "name": selected_asset},
+                {"_id": 1}
+            )
+            if not asset_doc:
+                return list()
 
-        subset_query = {
-            "type": "subset",
-            "parent": {"$in": asset_ids}
+            # Filter subsets by subset names from content
+            subset_names = set()
+            for subset_doc in self.content_subsets.values():
+                subset_names.add(subset_doc["name"])
+            subset_docs = io.find(
+                {
+                    "type": "subset",
+                    "parent": asset_doc["_id"],
+                    "name": {"$in": list(subset_names)}
+                },
+                {"_id": 1}
+            )
+            subset_ids = [
+                subset_doc["_id"]
+                for subset_doc in subset_docs
+            ]
+            if not subset_ids:
+                return list()
+
+            last_versions_by_subset_id = self.find_last_versions(subset_ids)
+            subset_id_by_version_id = {}
+            for subset_id, last_version in last_versions_by_subset_id.items():
+                version_id = last_version["_id"]
+                subset_id_by_version_id[version_id] = subset_id
+
+            if not subset_id_by_version_id:
+                return list()
+
+            repre_docs = list(io.find(
+                {
+                    "type": "representation",
+                    "parent": {"$in": list(subset_id_by_version_id.keys())}
+                },
+                {
+                    "name": 1,
+                    "parent": 1
+                }
+            ))
+            if not repre_docs:
+                return list()
+
+            repre_names_by_parent = collections.defaultdict(set)
+            for repre_doc in repre_docs:
+                repre_names_by_parent[repre_doc["parent"]].add(
+                    repre_doc["name"]
+                )
+
+            available_repres = None
+            for repre_names in repre_names_by_parent.values():
+                if available_repres is None:
+                    available_repres = repre_names
+                    continue
+
+                available_repres = available_repres.intersection(repre_names)
+
+            return list(available_repres)
+
+        # [ ] [x] [?]
+        subset_docs = list(io.find(
+            {
+                "type": "subset",
+                "parent": {"$in": list(self.content_assets.keys())}
+            },
+            {"_id": 1, "parent": 1}
+        ))
+        if not subset_docs:
+            return list()
+
+        subset_docs_by_id = {
+            subset_doc["_id"]: subset_doc
+            for subset_doc in subset_docs
         }
-        if selected_subset:
-            subset_query["name"] = selected_subset
+        last_versions_by_subset_id = self.find_last_versions(
+            subset_docs_by_id.keys()
+        )
 
-        subsets = list(io.find(subset_query))
-        if not subsets:
+        subset_id_by_version_id = {}
+        for subset_id, last_version in last_versions_by_subset_id.items():
+            version_id = last_version["_id"]
+            subset_id_by_version_id[version_id] = subset_id
+
+        if not subset_id_by_version_id:
             return list()
 
-        # versions
-        versions = list(io.find({
-            "type": "version",
-            "parent": {"$in": [subset["_id"] for subset in subsets]}
-        }, sort=[("name", -1)]))
-        if not versions:
+        repre_docs = list(io.find(
+            {
+                "type": "representation",
+                "parent": {"$in": list(subset_id_by_version_id.keys())}
+            },
+            {
+                "name": 1,
+                "parent": 1
+            }
+        ))
+        if not repre_docs:
             return list()
 
-        higher_versions_map = {}
-        for version in versions:
-            parent_id = version["parent"]
-            if parent_id not in higher_versions_map:
-                higher_versions_map[parent_id] = version
+        repre_names_by_asset_id = {}
+        for repre_doc in repre_docs:
+            subset_id = subset_id_by_version_id[repre_doc["parent"]]
+            asset_id = subset_docs_by_id[subset_id]["parent"]
+            if asset_id not in repre_names_by_asset_id:
+                repre_names_by_asset_id[asset_id] = set()
+            repre_names_by_asset_id[asset_id].add(repre_doc["name"])
 
-        higher_versions_ids = [
-            version["_id"] for version in higher_versions_map.values()
-        ]
+        available_repres = None
+        for repre_names in repre_names_by_parent.values():
+            if available_repres is None:
+                available_repres = repre_names
+                continue
 
-        higher_version_repres = io.find({
-            "type": "representation",
-            "parent": {"$in": higher_versions_ids}
-        })
+            available_repres = available_repres.intersection(repre_names)
 
-        repre_per_version = collections.defaultdict(set)
-        for repre in higher_version_repres:
-            repre_per_version[repre["parent"]].add(repre["name"])
-
-        # representations
-        output_repres = None
-        for repre_names in repre_per_version.values():
-            if output_repres is None:
-                output_repres = repre_names
-            else:
-                output_repres = (output_repres & repre_names)
-
-            if not output_repres:
-                break
-
-        return list(output_repres or list())
+        return list(available_repres)
 
     def _is_asset_ok(self, validation_state):
         selected_asset = self._assets_box.get_valid_value()
