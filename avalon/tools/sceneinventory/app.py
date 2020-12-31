@@ -1248,7 +1248,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             repre_names_by_asset_id[asset_id].add(repre_doc["name"])
 
         available_repres = None
-        for repre_names in repre_names_by_parent.values():
+        for repre_names in repre_names_by_asset_id.values():
             if available_repres is None:
                 available_repres = repre_names
                 continue
@@ -1491,7 +1491,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             repre_names = (
                 repres_by_asset_id.get(asset_id) or []
             )
-            if repre_doc["name"] not in repres_by_subset_name:
+            if repre_doc["name"] not in repres_by_asset_id:
                 validation_state.repre_ok = False
                 break
 
