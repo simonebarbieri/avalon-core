@@ -1203,7 +1203,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         subset_docs = list(io.find(
             {
                 "type": "subset",
-                "parent": {"$in": list(self.content_assets.keys())}
+                "parent": {"$in": list(self.content_assets.keys())},
+                "name": selected_subset
             },
             {"_id": 1, "parent": 1}
         ))
@@ -1423,8 +1424,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             )
             repres_by_subset_name = {}
             for repre_doc in repre_docs:
-                version_id = repre_doc["parent"]
-                subset_id = subset_id_by_version_id[version_id]
+                subset_id = subset_id_by_version_id[repre_doc["parent"]]
                 subset_name = subset_name_by_id[subset_id]
                 if subset_name not in repres_by_subset_name:
                     repres_by_subset_name[subset_name] = set()
@@ -1476,10 +1476,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         )
         repres_by_asset_id = {}
         for repre_doc in repre_docs:
-            version_id = repre_doc["parent"]
-            subset_id = subset_id_by_version_id[version_id]
-            subset_doc = subset_docs_by_id[subset_id]
-            asset_id = subset_doc["parent"]
+            subset_id = subset_id_by_version_id[repre_doc["parent"]]
+            asset_id = subset_docs_by_id[subset_id]["parent"]
             if asset_id not in repres_by_asset_id:
                 repres_by_asset_id[asset_id] = set()
             repres_by_asset_id[asset_id].add(repre_doc["name"])
