@@ -686,6 +686,21 @@ class SearchComboBox(QtWidgets.QComboBox):
         return text or None
 
 
+class ValidationState:
+    def __init__(self):
+        self.asset_ok = True
+        self.subset_ok = True
+        self.repre_ok = True
+
+    @property
+    def all_ok(self):
+        return (
+            self.asset_ok
+            and self.subset_ok
+            and self.repre_ok
+        )
+
+
 class SwitchAssetDialog(QtWidgets.QDialog):
     """Widget to support asset switching"""
 
@@ -888,6 +903,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             asset_values = self._get_asset_box_values()
             self._fill_combobox(asset_values, "asset")
 
+        validation_state = ValidationState()
+
         # Set other comboboxes to empty if any document is missing or any asset
         # of loaded representations is archived.
         asset_ok = self._is_asset_ok()
@@ -911,7 +928,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         # Fill comboboxes with values
         self.set_labels()
-        self.apply_validations(asset_ok, subset_ok, repre_ok)
+        self.apply_validations(validation_state)
 
         self.fill_check = True
 
@@ -968,7 +985,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._subset_label.setText(subset_label or default)
         self._repre_label.setText(repre_label or default)
 
-    def apply_validations(self, asset_ok, subset_ok, repre_ok):
+    def apply_validations(self, validation_state):
         error_msg = "*Please select"
         error_sheet = "border: 1px solid red;"
         success_sheet = "border: 1px solid green;"
@@ -977,26 +994,24 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         subset_sheet = None
         repre_sheet = None
         accept_sheet = None
-        all_ok = asset_ok and subset_ok and repre_ok
-
-        if asset_ok is False:
+        if validation_state.asset_ok is False:
             asset_sheet = error_sheet
             self._asset_label.setText(error_msg)
-        elif subset_ok is False:
+        elif validation_state.subset_ok is False:
             subset_sheet = error_sheet
             self._subset_label.setText(error_msg)
-        elif repre_ok is False:
+        elif validation_state.repre_ok is False:
             repre_sheet = error_sheet
             self._repre_label.setText(error_msg)
 
-        if all_ok:
+        if validation_state.all_ok:
             accept_sheet = success_sheet
 
         self._assets_box.setStyleSheet(asset_sheet or "")
         self._subsets_box.setStyleSheet(subset_sheet or "")
         self._representations_box.setStyleSheet(repre_sheet or "")
 
-        self._accept_btn.setEnabled(all_ok)
+        self._accept_btn.setEnabled(validation_state.all_ok)
         self._accept_btn.setStyleSheet(accept_sheet or "")
 
     def _get_asset_box_values(self):
