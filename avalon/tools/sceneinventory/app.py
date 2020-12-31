@@ -884,11 +884,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         asset_ok = True
         subset_ok = True
         repre_ok = True
-
-        asset_values = None
-        subset_values = None
-        repre_values = None
-
         if init_refresh:
             asset_values = self._get_asset_box_values()
             self._fill_combobox(asset_values, "asset")
@@ -913,11 +908,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             else:
                 repre_ok = self._is_repre_ok(repre_values)
 
-        if not asset_ok:
-            subset_values = list()
-            repre_values = list()
-        elif not subset_ok:
-            repre_values = list()
 
         # Fill comboboxes with values
         self.set_labels()
