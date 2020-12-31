@@ -796,11 +796,11 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             "_id": {"$in": list(set(version_ids))}
         })
         content_versions = {}
-        has_master_versions = False
+        master_version_ids = set()
         for version in versions:
             content_versions[version["_id"]] = version
-            if not has_master_versions:
-                has_master_versions = version["type"] == "master_version"
+            if version["type"] == "master_version":
+                master_version_ids.add(version["_id"])
 
         missing_versions = []
         subset_ids = []
@@ -854,7 +854,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self.content_versions = content_versions
         self.content_repres = content_repres
 
-        self.has_master_versions = has_master_versions
+        self.master_version_ids = master_version_ids
 
         self.missing_assets = missing_assets
         self.missing_versions = missing_versions
