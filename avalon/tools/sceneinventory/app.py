@@ -1008,18 +1008,27 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._accept_btn.setStyleSheet(accept_sheet or "")
 
     def _get_asset_box_values(self):
-        assets_by_id = {
-            asset_doc["_id"]: asset_doc
-            for asset_doc in io.find({"type": "asset"})
+        asset_docs = io.find(
+            {"type": "asset"},
+            {"_id": 1, "name": 1}
+        )
+        asset_names_by_id = {
+            asset_doc["_id"]: asset_doc["name"]
+            for asset_doc in asset_docs
         }
-        subsets = io.find({
-            "type": "subset",
-            "parent": {"$in": list(assets_by_id.keys())}
-        })
+        subsets = io.find(
+            {
+                "type": "subset",
+                "parent": {"$in": list(asset_names_by_id.keys())}
+            },
+            {
+                "parent": 1
+            }
+        )
 
         filtered_assets = []
         for subset in subsets:
-            asset_name = assets_by_id[subset["parent"]]["name"]
+            asset_name = asset_names_by_id[subset["parent"]]
             if asset_name not in filtered_assets:
                 filtered_assets.append(asset_name)
         return sorted(filtered_assets)
