@@ -604,10 +604,15 @@ class FamilyDescriptionWidget(QtWidgets.QWidget):
 
         # Support a font-awesome icon
         plugin = item.data(PluginRole)
-        icon = getattr(plugin, "icon", "info-circle")
-        assert isinstance(icon, six.string_types)
-        icon = qtawesome.icon("fa.{}".format(icon), color="white")
-        pixmap = icon.pixmap(self.SIZE, self.SIZE)
+        icon_name = getattr(plugin, "icon", None) or "info-circle"
+        try:
+            icon = qtawesome.icon("fa.{}".format(icon_name), color="white")
+            pixmap = icon.pixmap(self.SIZE, self.SIZE)
+        except Exception:
+            print("BUG: Couldn't load icon \"fa.{}\"".format(str(icon_name)))
+            # Create transparent pixmap
+            pixmap = QtGui.QPixmap()
+            pixmap.fill(QtCore.Qt.transparent)
         pixmap = pixmap.scaled(self.SIZE, self.SIZE)
 
         # Parse a clean line from the Creator's docstring
