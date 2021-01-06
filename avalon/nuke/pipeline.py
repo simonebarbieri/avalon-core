@@ -117,8 +117,6 @@ def parse_container(node):
 
     # Store the node's name
     data["objectName"] = node["name"].value()
-    # Store reference to the node object
-    data["_node"] = node
 
     return data
 
