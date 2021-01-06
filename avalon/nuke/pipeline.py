@@ -13,6 +13,8 @@ from .. import api
 from ..vendor.Qt import QtWidgets
 from ..pipeline import AVALON_CONTAINER_ID
 
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+
 log = logging.getLogger(__name__)
 
 self = sys.modules[__name__]
