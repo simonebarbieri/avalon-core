@@ -213,7 +213,8 @@ def create_knobs(data, tab=None):
                 knobs.append(end)
             else:
                 # Create a group of knobs
-                knobs.append(nuke.Tab_Knob(name, nice, nuke.TABBEGINGROUP))
+                knobs.append(nuke.Tab_Knob(
+                    name, nice, nuke.TABBEGINCLOSEDGROUP))
                 knobs += create_knobs(value)
                 knobs.append(nuke.Tab_Knob(name, nice, nuke.TABENDGROUP))
             continue
@@ -336,7 +337,10 @@ def set_avalon_knob_data(node, data=None, prefix="avalon:"):
 
         if knob_name in existed_knobs:
             # Set value
-            node[knob_name].setValue(value)
+            try:
+                node[knob_name].setValue(value)
+            except TypeError:
+                node[knob_name].setValue(str(value))
         else:
             # New knob
             name = (knob_name, gui_name)  # Hide prefix on GUI
@@ -346,7 +350,6 @@ def set_avalon_knob_data(node, data=None, prefix="avalon:"):
                 create[name] = Knobby("String_Knob",
                                       str(value),
                                       flags=[nuke.READ_ONLY])
-
     if tab_name in existed_knobs:
         tab_name = None
     else:
@@ -361,25 +364,45 @@ def set_avalon_knob_data(node, data=None, prefix="avalon:"):
         create = tab
 
     imprint(node, create, tab=tab_name)
-
     return node
 
 
 def get_avalon_knob_data(node, prefix="avalon:"):
-    """ Get data from nodes's avalon knob
+    """ Gets a data from nodes's avalon knob
 
     Arguments:
-        node (nuke.Node): Nuke node to search for data,
+        node (obj): Nuke node to search for data,
         prefix (str, optional): filtering prefix
 
     Returns:
         data (dict)
     """
-    data = {
-        knob[len(prefix):]: node[knob].value()
-        for knob in node.knobs().keys()
-        if knob.startswith(prefix)
-    }
+    # check if lists
+    if not isinstance(prefix, list):
+        prefix = list([prefix])
+
+    data = dict()
+
+    # loop prefix
+    for p in prefix:
+        # check if the node is avalon tracked
+        if "AvalonTab" not in node.knobs():
+            continue
+        try:
+            # check if data available on the node
+            test = node['avalonDataGroup'].value()
+            log.debug("Only testing if data avalable: `{}`".format(test))
+        except NameError as e:
+            # if it doesn't then create it
+            log.debug("Creating avalon knob: `{}`".format(e))
+            node = set_avalon_knob_data(node)
+            return get_avalon_knob_data(node)
+
+        # get data from filtered knobs
+        data.update({k.replace(p, ''): node[k].value()
+                    for k in node.knobs().keys()
+                    if p in k})
+
     return data
 
 
