@@ -216,7 +216,8 @@ def create_knobs(data, tab=None):
                 knobs.append(nuke.Tab_Knob(
                     name, nice, nuke.TABBEGINCLOSEDGROUP))
                 knobs += create_knobs(value)
-                knobs.append(nuke.Tab_Knob(name, nice, nuke.TABENDGROUP))
+                knobs.append(
+                    nuke.Tab_Knob(name + "_End", nice, nuke.TABENDGROUP))
             continue
 
         else:
