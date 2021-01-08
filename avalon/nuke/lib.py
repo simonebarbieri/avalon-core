@@ -299,7 +299,7 @@ def add_publish_knob(node):
     """
     if "publish" not in node.knobs():
         body = OrderedDict()
-        body[("divd", "")] = Knobby("Text_Knob", "")
+        body[("divd", "Publishing")] = Knobby("Text_Knob", '')
         body["publish"] = True
         imprint(node, body)
     return node
