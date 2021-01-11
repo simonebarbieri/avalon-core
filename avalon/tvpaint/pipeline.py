@@ -244,10 +244,24 @@ def write_workfile_metadata(metadata_key, value):
         .replace("'", "{__sq__}")
         .replace("\"", "{__dq__}")
     )
+    chunks = split_metadata_string(value)
+    chunks_len = len(chunks)
 
-    george_script = (
-        "tv_writeprojectstring \"{}\" \"{}\" \"{}\""
-    ).format(METADATA_SECTION, metadata_key, value)
+    write_template = "tv_writeprojectstring \"{}\" \"{}\" \"{}\""
+    george_script_parts = []
+    # Add information about chunks length to metadata key itself
+    george_script_parts.append(
+        write_template.format(METADATA_SECTION, metadata_key, chunks_len)
+    )
+    # Add chunk values to indexed metadata keys
+    for idx, chunk_value in enumerate(chunks):
+        sub_key = "{}{}".format(metadata_key, idx)
+        george_script_parts.append(
+            write_template.format(METADATA_SECTION, sub_key, chunk_value)
+        )
+
+    george_script = "\n".join(george_script_parts)
+
     return lib.execute_george_through_file(george_script)
 
 
