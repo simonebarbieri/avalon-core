@@ -15,6 +15,7 @@ METADATA_SECTION = "avalon"
 SECTION_NAME_CONTEXT = "context"
 SECTION_NAME_INSTANCES = "instances"
 SECTION_NAME_CONTAINERS = "containers"
+TVPAINT_CHUNK_LENGTH = 500
 
 
 def install():
@@ -88,6 +89,34 @@ def maintained_selection():
         yield
     finally:
         pass
+
+
+def split_metadata_string(text, chunk_length=None):
+    """Split string by length.
+
+    Split text to chunks by entered length.
+    Example:
+        ```python
+        text = "ABCDEFGHIJKLM"
+        result = split_metadata_string(text, 3)
+        print(result)
+        >>> ['ABC', 'DEF', 'GHI', 'JKL']
+        ```
+
+    Args:
+        text (str): Text that will be split into chunks.
+        chunk_length (int): Single chunk size. Default chunk_length is
+            set to global variable `TVPAINT_CHUNK_LENGTH`.
+
+    Returns:
+        list: List of strings wil at least one item.
+    """
+    if chunk_length is None:
+        chunk_length = TVPAINT_CHUNK_LENGTH
+    chunks = []
+    for idx in range(chunk_length, len(text) + chunk_length, chunk_length):
+        chunks.append(text[idx-chunk_length:idx])
+    return chunks
 
 
 def get_workfile_metadata_string(metadata_key):
