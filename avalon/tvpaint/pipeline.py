@@ -15,7 +15,31 @@ METADATA_SECTION = "avalon"
 SECTION_NAME_CONTEXT = "context"
 SECTION_NAME_INSTANCES = "instances"
 SECTION_NAME_CONTAINERS = "containers"
+# Maximum length of metadata chunk string
+# TODO find out the max (500 is safe enough)
 TVPAINT_CHUNK_LENGTH = 500
+
+"""TVPaint's Metadata
+
+Metadata are stored to TVPaint's workfile.
+
+Workfile works similar to .ini file but has few limitation. Most important
+limitation is that value under key has limited length. Due to this limitation
+each metadata section/key stores number of "subkeys" that are related to
+the section.
+
+Example:
+Metadata key `"instances"` may have stored value "2". In that case it is
+expected that there are also keys `["instances0", "instances1"]`.
+
+Workfile data looks like:
+```
+[avalon]
+instances0=[{{__dq__}id{__dq__}: {__dq__}pyblish.avalon.instance{__dq__...
+instances1=...more data...
+instances=2
+```
+"""
 
 
 def install():
@@ -178,9 +202,12 @@ def get_workfile_metadata_string(metadata_key):
     """Read metadata for specific key from current project workfile."""
     result = get_workfile_metadata_string_for_keys([metadata_key])
     if not result:
-        return result
+        return None
 
     stripped_result = result.strip()
+    if not stripped_result:
+        return None
+
     # NOTE Backwards compatibility when metadata key did not store range of key
     #   indexes but the value itself
     # NOTE We don't have to care about negative values with `isdecimal` check
