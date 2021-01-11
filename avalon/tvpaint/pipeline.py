@@ -123,12 +123,14 @@ def get_workfile_metadata_string_for_keys(metadata_keys):
     """Read metadata for specific keys from current project workfile.
 
     All values from entered keys are stored to single string without separator.
+
     Function is designed to help get all values for one metadata key at once.
+    So order of passed keys matteres.
 
     Args:
-        metadata_keys (list): Metadata keys for which data should be retrieved.
-            It is possible to enter only string (`"Instances"`).
-            Example: `["Instances0", "Instances1", "Instances2"]`
+        metadata_keys (list, str): Metadata keys for which data should be
+            retrieved. Order of keys matters! It is possible to enter only
+            single key as string.
     """
     # Add ability to pass only single key
     if isinstance(metadata_keys, str):
@@ -170,13 +172,32 @@ def get_workfile_metadata_string_for_keys(metadata_keys):
     os.remove(output_filepath)
 
     return output_string
+
+
+def get_workfile_metadata_string(metadata_key):
+    """Read metadata for specific key from current project workfile."""
+    result = get_workfile_metadata_string_for_keys([metadata_key])
+    if not result:
+        return result
+
+    stripped_result = result.strip()
+    # NOTE Backwards compatibility when metadata key did not store range of key
+    #   indexes but the value itself
+    # NOTE We don't have to care about negative values with `isdecimal` check
+    if not stripped_result.isdecimal():
+        json_string = result
+    else:
+        keys = []
+        for idx in range(int(stripped_result)):
+            keys.append("{}{}".format(metadata_key, idx))
+        json_string = get_workfile_metadata_string_for_keys(keys)
+
     # Replace quotes plaholders with their values
     json_string = (
         json_string
         .replace("{__sq__}", "'")
         .replace("{__dq__}", "\"")
     )
-    os.remove(output_filepath)
     return json_string
 
 
