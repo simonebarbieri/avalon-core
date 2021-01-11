@@ -119,23 +119,57 @@ def split_metadata_string(text, chunk_length=None):
     return chunks
 
 
-def get_workfile_metadata_string(metadata_key):
-    """Read metadata for specific key from current project workfile."""
+def get_workfile_metadata_string_for_keys(metadata_keys):
+    """Read metadata for specific keys from current project workfile.
+
+    All values from entered keys are stored to single string without separator.
+    Function is designed to help get all values for one metadata key at once.
+
+    Args:
+        metadata_keys (list): Metadata keys for which data should be retrieved.
+            It is possible to enter only string (`"Instances"`).
+            Example: `["Instances0", "Instances1", "Instances2"]`
+    """
+    # Add ability to pass only single key
+    if isinstance(metadata_keys, str):
+        metadata_keys = [metadata_keys]
+
     output_file = tempfile.NamedTemporaryFile(
         mode="w", prefix="a_tvp_", suffix=".txt", delete=False
     )
     output_file.close()
-
     output_filepath = output_file.name.replace("\\", "/")
-    george_script = (
-        "output_path = \"{}\"\n"
-        "tv_readprojectstring \"{}\" \"{}\" \"[]\"\n"
-        "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' result"
-    ).format(output_filepath, METADATA_SECTION, metadata_key)
+
+    george_script_parts = []
+    george_script_parts.append(
+        "output_path = \"{}\"".format(output_filepath)
+    )
+    # Store data for each index of metadata key
+    for metadata_key in metadata_keys:
+        george_script_parts.append(
+            "tv_readprojectstring \"{}\" \"{}\" \"\"".format(
+                METADATA_SECTION, metadata_key
+            )
+        )
+        george_script_parts.append(
+            "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' result"
+        )
+
+    # Execute the script
+    george_script = "\n".join(george_script_parts)
     lib.execute_george_through_file(george_script)
 
+    # Load data from temp file
     with open(output_filepath, "r") as stream:
-        json_string = stream.read()
+        file_content = stream.read()
+
+    # Remove `\n` from content
+    output_string = file_content.replace("\n", "")
+
+    # Delete temp file
+    os.remove(output_filepath)
+
+    return output_string
     # Replace quotes plaholders with their values
     json_string = (
         json_string
