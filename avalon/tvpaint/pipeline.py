@@ -139,7 +139,8 @@ def split_metadata_string(text, chunk_length=None):
         chunk_length = TVPAINT_CHUNK_LENGTH
     chunks = []
     for idx in range(chunk_length, len(text) + chunk_length, chunk_length):
-        chunks.append(text[idx-chunk_length:idx])
+        start_idx = idx - chunk_length
+        chunks.append(text[start_idx:idx])
     return chunks
 
 
