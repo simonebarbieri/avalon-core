@@ -245,7 +245,16 @@ def get_workfile_metadata(metadata_key, default=None):
 
     json_string = get_workfile_metadata_string(metadata_key)
     if json_string:
-        return json.loads(json_string)
+        try:
+            return json.loads(json_string)
+        except json.decoder.JSONDecodeError:
+            # TODO remove when backwards compatibility of storing metadata
+            # will be removed
+            print((
+                "Fixed invalid metadata in workfile."
+                " Not serializable string was: {}"
+            ).format(json_string))
+            write_workfile_metadata(metadata_key, default)
     return default
 
 
