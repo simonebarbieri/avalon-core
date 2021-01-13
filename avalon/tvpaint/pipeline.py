@@ -213,20 +213,20 @@ def get_workfile_metadata_string(metadata_key):
     #   indexes but the value itself
     # NOTE We don't have to care about negative values with `isdecimal` check
     if not stripped_result.isdecimal():
-        json_string = result
+        metadata_string = result
     else:
         keys = []
         for idx in range(int(stripped_result)):
             keys.append("{}{}".format(metadata_key, idx))
-        json_string = get_workfile_metadata_string_for_keys(keys)
+        metadata_string = get_workfile_metadata_string_for_keys(keys)
 
     # Replace quotes plaholders with their values
-    json_string = (
-        json_string
+    metadata_string = (
+        metadata_string
         .replace("{__sq__}", "'")
         .replace("{__dq__}", "\"")
     )
-    return json_string
+    return metadata_string
 
 
 def get_workfile_metadata(metadata_key, default=None):
