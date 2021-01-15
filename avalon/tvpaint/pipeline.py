@@ -15,6 +15,31 @@ METADATA_SECTION = "avalon"
 SECTION_NAME_CONTEXT = "context"
 SECTION_NAME_INSTANCES = "instances"
 SECTION_NAME_CONTAINERS = "containers"
+# Maximum length of metadata chunk string
+# TODO find out the max (500 is safe enough)
+TVPAINT_CHUNK_LENGTH = 500
+
+"""TVPaint's Metadata
+
+Metadata are stored to TVPaint's workfile.
+
+Workfile works similar to .ini file but has few limitation. Most important
+limitation is that value under key has limited length. Due to this limitation
+each metadata section/key stores number of "subkeys" that are related to
+the section.
+
+Example:
+Metadata key `"instances"` may have stored value "2". In that case it is
+expected that there are also keys `["instances0", "instances1"]`.
+
+Workfile data looks like:
+```
+[avalon]
+instances0=[{{__dq__}id{__dq__}: {__dq__}pyblish.avalon.instance{__dq__...
+instances1=...more data...
+instances=2
+```
+"""
 
 
 def install():
@@ -90,31 +115,118 @@ def maintained_selection():
         pass
 
 
-def get_workfile_metadata_string(metadata_key):
-    """Read metadata for specific key from current project workfile."""
+def split_metadata_string(text, chunk_length=None):
+    """Split string by length.
+
+    Split text to chunks by entered length.
+    Example:
+        ```python
+        text = "ABCDEFGHIJKLM"
+        result = split_metadata_string(text, 3)
+        print(result)
+        >>> ['ABC', 'DEF', 'GHI', 'JKL']
+        ```
+
+    Args:
+        text (str): Text that will be split into chunks.
+        chunk_length (int): Single chunk size. Default chunk_length is
+            set to global variable `TVPAINT_CHUNK_LENGTH`.
+
+    Returns:
+        list: List of strings wil at least one item.
+    """
+    if chunk_length is None:
+        chunk_length = TVPAINT_CHUNK_LENGTH
+    chunks = []
+    for idx in range(chunk_length, len(text) + chunk_length, chunk_length):
+        start_idx = idx - chunk_length
+        chunks.append(text[start_idx:idx])
+    return chunks
+
+
+def get_workfile_metadata_string_for_keys(metadata_keys):
+    """Read metadata for specific keys from current project workfile.
+
+    All values from entered keys are stored to single string without separator.
+
+    Function is designed to help get all values for one metadata key at once.
+    So order of passed keys matteres.
+
+    Args:
+        metadata_keys (list, str): Metadata keys for which data should be
+            retrieved. Order of keys matters! It is possible to enter only
+            single key as string.
+    """
+    # Add ability to pass only single key
+    if isinstance(metadata_keys, str):
+        metadata_keys = [metadata_keys]
+
     output_file = tempfile.NamedTemporaryFile(
         mode="w", prefix="a_tvp_", suffix=".txt", delete=False
     )
     output_file.close()
-
     output_filepath = output_file.name.replace("\\", "/")
-    george_script = (
-        "output_path = \"{}\"\n"
-        "tv_readprojectstring \"{}\" \"{}\" \"[]\"\n"
-        "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' result"
-    ).format(output_filepath, METADATA_SECTION, metadata_key)
+
+    george_script_parts = []
+    george_script_parts.append(
+        "output_path = \"{}\"".format(output_filepath)
+    )
+    # Store data for each index of metadata key
+    for metadata_key in metadata_keys:
+        george_script_parts.append(
+            "tv_readprojectstring \"{}\" \"{}\" \"\"".format(
+                METADATA_SECTION, metadata_key
+            )
+        )
+        george_script_parts.append(
+            "tv_writetextfile \"strict\" \"append\" '\"'output_path'\"' result"
+        )
+
+    # Execute the script
+    george_script = "\n".join(george_script_parts)
     lib.execute_george_through_file(george_script)
 
+    # Load data from temp file
     with open(output_filepath, "r") as stream:
-        json_string = stream.read()
+        file_content = stream.read()
+
+    # Remove `\n` from content
+    output_string = file_content.replace("\n", "")
+
+    # Delete temp file
+    os.remove(output_filepath)
+
+    return output_string
+
+
+def get_workfile_metadata_string(metadata_key):
+    """Read metadata for specific key from current project workfile."""
+    result = get_workfile_metadata_string_for_keys([metadata_key])
+    if not result:
+        return None
+
+    stripped_result = result.strip()
+    if not stripped_result:
+        return None
+
+    # NOTE Backwards compatibility when metadata key did not store range of key
+    #   indexes but the value itself
+    # NOTE We don't have to care about negative values with `isdecimal` check
+    if not stripped_result.isdecimal():
+        metadata_string = result
+    else:
+        keys = []
+        for idx in range(int(stripped_result)):
+            keys.append("{}{}".format(metadata_key, idx))
+        metadata_string = get_workfile_metadata_string_for_keys(keys)
+
     # Replace quotes plaholders with their values
-    json_string = (
-        json_string
+    metadata_string = (
+        metadata_string
         .replace("{__sq__}", "'")
         .replace("{__dq__}", "\"")
     )
-    os.remove(output_filepath)
-    return json_string
+    return metadata_string
 
 
 def get_workfile_metadata(metadata_key, default=None):
@@ -133,7 +245,16 @@ def get_workfile_metadata(metadata_key, default=None):
 
     json_string = get_workfile_metadata_string(metadata_key)
     if json_string:
-        return json.loads(json_string)
+        try:
+            return json.loads(json_string)
+        except json.decoder.JSONDecodeError:
+            # TODO remove when backwards compatibility of storing metadata
+            # will be removed
+            print((
+                "Fixed invalid metadata in workfile."
+                " Not serializable string was: {}"
+            ).format(json_string))
+            write_workfile_metadata(metadata_key, default)
     return default
 
 
@@ -160,10 +281,24 @@ def write_workfile_metadata(metadata_key, value):
         .replace("'", "{__sq__}")
         .replace("\"", "{__dq__}")
     )
+    chunks = split_metadata_string(value)
+    chunks_len = len(chunks)
 
-    george_script = (
-        "tv_writeprojectstring \"{}\" \"{}\" \"{}\""
-    ).format(METADATA_SECTION, metadata_key, value)
+    write_template = "tv_writeprojectstring \"{}\" \"{}\" \"{}\""
+    george_script_parts = []
+    # Add information about chunks length to metadata key itself
+    george_script_parts.append(
+        write_template.format(METADATA_SECTION, metadata_key, chunks_len)
+    )
+    # Add chunk values to indexed metadata keys
+    for idx, chunk_value in enumerate(chunks):
+        sub_key = "{}{}".format(metadata_key, idx)
+        george_script_parts.append(
+            write_template.format(METADATA_SECTION, sub_key, chunk_value)
+        )
+
+    george_script = "\n".join(george_script_parts)
+
     return lib.execute_george_through_file(george_script)
 
 
