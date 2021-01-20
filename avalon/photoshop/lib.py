@@ -86,11 +86,15 @@ def safe_excepthook(*args):
     traceback.print_exception(*args)
 
 
-def launch(application):
+def launch(application, workfile):
     """Starts the websocket server that will be hosted
        in the Photoshop extension.
     """
     from avalon import api, photoshop
+
+    # check if workfile available and add it to executable
+    if workfile:
+        application = " ".join([application, workfile])
 
     api.install(photoshop)
     sys.excepthook = safe_excepthook
@@ -159,4 +163,3 @@ def maintained_visibility():
         for layer in layers:
             stub().set_visible(layer.id, visibility[layer.id])
             pass
-
