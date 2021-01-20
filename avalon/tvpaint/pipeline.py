@@ -395,7 +395,7 @@ class Loader(api.Loader):
     hosts = ["tvpaint"]
 
     @staticmethod
-    def layer_ids_from_container(container):
+    def get_members_from_container(container):
         if "members" not in container and "objectName" in container:
             # Backwards compatibility
             layer_ids_str = container.get("objectName")
