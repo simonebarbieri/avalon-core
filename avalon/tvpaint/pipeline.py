@@ -69,15 +69,15 @@ def uninstall():
 
 
 def containerise(
-    name, namespace, layer_ids, context, loader, current_containers=None
+    name, namespace, members, context, loader, current_containers=None
 ):
     """Add new container to metadata.
 
     Args:
         name (str): Container name.
         namespace (str): Container namespace.
-        layer_ids (list): List of layer that were loaded and belongs to the
-            container.
+        members (list): List of members that were loaded and belongs
+            to the container (layer names).
         current_containers (list): Preloaded containers. Should be used only
             on update/switch when containers were modified durring the process.
 
@@ -88,7 +88,7 @@ def containerise(
     container_data = {
         "schema": "avalon-core:container-2.0",
         "id": AVALON_CONTAINER_ID,
-        "members": layer_ids,
+        "members": members,
         "name": name,
         "namespace": namespace,
         "loader": str(loader),
