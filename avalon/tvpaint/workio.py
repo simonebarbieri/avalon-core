@@ -8,13 +8,16 @@
 
 from avalon import api
 from . import CommunicationWrapper
+from .lib import execute_george_through_file
 from . pipeline import save_current_workfile_context
 
 
 def open_file(filepath):
     """Open the scene file in Blender."""
-    george_script = "tv_LoadProject {}".format(filepath.replace("\\", "/"))
-    return CommunicationWrapper.execute_george(george_script)
+    george_script = "tv_LoadProject '\"'\"{}\"'\"'".format(
+        filepath.replace("\\", "/")
+    )
+    return execute_george_through_file(george_script)
 
 
 def save_file(filepath):
