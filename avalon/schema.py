@@ -48,7 +48,7 @@ def get_schema_version(schema_name):
     schema_regex = re.compile(r"[^:]+:[^-]+-(\d.\d)")
     groups = schema_regex.findall(schema_name)
     if not groups:
-    return 0, 0
+        return 0, 0
 
     return groups[0].split(".")
 
