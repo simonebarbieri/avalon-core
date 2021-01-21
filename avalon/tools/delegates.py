@@ -123,7 +123,8 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
                 "parent": parent_id
             }, {
                 "name": 1,
-                "data.tags": 1
+                "data.tags": 1,
+                "version_id": 1
             }
         )
 
