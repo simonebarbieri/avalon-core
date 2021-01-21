@@ -1040,14 +1040,36 @@ def get_repres_contexts(representation_ids, dbcon=None):
         repre_docs_by_id[repre_doc["_id"]] = repre_doc
 
     version_docs = dbcon.find({
-        "type": "version",
+        "type": {"$in": ["version", "master_version"]},
         "_id": {"$in": list(version_ids)}
     })
+
     version_docs_by_id = {}
+    master_version_docs = []
+    versions_for_masters = set()
     subset_ids = set()
     for version_doc in version_docs:
+        if version_doc["type"] == "master_version":
+            master_version_docs.append(version_doc)
+            versions_for_masters.add(version_doc["version_id"])
         version_docs_by_id[version_doc["_id"]] = version_doc
         subset_ids.add(version_doc["parent"])
+
+    if versions_for_masters:
+        _version_docs = dbcon.find({
+            "type": "version",
+            "_id": {"$in": list(versions_for_masters)}
+        })
+        _version_data_by_id = {
+            version_doc["_id"]: version_doc["data"]
+            for version_doc in _version_docs
+        }
+
+        for master_version_doc in master_version_docs:
+            master_version_id = master_version_doc["_id"]
+            version_id = master_version_doc["version_id"]
+            version_data = copy.deepcopy(_version_data_by_id[version_id])
+            version_docs_by_id[master_version_id]["data"] = version_data
 
     subset_docs = dbcon.find({
         "type": "subset",
