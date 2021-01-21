@@ -14,6 +14,7 @@ Resources:
 
 import os
 import sys
+import re
 import json
 import logging
 
@@ -23,6 +24,33 @@ log_ = logging.getLogger(__name__)
 
 ValidationError = jsonschema.ValidationError
 SchemaError = jsonschema.SchemaError
+
+
+def get_schema_version(schema_name):
+    """Extract version form schema name.
+
+    It is expected that schema name contain only major and minor version.
+
+    Expected name should match to:
+    "{name}:{type}-{major version}.{minor version}"
+    - `name` - must not contain colon
+    - `type` - must not contain dash
+    - major and minor versions must be numbers separated by dot
+
+    Args:
+    schema_name(str): Name of schema that should be parsed.
+
+    Returns:
+    tuple: Contain two values major version as first and minor version as
+    second. When schema does not match parsing regex then `(0, 0)` is
+    returned.
+    """
+    schema_regex = re.compile(r"[^:]+:[^-]+-(\d.\d)")
+    groups = schema_regex.findall(schema_name)
+    if not groups:
+    return 0, 0
+
+    return groups[0].split(".")
 
 
 def validate(data, schema=None):
