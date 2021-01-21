@@ -21,6 +21,7 @@ from collections import OrderedDict
 from . import (
     io,
     lib,
+    schema,
 
     Session,
 
@@ -1724,10 +1725,11 @@ def is_compatible_loader(Loader, context):
         bool
 
     """
-    if context["subset"]["schema"] == "avalon-core:subset-3.0":
-        families = context["subset"]["data"]["families"]
-    else:
+    maj_version, _ = schema.get_schema_version(context["subset"]["schema"])
+    if maj_version < 3:
         families = context["version"]["data"].get("families", [])
+    else:
+        families = context["subset"]["data"]["families"]
 
     representation = context["representation"]
     has_family = ("*" in Loader.families or
