@@ -143,9 +143,6 @@ class Window(QtWidgets.QDialog):
         # Set default thumbnail on start
         thumbnail.set_thumbnail(None)
 
-        # Try set default project
-        self._set_projects(True)
-
         # Defaults
         self.resize(1330, 700)
 
@@ -154,13 +151,6 @@ class Window(QtWidgets.QDialog):
         selection_model = subsets_widget.view.selectionModel()
         if selection_model.selectedIndexes():
             selection_model.clearSelection()
-
-    def on_refresh_clicked(self):
-        assets_widget = self.data["widgets"]["assets"]
-        with tools_lib.preserve_states(
-            assets_widget.view, column=0, role=assets_widget.model.ObjectIdRole
-        ):
-            self._set_projects()
 
     def _set_projects(self, default=False):
         projects = self.get_filtered_projects()
@@ -212,7 +202,7 @@ class Window(QtWidgets.QDialog):
         self.family_config_cache.refresh()
         self.groups_config.refresh()
 
-        self._refresh()
+        self._refresh_assets()
         self._assetschanged()
 
         project_name = self.dbcon.active_project() or "No project selected"
@@ -258,8 +248,11 @@ class Window(QtWidgets.QDialog):
         )
 
     # ------------------------------
-
     def _refresh(self):
+        project_name = self.combo_projects.currentText()
+        self._set_projects(bool(not project_name))
+
+    def _refresh_assets(self):
         """Load assets from database"""
         if self.current_project is None:
             return
@@ -449,7 +442,7 @@ class Window(QtWidgets.QDialog):
             # displaying the silo tabs. Calling `window.refresh()` and directly
             # `window.set_context()` the `set_context()` seems to override the
             # scheduled refresh and the silo tabs are not shown.
-            self._refresh()
+            self._refresh_assets()
 
         asset_widget = self.data["widgets"]["assets"]
         asset_widget.select_assets(asset)

@@ -78,7 +78,6 @@ class AssetWidget(QtWidgets.QWidget):
         selection.currentChanged.connect(self.current_changed)
         refresh.clicked.connect(self.refresh)
 
-        self.refreshButton = refresh
         self.model = model
         self.proxy = proxy
         self.view = view
@@ -90,12 +89,11 @@ class AssetWidget(QtWidgets.QWidget):
         self._store_model_selection()
         time_start = time.time()
 
-        self.set_loading_state(
-            loading=True,
-            empty=True
-        )
-        # Refresh model
-        self.model.refresh()
+        if self.dbcon.Session["AVALON_PROJECT"]:
+            self.set_loading_state(
+                loading=True,
+                empty=True
+            )
 
         def on_refreshed(has_item):
             self.set_loading_state(loading=False, empty=not has_item)
@@ -104,8 +102,12 @@ class AssetWidget(QtWidgets.QWidget):
             self.refreshed.emit()
             print("Duration: %.3fs" % (time.time() - time_start))
 
+        # Connect to signal
         self.model.refreshed.connect(on_refreshed)
+        # Trigger signal before refresh is called
         self.refresh_triggered.emit()
+        # Refresh model
+        self.model.refresh()
 
     def refresh(self):
         self._refresh_model()
