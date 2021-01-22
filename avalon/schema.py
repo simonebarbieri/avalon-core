@@ -50,7 +50,8 @@ def get_schema_version(schema_name):
     if not groups:
         return 0, 0
 
-    return groups[0].split(".")
+    maj_version, min_version = groups[0].split(".")
+    return int(maj_version), int(min_version)
 
 
 def validate(data, schema=None):
