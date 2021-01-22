@@ -274,10 +274,6 @@ def show(module_name):
     else:
         module.show()
 
-    # QApplication needs to always execute.
-    if "publish" in module_name:
-        return
-
     app.exec_()
 
 
