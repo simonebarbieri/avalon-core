@@ -522,7 +522,7 @@ class SubsetWidget(QtWidgets.QWidget):
                 error_info.append((
                     "Incompatible Loader",
                     None,
-                    representation.get("name"),
+                    representation_name,
                     item["subset"],
                     item["version_document"]["name"]
                 ))
@@ -535,7 +535,7 @@ class SubsetWidget(QtWidgets.QWidget):
                 error_info.append((
                     str(exc),
                     formatted_traceback,
-                    representation.get("name"),
+                    representation_name,
                     item["subset"],
                     item["version_document"]["name"]
                 ))
