@@ -166,7 +166,7 @@ class View(QtWidgets.QTreeView):
                         version_id_by_repre_id.items()
                     ):
                         if _version_id == master_version_id:
-                            version_id_by_repre_id[_repre_id] = version_id
+                            version_id_by_repre_id[_repre_id] = _version_id
 
                 version_docs = io.find(
                     {
