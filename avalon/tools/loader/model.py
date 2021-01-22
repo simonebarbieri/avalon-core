@@ -1,6 +1,9 @@
 import copy
 
-from ... import style
+from ... import (
+    style,
+    schema
+)
 from ...vendor.Qt import QtCore, QtGui
 from ...vendor import qtawesome
 
@@ -230,10 +233,11 @@ class SubsetsModel(TreeModel):
             frames = None
             duration = None
 
-        if item["schema"] == "avalon-core:subset-3.0":
-            families = item["data"]["families"]
-        else:
+        schema_maj_version, _ = schema.get_schema_version(item["schema"])
+        if schema_maj_version < 3:
             families = version_data.get("families", [None])
+        else:
+            families = item["data"]["families"]
 
         family = families[0]
         family_config = self.family_config_cache.family_config(family)
