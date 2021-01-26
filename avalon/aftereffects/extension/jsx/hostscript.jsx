@@ -296,41 +296,55 @@ function replaceItem(comp_id, path, item_name){
     app.endUndoGroup();
 }
 
-function renameItem(comp_id, new_name){
-    var item = app.project.itemByID(comp_id);
+function renameItem(item_id, new_name){
+    /**
+     * Renames item with 'item_id' to 'new_name'
+     *
+     * Args:
+     *    item_id (int): id to search item
+     *    new_name (str)
+     */
+    var item = app.project.itemByID(item_id);
     if (item){
         item.name = new_name;
     }else{
-        alert("There is no composition with "+ comp_id);
+        alert("There is no composition with "+ item_id);
     }
 }
 
-function deleteItem(comp_id){
-    var item = app.project.itemByID(comp_id);
+function deleteItem(item_id){
+    /**
+     *  Delete any 'item_id'
+     *
+     *  Not restricted only to comp, it could delete
+     *  any item with 'id'
+     */
+    var item = app.project.itemByID(item_id);
     if (item){
         item.remove();
     }else{
-        alert("There is no composition with "+ comp_id);
-    }  
+        alert("There is no composition with "+ item_id);
+    }
 }
 
 function getWorkArea(comp_id){
     /**
      * Returns information about workarea - are that will be
-     * rendered. All calculation will be done in Pype, 
+     * rendered. All calculation will be done in Pype,
      * easier to modify without redeploy of extension.
-     * 
-     * Returns dict
+     *
+     * Returns
+     *     (dict)
      */
     var item = app.project.itemByID(comp_id);
     if (item){
         return JSON.stringify({
-            "workAreaStart": item.displayStartFrame, 
+            "workAreaStart": item.displayStartFrame,
             "workAreaDuration": item.duration,
             "frameRate": item.frameRate});
     }else{
         alert("There is no composition with "+ comp_id);
-    }  
+    }
 }
 
 function setWorkArea(comp_id, workAreaStart, workAreaDuration, frameRate){
@@ -344,7 +358,7 @@ function setWorkArea(comp_id, workAreaStart, workAreaDuration, frameRate){
         item.frameRate = frameRate;
     }else{
         alert("There is no composition with "+ comp_id);
-    } 
+    }
 }
 
 function save(){
@@ -364,7 +378,7 @@ function saveAs(path){
 function getRenderInfo(){
     /***
         Get info from render queue.
-        Currently pulls only file name to parse extension and 
+        Currently pulls only file name to parse extension and
         if it is sequence in Python
     **/
     try{
@@ -377,11 +391,22 @@ function getRenderInfo(){
     var file_url = item.file.toString();
 
     return JSON.stringify({
-        "file_name": file_url            
+        "file_name": file_url
     })
 }
 
 function getAudioUrlForComp(comp_id){
+    /**
+     * Searches composition for audio layer
+     *
+     * Only single AVLayer is expected!
+     * Used for collecting Audio
+     *
+     * Args:
+     *    comp_id (int): id of composition
+     * Return:
+     *    (str) with url to audio content
+     */
     var item = app.project.itemByID(comp_id);
     if (item){
         for (i = 1; i <= item.numLayers; ++i){
@@ -401,7 +426,7 @@ function addItemAsLayerToComp(comp_id, item_id, found_comp){
     /**
      * Adds already imported FootageItem ('item_id') as a new
      * layer to composition ('comp_id').
-     * 
+     *
      * Args:
      *  comp_id (int): id of target composition
      *  item_id (int): FootageItem.id
@@ -424,17 +449,17 @@ function addItemAsLayerToComp(comp_id, item_id, found_comp){
 function importBackground(comp_id, composition_name, files_to_import){
     /**
      * Imports backgrounds images to existing or new composition.
-     * 
+     *
      * If comp_id is not provided, new composition is created, basic
      * values (width, heights, frameRatio) takes from first imported
      * image.
-     * 
+     *
      * Args:
      *   comp_id (int): id of existing composition (null if new)
-     *   composition_name (str): used when new composition 
+     *   composition_name (str): used when new composition
      *   files_to_import (list): list of absolute paths to import and
      *      add as layers
-     * 
+     *
      * Returns:
      *  (str): json representation (id, name, members)
      */
@@ -456,7 +481,7 @@ function importBackground(comp_id, composition_name, files_to_import){
             }
         }
     }
-       
+
     if (files_to_import){
         for (i = 0; i < files_to_import.length; ++i){
             item = _importItem(files_to_import[i]);
@@ -467,8 +492,8 @@ function importBackground(comp_id, composition_name, files_to_import){
             if (!comp){
                 folder = app.project.items.addFolder(composition_name);
                 imported_ids.push(folder.id);
-                comp = app.project.items.addComp(composition_name, item.width, 
-                    item.height, item.pixelAspect, 
+                comp = app.project.items.addComp(composition_name, item.width,
+                    item.height, item.pixelAspect,
                     1, 26.7);  // hardcode defaults
                 imported_ids.push(comp.id);
                 comp.parentFolder = folder;
@@ -477,7 +502,7 @@ function importBackground(comp_id, composition_name, files_to_import){
             item.parentFolder = folder;
 
             addItemAsLayerToComp(comp.id, item.id, comp);
-        }       
+        }
     }
     var item = {"name": comp.name,
                 "id": folder.id,
@@ -488,34 +513,128 @@ function importBackground(comp_id, composition_name, files_to_import){
 function reloadBackground(comp_id, composition_name, files_to_import){
     /**
      * Reloads existing composition.
-     * 
+     *
      * It deletes complete composition with encompassing folder, recreates
      * from scratch via 'importBackground' functionality.
-     * 
+     *
      * Args:
      *   comp_id (int): id of existing composition (null if new)
-     *   composition_name (str): used when new composition 
+     *   composition_name (str): used when new composition
      *   files_to_import (list): list of absolute paths to import and
      *      add as layers
-     * 
+     *
      * Returns:
      *  (str): json representation (id, name, members)
-     * 
+     *
      */
+    var imported_ids = []; // keep track of members of composition
     comp = app.project.itemByID(comp_id);
     folder = comp.parentFolder;
     if (folder){
-        folder.remove();
-    }else{
-        comp.remove();
+        renameItem(folder.id, composition_name);
+        imported_ids.push(folder.id);
     }
-    return importBackground(null, composition_name, files_to_import);
+    if (comp){
+        renameItem(comp.id, composition_name);
+        imported_ids.push(comp.id);
+    }
+
+    var existing_layer_names = [];
+    var existing_layer_ids = []; // because ExtendedScript doesnt have keys()
+    for (i = 1; i <= folder.items.length; ++i){
+        layer = folder.items[i];
+        //because comp.layers[i] doesnt have 'id' accessible
+        if (layer instanceof CompItem){
+            continue;
+        }
+        existing_layer_names.push(layer.name);
+        existing_layer_ids.push(layer.id);
+    }
+
+    var new_filenames = [];
+    if (files_to_import){
+        for (i = 0; i < files_to_import.length; ++i){
+            file_name = _get_file_name(files_to_import[i]);
+            new_filenames.push(file_name);
+
+            idx = existing_layer_names.indexOf(file_name);
+            if (idx >= 0){  // update
+                var layer_id = existing_layer_ids[idx];
+                replaceItem(layer_id, files_to_import[i], file_name);
+                imported_ids.push(layer_id);
+            }else{ // new layer
+                item = _importItem(files_to_import[i]);
+                if (!item){
+                    alert("No item for " + files_to_import[i] + ". Import failed.");
+                    return false;
+                }
+                imported_ids.push(item.id);
+                item.parentFolder = folder;
+                addItemAsLayerToComp(comp.id, item.id, comp);
+            }
+        }
+    }
+
+    _delete_obsolete_items(folder, new_filenames);
+
+    var item = {"name": comp.name,
+                "id": folder.id,
+                "members": imported_ids};
+
+    return JSON.stringify(item);
+}
+
+function _get_file_name(file_url){
+    /**
+     * Returns file name without extension from 'file_url'
+     *
+     * Args:
+     *    file_url (str): full absolute url
+     * Returns:
+     *    (str)
+     */
+    fp = new File(file_url);
+    file_name = fp.name.substring(0, fp.name.lastIndexOf("."));
+    return file_name;
+}
+
+function _delete_obsolete_items(folder, new_filenames){
+    /***
+     * Goes through 'folder' and removes layers not in new
+     * background
+     *
+     * Args:
+     *   folder (FolderItem)
+     *   new_filenames (array): list of layer names in new bg
+     */
+    // remove items in old, but not in new
+    delete_ids = []
+    for (i = 1; i <= folder.items.length; ++i){
+        layer = folder.items[i];
+        //because comp.layers[i] doesnt have 'id' accessible
+        if (layer instanceof CompItem){
+            continue;
+        }
+        if (new_filenames.indexOf(layer.name) < 0){
+            delete_ids.push(layer.id);
+        }
+    }
+    for (i = 0; i < delete_ids.length; ++i){
+        deleteItem(delete_ids[i]);
+    }
 }
 
 function _importItem(file_url){
-    fp = new File(file_url);
-    file_name = fp.name.substring(0, fp.name.lastIndexOf("."));
-    
+    /**
+     * Imports 'file_url' as new FootageItem
+     *
+     * Args:
+     *    file_url (str): file url with content
+     * Returns:
+     *    (FootageItem)
+     */
+    file_name = _get_file_name(file_url);
+
     //importFile prepared previously to return json
     item_json = importFile(file_url, file_name, JSON.stringify({"ImportAsType":"FOOTAGE"}));
     item_json = JSON.parse(item_json);
@@ -523,7 +642,7 @@ function _importItem(file_url){
 
     return item;
 }
- 
+
 // var img = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\image\\imageBG\\v013\\petr_test_Jungle_imageBG_v013.jpg';
 // var psd = 'c:\\projects\\petr_test\\assets\\locations\\Jungle\\publish\\workfile\\workfileArt\\v013\\petr_test_Jungle_workfileArt_v013.psd';
 // var mov = 'c:\\Users\\petrk\\Downloads\\Samples\\sample_iTunes.mov';
@@ -544,12 +663,9 @@ function _importItem(file_url){
 //$.writeln(importBackground(null, 'New comp', [img]));
 
 //deleteItem(600);
+//    'C:/projects/petr_test/assets/locations/Jungle/publish/background/backgroundComp/v002/03_FG_01_Layer_1.png',
 // files_to_import =[
-//     'C:/projects/petr_test/assets/locations/Jungle/publish/background/backgroundComp/v002/03_FG_01_Layer_1.png',
+
 //     'C:/projects/petr_test/assets/locations/Jungle/publish/background/backgroundComp/v002/03_FG_02_Layer_2.png'
 // ]
-// reloadBackground(707, 'Jungle_backgroundComp_001', files_to_import);
-
-
-
-
+// reloadBackground(1067, 'Jungle_backgroundComp_001', files_to_import);
