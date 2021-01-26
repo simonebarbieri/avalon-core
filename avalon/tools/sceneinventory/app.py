@@ -729,6 +729,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._subset_label = QtWidgets.QLabel("")
         self._repre_label = QtWidgets.QLabel("")
 
+        self.current_asset_btn = QtWidgets.QPushButton("Use current asset")
 
         main_layout = QtWidgets.QGridLayout(self)
 
@@ -739,6 +740,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         accept_btn.setFixedHeight(24)
 
         # Asset column
+        main_layout.addWidget(self.current_asset_btn, 0, 0)
         main_layout.addWidget(self._assets_box, 1, 0)
         main_layout.addWidget(self._asset_label, 2, 0)
         # Subset column
@@ -762,6 +764,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             self._combobox_value_changed
         )
         self._accept_btn.clicked.connect(self._on_accept)
+        self.current_asset_btn.clicked.connect(self._on_current_asset)
 
         self._items = items
         self._prepare_content_data()
@@ -1486,6 +1489,16 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             if repre_doc["name"] not in repre_names:
                 validation_state.repre_ok = False
                 break
+
+    def _on_current_asset(self):
+        # Set initial asset as current.
+        asset_name = api.Session["AVALON_ASSET"]
+        index = self._assets_box.findText(
+            asset_name, QtCore.Qt.MatchFixedString
+        )
+        if index >= 0:
+            print("Setting asset to {}".format(asset_name))
+            self._assets_box.setCurrentIndex(index)
 
     def _on_accept(self):
         # Use None when not a valid value or when placeholder value
