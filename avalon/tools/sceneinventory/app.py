@@ -729,11 +729,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._subset_label = QtWidgets.QLabel("")
         self._repre_label = QtWidgets.QLabel("")
 
-        main_layout = QtWidgets.QVBoxLayout()
-        context_layout = QtWidgets.QHBoxLayout()
-        asset_layout = QtWidgets.QVBoxLayout()
-        subset_layout = QtWidgets.QVBoxLayout()
-        repre_layout = QtWidgets.QVBoxLayout()
+
+        main_layout = QtWidgets.QGridLayout(self)
 
         accept_icon = qtawesome.icon("fa.check", color="white")
         accept_btn = QtWidgets.QPushButton()
@@ -741,17 +738,17 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         accept_btn.setFixedWidth(24)
         accept_btn.setFixedHeight(24)
 
-        asset_layout.addWidget(self._assets_box)
-        asset_layout.addWidget(self._asset_label)
-        subset_layout.addWidget(self._subsets_box)
-        subset_layout.addWidget(self._subset_label)
-        repre_layout.addWidget(self._representations_box)
-        repre_layout.addWidget(self._repre_label)
-
-        context_layout.addLayout(asset_layout)
-        context_layout.addLayout(subset_layout)
-        context_layout.addLayout(repre_layout)
-        context_layout.addWidget(accept_btn)
+        # Asset column
+        main_layout.addWidget(self._assets_box, 1, 0)
+        main_layout.addWidget(self._asset_label, 2, 0)
+        # Subset column
+        main_layout.addWidget(self._subsets_box, 1, 1)
+        main_layout.addWidget(self._subset_label, 2, 1)
+        # Representation column
+        main_layout.addWidget(self._representations_box, 1, 2)
+        main_layout.addWidget(self._repre_label, 2, 2)
+        # Btn column
+        main_layout.addWidget(accept_btn, 1, 3)
 
         self._accept_btn = accept_btn
 
@@ -765,9 +762,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             self._combobox_value_changed
         )
         self._accept_btn.clicked.connect(self._on_accept)
-
-        main_layout.addLayout(context_layout)
-        self.setLayout(main_layout)
 
         self._items = items
         self._prepare_content_data()
