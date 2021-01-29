@@ -6,6 +6,11 @@ indent: 4, maxerr: 50 */
 
 app.preferences.savePrefAsBool("General Section", "Show Welcome Screen", false) ;
 
+if(!Array.prototype.indexOf) {
+    var msg = "This extension requires Javascript engine. Please set it in:\n"+
+        "File>Project Settings>Expressions>Expressions Engine: Javascript";
+    alert(msg);
+}
 
 function sayHello(){
     alert("hello from ExtendScript");
