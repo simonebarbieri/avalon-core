@@ -1,5 +1,9 @@
 # Photoshop Integration
 
+Requirements: This extension requires use of Javascript engine, which is 
+available since CC 16.0.
+Please check your File>Project Settings>Expressions>Expressions Engine
+
 ## Setup
 
 The After Effects integration requires two components to work; `extension` and `server`.
@@ -47,10 +51,12 @@ ZXPSignCmd -sign {path to avalon-core}\avalon\aftereffects\extension {path to av
 
 These plugins were made with the [polly config](https://github.com/mindbender-studio/config). To fully integrate and load, you will have to use this config and add `image` to the [integration plugin](https://github.com/mindbender-studio/config/blob/master/polly/plugins/publish/integrate_asset.py).
 
+Expected deployed extension location on default Windows:
+`c:\Program Files (x86)\Common Files\Adobe\CEP\extensions\com.pype.AE.panel`
 
 For easier debugging of Javascript:
 https://community.adobe.com/t5/download-install/adobe-extension-debuger-problem/td-p/10911704?page=1
-Add --enable-blink-features=ShadowDOMV0,CustomElementsV0 when starting Chrome
+Add (optional) --enable-blink-features=ShadowDOMV0,CustomElementsV0 when starting Chrome
 then localhost:8092
 
 Or use Visual Studio Code https://medium.com/adobetech/extendscript-debugger-for-visual-studio-code-public-release-a2ff6161fa01 
