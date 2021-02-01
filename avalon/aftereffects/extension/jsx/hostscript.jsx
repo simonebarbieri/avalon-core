@@ -6,6 +6,16 @@ indent: 4, maxerr: 50 */
 
 app.preferences.savePrefAsBool("General Section", "Show Welcome Screen", false) ;
 
+if(!Array.prototype.indexOf) {
+    Array.prototype.indexOf = function ( item ) {
+        var index = 0, length = this.length;
+        for ( ; index < length; index++ ) {
+                  if ( this[index] === item )
+                        return index;
+        }
+        return -1;
+        };
+}
 
 function sayHello(){
     alert("hello from ExtendScript");
