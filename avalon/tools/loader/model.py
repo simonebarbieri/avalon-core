@@ -239,7 +239,10 @@ class SubsetsModel(TreeModel):
         else:
             families = item["data"]["families"]
 
-        family = families[0]
+        family = None
+        if families:
+            family = families[0]
+
         family_config = self.family_config_cache.family_config(family)
 
         item.update({
