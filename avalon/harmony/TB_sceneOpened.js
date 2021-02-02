@@ -7,6 +7,13 @@ This script implements client communication with Avalon server to bridge
 gap between Python and QtScript.
 
 */
+
+var LD_OPENHARMONY_PATH = System.getenv('LIB_OPENHARMONY_PATH');
+LD_OPENHARMONY_PATH = LD_OPENHARMONY_PATH + '/openHarmony.js';
+LD_OPENHARMONY_PATH = LD_OPENHARMONY_PATH.replace(/\\/g, "/");
+include(LD_OPENHARMONY_PATH);
+this.__proto__['$'] = $;
+
 function Client() {
     var self = this;
     /** socket */
