@@ -91,22 +91,17 @@ def safe_excepthook(*args):
     traceback.print_exception(*args)
 
 
-def launch(application, workfile=None):
+def launch(*subprocess_args):
     """Starts the websocket server that will be hosted
        in the Photoshop extension.
     """
     from avalon import api, aftereffects
 
-    # check if workfile available and add it to executable
-    args = [application]
-    if workfile:
-        args.append(workfile)
-
     api.install(aftereffects)
     sys.excepthook = safe_excepthook
 
     # Launch aftereffects and the websocket server.
-    process = subprocess.Popen(args, stdout=subprocess.PIPE)
+    process = subprocess.Popen(subprocess_args, stdout=subprocess.PIPE)
 
     websocket_server = WebSocketServer()
     websocket_server.websocket_thread.start()
