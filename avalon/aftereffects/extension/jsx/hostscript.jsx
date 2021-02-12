@@ -7,9 +7,14 @@ indent: 4, maxerr: 50 */
 app.preferences.savePrefAsBool("General Section", "Show Welcome Screen", false) ;
 
 if(!Array.prototype.indexOf) {
-    var msg = "This extension requires Javascript engine. Please set it in:\n"+
-        "File>Project Settings>Expressions>Expressions Engine: Javascript";
-    alert(msg);
+    Array.prototype.indexOf = function ( item ) {
+        var index = 0, length = this.length;
+        for ( ; index < length; index++ ) {
+                  if ( this[index] === item )
+                        return index;
+        }
+        return -1;
+        };
 }
 
 function sayHello(){

@@ -85,7 +85,6 @@ def stub():
 def safe_excepthook(*args):
     traceback.print_exception(*args)
 
-
 def launch(application, workfile):
     """Starts the websocket server that will be hosted
        in the Photoshop extension.
@@ -93,7 +92,6 @@ def launch(application, workfile):
     from avalon import api, photoshop
 
     # check if workfile available and add it to executable
-
     args = [application]
     if workfile:
         args.append(workfile)
