@@ -73,7 +73,7 @@ def main_thread_listen():
     callback()
 
 
-def launch(application_path):
+def launch(application_path, *args):
     """Set Harmony for launch.
 
     Launches Harmony and the server, then starts listening on the main thread

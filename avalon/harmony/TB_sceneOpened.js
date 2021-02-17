@@ -483,7 +483,7 @@ function ensureSceneSettings() {
   var app = QCoreApplication.instance();
   app.avalonClient.send(
     {
-      "module": "pype.hosts.harmony",
+      "module": "pype.hosts.harmony.api",
       "method": "ensure_scene_settings",
       "args": []
     },
