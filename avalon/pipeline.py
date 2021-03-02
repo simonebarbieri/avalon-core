@@ -34,7 +34,7 @@ from . import (
 )
 
 from .vendor import six
-from pype.api import Anatomy
+from pype.lib import Anatomy
 
 self = sys.modules[__name__]
 self._is_installed = False
