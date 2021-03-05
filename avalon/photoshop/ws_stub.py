@@ -1,10 +1,11 @@
-from pype.modules.websocket_server import WebSocketServer
 """
     Stub handling connection from server to client.
     Used anywhere solution is calling client methods.
 """
 import json
 from collections import namedtuple
+from avalon.tools.webserver.app import WebServerTool
+from wsrpc_aiohttp import WebSocketAsync
 
 
 class PhotoshopServerStub():
@@ -16,8 +17,23 @@ class PhotoshopServerStub():
     """
 
     def __init__(self):
-        self.websocketserver = WebSocketServer.get_instance()
-        self.client = self.websocketserver.get_client()
+        self.websocketserver = WebServerTool.get_instance()
+        self.client = self.get_client()
+
+    @staticmethod
+    def get_client():
+        """
+            Return first connected client to WebSocket
+            TODO implement selection by Route
+        :return: <WebSocketAsync> client
+        """
+        clients = WebSocketAsync.get_clients()
+        client = None
+        if len(clients) > 0:
+            key = list(clients.keys())[0]
+            client = clients.get(key)
+
+        return client
 
     def open(self, path):
         """
