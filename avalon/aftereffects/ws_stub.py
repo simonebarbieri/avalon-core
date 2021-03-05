@@ -41,9 +41,23 @@ class AfterEffectsServerStub():
     """
 
     def __init__(self):
-        self.client = self.websocketserver.get_client()
         self.websocketserver = WebServerTool.get_instance()
+        self.client = self.get_client()
 
+    @staticmethod
+    def get_client():
+        """
+            Return first connected client to WebSocket
+            TODO implement selection by Route
+        :return: <WebSocketAsync> client
+        """
+        clients = WebSocketAsync.get_clients()
+        client = None
+        if len(clients) > 0:
+            key = list(clients.keys())[0]
+            client = clients.get(key)
+
+        return client
 
     def open(self, path):
         """
