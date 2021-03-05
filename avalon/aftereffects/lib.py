@@ -10,11 +10,10 @@ import logging
 
 from ..vendor.Qt import QtWidgets
 from ..tools import workfiles
-
-from pype.modules.websocket_server import WebSocketServer
 from pype.modules.websocket_server.stubs.aftereffects_server_stub import (
     AfterEffectsServerStub
 )
+from avalon.tools.webserver.app import WebServerTool
 
 self = sys.modules[__name__]
 self.callback_queue = None
@@ -103,8 +102,8 @@ def launch(*subprocess_args):
     # Launch aftereffects and the websocket server.
     process = subprocess.Popen(subprocess_args, stdout=subprocess.PIPE)
 
-    websocket_server = WebSocketServer()
-    websocket_server.websocket_thread.start()
+    websocket_server = WebServerTool()
+    websocket_server.start_server()
 
     while True:
         if process.poll() is not None:
