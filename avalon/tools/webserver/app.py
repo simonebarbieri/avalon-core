@@ -1,3 +1,8 @@
+"""This Webserver tool is python 3 specific.
+
+Don't import directly to avalon.tools or implementation of Python 2 hosts
+would break.
+"""
 import os
 import logging
 import urllib
