@@ -7,6 +7,9 @@ import importlib
 import time
 import traceback
 import logging
+from wsrpc_aiohttp import (
+    WebSocketAsync
+)
 
 from ..vendor.Qt import QtWidgets
 from ..tools import workfiles
@@ -103,6 +106,8 @@ def launch(*subprocess_args):
     process = subprocess.Popen(subprocess_args, stdout=subprocess.PIPE)
 
     websocket_server = WebServerTool()
+    # Add Websocket route
+    websocket_server.add_route("*", "/ws/", WebSocketAsync)
     websocket_server.start_server()
 
     while True:
