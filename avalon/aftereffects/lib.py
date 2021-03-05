@@ -18,8 +18,8 @@ from avalon.tools.webserver.app import WebServerTool
 self = sys.modules[__name__]
 self.callback_queue = None
 
-self.log = logging.getLogger(__name__)
-self.log.setLevel(logging.DEBUG)
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
