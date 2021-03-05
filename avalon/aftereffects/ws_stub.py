@@ -1,4 +1,3 @@
-from pype.modules.websocket_server import WebSocketServer
 """
     Stub handling connection from server to client.
     Used anywhere solution is calling client methods.
@@ -7,6 +6,10 @@ import json
 import attr
 
 import logging
+
+from avalon.tools.webserver.app import WebServerTool
+from wsrpc_aiohttp import WebSocketAsync
+
 log = logging.getLogger(__name__)
 
 
@@ -38,8 +41,9 @@ class AfterEffectsServerStub():
     """
 
     def __init__(self):
-        self.websocketserver = WebSocketServer.get_instance()
         self.client = self.websocketserver.get_client()
+        self.websocketserver = WebServerTool.get_instance()
+
 
     def open(self, path):
         """
