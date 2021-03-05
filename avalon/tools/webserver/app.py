@@ -45,7 +45,7 @@ class WebServerTool:
         self.app.router.add_static(*args, **kwargs)
 
     def start_server(self):
-        if self.webserver_thread:
+        if self.webserver_thread and not self.webserver_thread.is_alive():
             self.webserver_thread.start()
 
     def stop_server(self):
