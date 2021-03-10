@@ -167,8 +167,10 @@ def launch(*subprocess_args):
     # Add Websocket route
     websocket_server.add_route("*", "/ws/", WebSocketAsync)
     # Add after effects route to websocket handler
+    route_name = 'AfterEffects'
+    print("Adding {} route".format(route_name))
     WebSocketAsync.add_route(
-        AfterEffectsRoute.__class__.__name__, AfterEffectsRoute
+        route_name, AfterEffectsRoute
     )
     websocket_server.start_server()
 
