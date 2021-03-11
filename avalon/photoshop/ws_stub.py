@@ -3,7 +3,6 @@
     Used anywhere solution is calling client methods.
 """
 import json
-from collections import namedtuple
 from avalon.tools.webserver.app import WebServerTool
 from wsrpc_aiohttp import WebSocketAsync
 import attr
@@ -253,7 +252,7 @@ class PhotoshopServerStub:
         Returns(string): full path with name
         """
         res = self.websocketserver.call(
-              self.client.call('Photoshop.get_active_document_full_name'))
+            self.client.call('Photoshop.get_active_document_full_name'))
 
         return res
 
@@ -336,7 +335,7 @@ class PhotoshopServerStub:
             temp_layers_meta = {}
             for layer_meta in layers_data:
                 layer_id = layer_meta.get("uuid") or \
-                           (layer_meta.get("members")[0])
+                    (layer_meta.get("members")[0])
                 temp_layers_meta[layer_id] = layer_meta
             layers_data = temp_layers_meta
         else:

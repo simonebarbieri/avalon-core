@@ -171,7 +171,7 @@ class AfterEffectsServerStub():
         Returns(string): file name
         """
         res = self.websocketserver.call(self.client.call(
-              'AfterEffects.get_active_document_full_name'))
+            'AfterEffects.get_active_document_full_name'))
 
         return res
 
@@ -181,7 +181,7 @@ class AfterEffectsServerStub():
         Returns(string): file name
         """
         res = self.websocketserver.call(self.client.call(
-              'AfterEffects.get_active_document_name'))
+            'AfterEffects.get_active_document_name'))
 
         return res
 
@@ -202,12 +202,12 @@ class AfterEffectsServerStub():
         Returns:
             (list) of namedtuples
         """
-        res = self.websocketserver.call(self.client.call
-                                        ('AfterEffects.get_items',
-                                         comps=comps,
-                                         folders=folders,
-                                         footages=footages)
-                                        )
+        res = self.websocketserver.call(
+            self.client.call('AfterEffects.get_items',
+                             comps=comps,
+                             folders=folders,
+                             footages=footages)
+              )
         return self._to_records(res)
 
     def get_selected_items(self, comps, folders=False, footages=False):
@@ -240,12 +240,12 @@ class AfterEffectsServerStub():
                 config
 
         """
-        res = self.websocketserver.call(self.client.call(
-                'AfterEffects.import_file',
-                path=path,
-                item_name=item_name,
-                import_options=import_options)
-              )
+        res = self.websocketserver.call(
+            self.client.call('AfterEffects.import_file',
+                             path=path,
+                             item_name=item_name,
+                             import_options=import_options)
+            )
         records = self._to_records(res)
         if records:
             return records.pop()
