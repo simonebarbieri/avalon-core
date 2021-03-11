@@ -1,26 +1,29 @@
-import contextlib
-import subprocess
 import os
 import sys
+import contextlib
+import subprocess
 import queue
 import importlib
 import time
 import traceback
 import logging
+import functools
+
+from wsrpc_aiohttp import (
+    WebSocketRoute,
+    WebSocketAsync
+)
 
 from ..vendor.Qt import QtWidgets
 from ..tools import workfiles
-
-from pype.modules.websocket_server import WebSocketServer
-from pype.modules.websocket_server.stubs.aftereffects_server_stub import (
-    AfterEffectsServerStub
-)
+from avalon.tools.webserver.app import WebServerTool
+from .ws_stub import AfterEffectsServerStub
 
 self = sys.modules[__name__]
 self.callback_queue = None
 
-self.log = logging.getLogger(__name__)
-self.log.setLevel(logging.DEBUG)
+log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
@@ -72,6 +75,63 @@ class ConnectionNotEstablishedYet(Exception):
     pass
 
 
+class AfterEffectsRoute(WebSocketRoute):
+    """
+        One route, mimicking external application (like Harmony, etc).
+        All functions could be called from client.
+        'do_notify' function calls function on the client - mimicking
+            notification after long running job on the server or similar
+    """
+    instance = None
+
+    def init(self, **kwargs):
+        # Python __init__ must be return "self".
+        # This method might return anything.
+        log.debug("someone called AfterEffects route")
+        self.instance = self
+        return kwargs
+
+    # server functions
+    async def ping(self):
+        log.debug("someone called AfterEffects route ping")
+
+    # This method calls function on the client side
+    # client functions
+
+    async def read(self):
+        log.debug("aftereffects.read client calls server server calls "
+                  "aftereffects client")
+        return await self.socket.call('aftereffects.read')
+
+    # panel routes for tools
+    async def creator_route(self):
+        self._tool_route("creator")
+
+    async def workfiles_route(self):
+        self._tool_route("workfiles")
+
+    async def loader_route(self):
+        self._tool_route("loader")
+
+    async def publish_route(self):
+        self._tool_route("publish")
+
+    async def sceneinventory_route(self):
+        self._tool_route("sceneinventory")
+
+    async def projectmanager_route(self):
+        self._tool_route("projectmanager")
+
+    def _tool_route(self, tool_name):
+        """The address accessed when clicking on the buttons."""
+        partial_method = functools.partial(show, tool_name)
+
+        execute_in_main_thread(partial_method)
+
+        # Required return statement.
+        return "nothing"
+
+
 def stub():
     """
         Convenience function to get server RPC stub to call methods directed
@@ -103,8 +163,16 @@ def launch(*subprocess_args):
     # Launch aftereffects and the websocket server.
     process = subprocess.Popen(subprocess_args, stdout=subprocess.PIPE)
 
-    websocket_server = WebSocketServer()
-    websocket_server.websocket_thread.start()
+    websocket_server = WebServerTool()
+    # Add Websocket route
+    websocket_server.add_route("*", "/ws/", WebSocketAsync)
+    # Add after effects route to websocket handler
+    route_name = 'AfterEffects'
+    print("Adding {} route".format(route_name))
+    WebSocketAsync.add_route(
+        route_name, AfterEffectsRoute
+    )
+    websocket_server.start_server()
 
     while True:
         if process.poll() is not None:
