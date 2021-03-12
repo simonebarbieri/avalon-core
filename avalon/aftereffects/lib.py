@@ -119,8 +119,8 @@ class AfterEffectsRoute(WebSocketRoute):
     async def sceneinventory_route(self):
         self._tool_route("sceneinventory")
 
-    async def projectmanager_route(self):
-        self._tool_route("projectmanager")
+    async def subsetmanager_route(self):
+        self._tool_route("subsetmanager")
 
     def _tool_route(self, tool_name):
         """The address accessed when clicking on the buttons."""
