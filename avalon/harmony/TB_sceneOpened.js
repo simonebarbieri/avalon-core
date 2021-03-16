@@ -388,7 +388,7 @@ function start() {
         app.avalonClient.send({
             'module': 'avalon.harmony.lib',
             'method': 'show',
-            'args': ['avalon.tools.workfiles']
+            'args': ['pype.tools.workfiles']
         }, false);
     };
     if (app.avalonMenu == null) {
