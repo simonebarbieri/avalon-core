@@ -354,6 +354,17 @@ class SubsetsModel(TreeModel):
 
             last_versions_by_subset_id[subset_id] = master_version
 
+        version_ids = set()
+        for subset_id, doc in last_versions_by_subset_id.items():
+            version_ids.add(doc["_id"])
+
+        query = self._repre_per_version_pipeline(list(version_ids))
+        repre_info_by_version_id = {}
+        for doc in self.dbcon.aggregate(query):
+            if self._doc_fetching_stop:
+                return
+            repre_info_by_version_id[doc["_id"]] = doc
+
         self._doc_payload = {
             "asset_docs_by_id": asset_docs_by_id,
             "subset_docs_by_id": subset_docs_by_id,
@@ -621,6 +632,68 @@ class SubsetsModel(TreeModel):
                 return self.column_labels_mapping.get(key) or key
 
         super(TreeModel, self).headerData(section, orientation, role)
+
+
+    def _repre_per_version_pipeline(self, version_ids):
+        # TODO fix 'studio'
+        query = [
+                {"$match": {"parent": {"$in": version_ids},
+                            "type": "representation"}},
+                {"$unwind": "$files"},
+                {'$addFields': {
+                    'order_local': {
+                        '$filter': {'input': '$files.sites', 'as': 'p',
+                                    'cond': {'$eq': ['$$p.name', 'studio']}
+                                    }}
+                }},
+                {'$addFields': {
+                    'progress_local': {'$first': {
+                        '$cond': [{'$size': "$order_local.progress"},
+                                  "$order_local.progress",
+                                  # if exists created_dt count is as available
+                                  {'$cond': [
+                                      {'$size': "$order_local.created_dt"},
+                                      [1],
+                                      [0]
+                                  ]}
+                                  ]}}
+                }},
+                # {'$addFields': {
+                #     'progress_remote': {'$first': {
+                #         '$cond': [{'$size': "$order_remote.progress"},
+                #                   "$order_remote.progress",
+                #                   {'$cond': [
+                #                       {'$size': "$order_remote.created_dt"},
+                #                       [1],
+                #                       [0]
+                #                   ]}
+                #                   ]}},
+                #     'progress_local': {'$first': {
+                #         '$cond': [{'$size': "$order_local.progress"},
+                #                   "$order_local.progress",
+                #                   {'$cond': [
+                #                       {'$size': "$order_local.created_dt"},
+                #                       [1],
+                #                       [0]
+                #                   ]}
+                #                   ]}}
+                # }},
+                {'$group': {  # first group by repre
+                    '_id': '$_id',
+                    'parent': {'$first': '$parent'},
+                    'files_count': {'$sum': 1},
+                    'files_avail': {'$sum': "$progress_local"},
+                    'avail_ratio': {'$first': {
+                        '$divide': [{'$sum': "$progress_local"}, {'$sum': 1}]}}
+                }},
+                {'$group': {  # second group by parent, eg version_id
+                    '_id': '$parent',
+                    'repre_count': {'$sum': 1},  # total representations
+                    # fully available representation for site
+                    'avail_repre': {'$sum': "$avail_ratio"}
+                }},
+        ]
+        return query
 
 
 class GroupMemberFilterProxyModel(QtCore.QSortFilterProxyModel):
