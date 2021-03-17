@@ -11,6 +11,8 @@ from ..models import TreeModel, Item
 from .. import lib
 from ...lib import MasterVersionType
 
+from pype.api import get_project_settings
+
 
 def is_filtering_recursible():
     """Does Qt binding support recursive filtering for QSortFilterProxyModel?
@@ -108,6 +110,15 @@ class SubsetsModel(TreeModel):
 
         self.asset_doc_projection = asset_doc_projection
         self.subset_doc_projection = subset_doc_projection
+
+        self.sync_server_settings = None
+        proj_settings = get_project_settings(dbcon.Session["AVALON_PROJECT"])
+        if proj_settings.get('global').get('sync_server')['enabled']:
+            self.sync_server_settings = proj_settings.get('global').\
+                get('sync_server')
+            self.Columns.append("repre_info")
+            self.column_labels_mapping["repre_info"] = "Repre info"
+            self.repre_icons = self._get_repre_icons()
 
         self.columns_index = dict(
             (key, idx) for idx, key in enumerate(self.Columns)
@@ -259,8 +270,15 @@ class SubsetsModel(TreeModel):
             "duration": duration,
             "handles": handles,
             "frames": frames,
-            "step": version_data.get("step", None)
+            "step": version_data.get("step", None),
         })
+
+        repre_info = item.get("repre_info")
+        if repre_info:
+            repres = "{}/{}".format(int(repre_info['avail_repre']),
+                                    int(repre_info['repre_count']))
+            item["repre_info"] = repres
+            item["repre_icon"] = self.repre_icons.get(repre_info["provider"])
 
     def _fetch(self):
         asset_docs = self.dbcon.find(
@@ -354,22 +372,29 @@ class SubsetsModel(TreeModel):
 
             last_versions_by_subset_id[subset_id] = master_version
 
-        version_ids = set()
-        for subset_id, doc in last_versions_by_subset_id.items():
-            version_ids.add(doc["_id"])
-
-        query = self._repre_per_version_pipeline(list(version_ids))
-        repre_info_by_version_id = {}
-        for doc in self.dbcon.aggregate(query):
-            if self._doc_fetching_stop:
-                return
-            repre_info_by_version_id[doc["_id"]] = doc
-
         self._doc_payload = {
             "asset_docs_by_id": asset_docs_by_id,
             "subset_docs_by_id": subset_docs_by_id,
             "last_versions_by_subset_id": last_versions_by_subset_id
         }
+
+        if self.sync_server_settings:
+            version_ids = set()
+            for subset_id, doc in last_versions_by_subset_id.items():
+                version_ids.add(doc["_id"])
+
+            site = 'studio'  # TODO
+            query = self._repre_per_version_pipeline(list(version_ids), site)
+
+            repre_info = {}
+            for doc in self.dbcon.aggregate(query):
+                if self._doc_fetching_stop:
+                    return
+                doc["provider"] = site
+                repre_info[doc["_id"]] = doc
+
+            self._doc_payload["repre_info_by_version_id"] = repre_info
+
         self.doc_fetched.emit()
 
     def fetch_subset_and_version(self):
@@ -411,6 +436,11 @@ class SubsetsModel(TreeModel):
         last_versions_by_subset_id = self._doc_payload.get(
             "last_versions_by_subset_id"
         )
+
+        repre_info_by_version_id = self._doc_payload.get(
+            "repre_info_by_version_id"
+        )
+
         if (
             asset_docs_by_id is None
             or subset_docs_by_id is None
@@ -422,7 +452,8 @@ class SubsetsModel(TreeModel):
             return
 
         self._fill_subset_items(
-            asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id
+            asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id,
+            repre_info_by_version_id
         )
 
     def create_multiasset_group(
@@ -450,7 +481,8 @@ class SubsetsModel(TreeModel):
         return merge_group
 
     def _fill_subset_items(
-        self, asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id
+        self, asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id,
+        repre_info_by_version_id
     ):
         _groups_tuple = self.groups_config.split_subsets_for_groups(
             subset_docs_by_id.values(), self._grouping
@@ -538,6 +570,8 @@ class SubsetsModel(TreeModel):
                     subset_doc["_id"]
                 )
                 data["last_version"] = last_version
+                data["repre_info"] = repre_info_by_version_id.get(
+                    last_version["_id"])
 
                 item = Item()
                 item.update(data)
@@ -606,6 +640,10 @@ class SubsetsModel(TreeModel):
                 item = index.internalPointer()
                 return item.get("familyIcon", None)
 
+            if index.column() == self.columns_index.get("repre_info"):
+                item = index.internalPointer()
+                return item.get("repre_icon", None)
+
         elif role == QtCore.Qt.ForegroundRole:
             item = index.internalPointer()
             version_doc = item.get("version_document")
@@ -634,8 +672,20 @@ class SubsetsModel(TreeModel):
         super(TreeModel, self).headerData(section, orientation, role)
 
 
-    def _repre_per_version_pipeline(self, version_ids):
-        # TODO fix 'studio'
+    def _get_repre_icons(self):
+        import pype.modules.sync_server as sync_server
+        import os
+        resource_path = os.path.dirname(sync_server.__file__)
+        resource_path = os.path.join(resource_path,
+                                     "providers", "resources")
+        icons = {}
+        for provider in ['studio', 'local_drive']:  # TODO get from sync module
+            pix_url = "{}/{}.png".format(resource_path, provider)
+            icons[provider] = QtGui.QIcon(pix_url)
+
+        return icons
+
+    def _repre_per_version_pipeline(self, version_ids, site):
         query = [
                 {"$match": {"parent": {"$in": version_ids},
                             "type": "representation"}},
@@ -643,7 +693,7 @@ class SubsetsModel(TreeModel):
                 {'$addFields': {
                     'order_local': {
                         '$filter': {'input': '$files.sites', 'as': 'p',
-                                    'cond': {'$eq': ['$$p.name', 'studio']}
+                                    'cond': {'$eq': ['$$p.name', site]}
                                     }}
                 }},
                 {'$addFields': {
@@ -658,26 +708,6 @@ class SubsetsModel(TreeModel):
                                   ]}
                                   ]}}
                 }},
-                # {'$addFields': {
-                #     'progress_remote': {'$first': {
-                #         '$cond': [{'$size': "$order_remote.progress"},
-                #                   "$order_remote.progress",
-                #                   {'$cond': [
-                #                       {'$size': "$order_remote.created_dt"},
-                #                       [1],
-                #                       [0]
-                #                   ]}
-                #                   ]}},
-                #     'progress_local': {'$first': {
-                #         '$cond': [{'$size': "$order_local.progress"},
-                #                   "$order_local.progress",
-                #                   {'$cond': [
-                #                       {'$size': "$order_local.created_dt"},
-                #                       [1],
-                #                       [0]
-                #                   ]}
-                #                   ]}}
-                # }},
                 {'$group': {  # first group by repre
                     '_id': '$_id',
                     'parent': {'$first': '$parent'},
