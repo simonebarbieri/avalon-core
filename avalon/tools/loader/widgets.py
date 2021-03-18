@@ -16,12 +16,13 @@ from ...lib import MasterVersionType
 from .. import lib as tools_lib
 from ..delegates import VersionDelegate, PrettyTimeDelegate
 from ..widgets import OptionalMenu, OptionalAction, OptionDialog
-from ..views import TreeViewSpinner
+from ..views import TreeViewSpinner, DeselectableTreeView
 
 from .model import (
     SubsetsModel,
     SubsetFilterProxyModel,
     FamiliesFilterProxyModel,
+    RepresentationModel
 )
 
 
@@ -970,3 +971,137 @@ class FamilyListWidget(QtWidgets.QListWidget):
         menu.addAction(state_unchecked)
 
         menu.exec_(globalpos)
+
+
+class RepresentationWidget(QtWidgets.QWidget):
+
+    default_widths = (
+        ("name", 100),
+        ("asset", 110),
+        ("subset", 100),
+        ("active_site", 10),
+        ("remote_site", 10)
+    )
+
+    default_hidden = ["asset", "subset"]
+
+    def __init__(self, dbcon, parent=None):
+        super(RepresentationWidget, self).__init__(parent=parent)
+
+        self.dbcon = dbcon
+        headers = [item[0] for item in self.default_widths]
+
+        model = RepresentationModel(dbcon, headers, [])
+
+        tree_view = DeselectableTreeView()
+        tree_view.setModel(model)
+        tree_view.setAllColumnsShowFocus(True)
+        tree_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        tree_view.setSelectionMode(
+            QtWidgets.QAbstractItemView.ExtendedSelection)
+        tree_view.setSortingEnabled(True)
+        tree_view.sortByColumn(1, QtCore.Qt.AscendingOrder)
+        tree_view.setAlternatingRowColors(True)
+
+        for column_name, width in self.default_widths:
+            idx = model.Columns.index(column_name)
+            tree_view.setColumnWidth(idx, width)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(tree_view)
+
+        # self.itemChanged.connect(self._on_item_changed)
+        tree_view.customContextMenuRequested.connect(self.on_context_menu)
+
+        self.tree_view = tree_view
+        self.model = model
+
+        for column in self.default_hidden:
+            self.change_visibility(column, False)
+
+        self.model.refresh()
+
+    def show_right_mouse_menu(self, pos):
+        """Build RMB menu under mouse at current position (within widget)"""
+        pass
+        # Get mouse position
+        # globalpos = self.viewport().mapToGlobal(pos)
+        #
+        # menu = QtWidgets.QMenu(self)
+        #
+        # # Add enable all action
+        # download = QtWidgets.QAction(menu, text="Download")
+        # download.triggered.connect(
+        #     lambda: self._set_download('studio'))
+        #
+        # menu.addAction(download)
+        #
+        # menu.exec_(globalpos)
+
+    def on_context_menu(self, point):
+        """Shows menu with loader actions on Right-click.
+
+        Registered actions are filtered by selection and help of
+        `loaders_from_representation` from avalon api. Intersection of actions
+        is shown when more subset is selected. When there are not available
+        actions for selected subsets then special action is shown (works as
+        info message to user): "*No compatible loaders for your selection"
+
+        """
+        point_index = self.tree_view.indexAt(point)
+        if not point_index.isValid():
+            return
+
+        # Get selected subsets without groups
+        selection = self.tree_view.selectionModel()
+        rows = selection.selectedRows(column=0)
+
+        items = []
+        for row_index in rows:
+            item = row_index.data(self.model.ItemRole)
+            items.append(item)
+
+        # Get all representation->loader combinations available for the
+        # index under the cursor, so we can list the user the options.
+        available_loaders = api.discover(api.Loader)
+
+        loaders = list()
+        for loader in available_loaders:
+            if hasattr(loader, "add_site_to_representation"):
+                loaders.append(loader)
+
+        menu = OptionalMenu(self)
+        if not loaders:
+            # no loaders available
+            submsg = "your selection."
+
+            msg = "No compatible loaders for {}".format(submsg)
+            self.echo(msg)
+
+            icon = qtawesome.icon(
+                "fa.exclamation",
+                color=QtGui.QColor(255, 51, 0)
+            )
+
+            action = OptionalAction(("*" + msg), icon, False, menu)
+            menu.addAction(action)
+        else:
+            action = OptionalAction(("*" + " Add site"), None, False, menu)
+            menu.addAction(action)
+
+        # Show the context action menu
+        global_point = self.tree_view.mapToGlobal(point)
+        action = menu.exec_(global_point)
+
+    def _set_download(self):
+        pass
+
+    def change_visibility(self, column_name, visible):
+        """
+            Hides or shows particular 'column_name'.
+
+            "asset" and "subset" columns should be visible only in multiselect
+        """
+        index = self.model.Columns.index(column_name)
+        self.tree_view.setColumnHidden(index, not visible)

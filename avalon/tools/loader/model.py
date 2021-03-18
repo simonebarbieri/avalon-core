@@ -118,7 +118,7 @@ class SubsetsModel(TreeModel):
                 get('sync_server')
             self.Columns.append("repre_info")
             self.column_labels_mapping["repre_info"] = "Repre info"
-            self.repre_icons = self._get_repre_icons()
+            self.repre_icons = get_repre_icons()
 
         self.columns_index = dict(
             (key, idx) for idx, key in enumerate(self.Columns)
@@ -671,20 +671,6 @@ class SubsetsModel(TreeModel):
 
         super(TreeModel, self).headerData(section, orientation, role)
 
-
-    def _get_repre_icons(self):
-        import pype.modules.sync_server as sync_server
-        import os
-        resource_path = os.path.dirname(sync_server.__file__)
-        resource_path = os.path.join(resource_path,
-                                     "providers", "resources")
-        icons = {}
-        for provider in ['studio', 'local_drive']:  # TODO get from sync module
-            pix_url = "{}/{}.png".format(resource_path, provider)
-            icons[provider] = QtGui.QIcon(pix_url)
-
-        return icons
-
     def _repre_per_version_pipeline(self, version_ids, site):
         query = [
                 {"$match": {"parent": {"$in": version_ids},
@@ -829,3 +815,142 @@ class FamiliesFilterProxyModel(GroupMemberFilterProxyModel):
             self.setSortRole(model.SortDescendingRole)
 
         super(FamiliesFilterProxyModel, self).sort(column, order)
+
+
+class RepresentationModel(TreeModel):
+
+    doc_fetched = QtCore.Signal()
+    refreshed = QtCore.Signal(bool)
+
+    Columns = [
+        "name",
+        "subset",
+        "asset",
+        "active_site",
+        "remote_site"
+    ]
+
+    def __init__(self, dbconn, header, version_ids):
+        super(RepresentationModel, self).__init__()
+        self.dbcon = dbconn
+        self._data = []
+        self._header = header
+        self.version_ids = version_ids
+
+        self.active_site = 'studio'  # TODO
+        self.remote_site = 'gdrive'  # TODO
+
+        self.doc_fetched.connect(self.on_doc_fetched)
+
+        self._docs = {}
+        self.repre_icons = get_repre_icons()
+
+    def set_version_ids(self, version_ids):
+        self.version_ids = version_ids
+        self.refresh()
+
+    def data(self, index, role):
+        if role == QtCore.Qt.DecorationRole:
+            if index.column() == self.Columns.index("active_site"):
+                item = index.internalPointer()
+                return item.get("active_site", None)
+            if index.column() == self.Columns.index("remote_site"):
+                item = index.internalPointer()
+                return item.get("remote_site", None)
+
+        return super(RepresentationModel, self).data(index, role)
+
+    def on_doc_fetched(self):
+        self.clear()
+        self.beginResetModel()
+        subsets = set()
+        assets = set()
+        for doc in self._docs:
+            progress = self._get_progress_for_repre(doc)
+
+            data = {
+                "name": doc["name"],
+                "subset": doc["context"]["subset"],
+                "asset": doc["context"]["asset"],
+
+                "active_site": self.repre_icons.get(self.active_site),
+                "remote_site": self.repre_icons.get(self.remote_site)
+            }
+            subsets.add(doc["context"]["subset"])
+            assets.add(doc["context"]["subset"])
+
+            item = Item()
+            item.update(data)
+
+            # TreeModel expects dict, attr here for later refactor
+            self.add_child(item, None)  # TODO parent
+
+        self.endResetModel()
+        self.refreshed.emit(False)
+
+    def refresh(self):
+
+        if self.version_ids:
+            # Simple find here for now, expected to receive lower number of
+            # representations and logic could be in Python
+            self._docs = self.dbcon.find(
+                {"type": "representation", "parent": {"$in": self.version_ids}}
+                , self._get_projection()
+            )
+
+        self.doc_fetched.emit()
+
+    def _get_projection(self):
+        return {
+            "_id": 1,
+            "name": 1,
+            "context.subset": 1,
+            "context.asset": 1,
+            "context.version": 1,
+            "context.representation": 1,
+            'files.sites': 1
+        }
+
+    def _get_progress_for_repre(self, doc):
+        """
+            Calculates average progress for representation.
+
+            If site has created_dt >> fully available >> progress == 1
+
+            Could be calculated in aggregate if it would be too slow
+            Args:
+                doc(dict): representation dict
+            Returns:
+                (dict) with active and remote sites progress
+        """
+        progress = {self.active_site: 0, self.remote_site: 0}
+        files = 0
+        if not doc:
+            return progress
+
+        for file in doc.get("files", []):
+            files = 1
+            for site in file.get("sites"):
+                if site["name"] in [self.active_site, self.remote_site]:
+                    if site.get("created_dt"):
+                        progress[site["name"]] += 1
+                    elif site.get("progress"):
+                        progress[site["name"]] += site["progress"]
+        files = max(1, files)  # for broken representations without files
+        progress[self.active_site] = progress[self.active_site] / files
+        progress[self.remote_site] = progress[self.remote_site] / files
+        return progress
+
+
+def get_repre_icons():
+    import pype.modules.sync_server as sync_server
+    import os
+    resource_path = os.path.dirname(sync_server.__file__)
+    resource_path = os.path.join(resource_path,
+                                 "providers", "resources")
+    icons = {}
+    for provider in ['studio', 'local_drive', 'gdrive']: # TODO get from sync module
+        pix_url = "{}/{}.png".format(resource_path, provider)
+        icons[provider] = QtGui.QIcon(pix_url)
+
+    return icons
