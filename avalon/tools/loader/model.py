@@ -822,6 +822,8 @@ class RepresentationModel(TreeModel):
     doc_fetched = QtCore.Signal()
     refreshed = QtCore.Signal(bool)
 
+    SiteNameRole = QtCore.Qt.UserRole + 2
+
     Columns = [
         "name",
         "subset",
@@ -851,12 +853,18 @@ class RepresentationModel(TreeModel):
 
     def data(self, index, role):
         if role == QtCore.Qt.DecorationRole:
+            item = index.internalPointer()
             if index.column() == self.Columns.index("active_site"):
-                item = index.internalPointer()
                 return item.get("active_site", None)
             if index.column() == self.Columns.index("remote_site"):
-                item = index.internalPointer()
                 return item.get("remote_site", None)
+
+        if role == self.SiteNameRole:
+            item = index.internalPointer()
+            if index.column() == self.Columns.index("active_site"):
+                return item.get("active_site_name", None)
+            if index.column() == self.Columns.index("remote_site"):
+                return item.get("remote_site_name", None)
 
         return super(RepresentationModel, self).data(index, role)
 
@@ -869,12 +877,15 @@ class RepresentationModel(TreeModel):
             progress = self._get_progress_for_repre(doc)
 
             data = {
+                "_id": doc["_id"],
                 "name": doc["name"],
                 "subset": doc["context"]["subset"],
                 "asset": doc["context"]["asset"],
 
                 "active_site": self.repre_icons.get(self.active_site),
-                "remote_site": self.repre_icons.get(self.remote_site)
+                "remote_site": self.repre_icons.get(self.remote_site),
+                "active_site_name": self.active_site,
+                "remote_site_name": self.remote_site
             }
             subsets.add(doc["context"]["subset"])
             assets.add(doc["context"]["subset"])

@@ -508,38 +508,11 @@ class SubsetWidget(QtWidgets.QWidget):
                 continue
             repre_ids.append(representation["_id"])
 
-        error_info = []
-        repre_contexts = pipeline.get_repres_contexts(repre_ids, self.dbcon)
-        for repre_context in repre_contexts.values():
-            try:
-                pipeline.load_with_repre_context(
-                    loader,
-                    repre_context,
-                    options=options
-                )
-
-            except pipeline.IncompatibleLoaderError as exc:
-                self.echo(exc)
-                error_info.append((
-                    "Incompatible Loader",
-                    None,
-                    representation_name,
-                    item["subset"],
-                    item["version_document"]["name"]
-                ))
-
-            except Exception as exc:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                formatted_traceback = "".join(traceback.format_exception(
-                    exc_type, exc_value, exc_traceback
-                ))
-                error_info.append((
-                    str(exc),
-                    formatted_traceback,
-                    representation_name,
-                    item["subset"],
-                    item["version_document"]["name"]
-                ))
+        version_name = item["version_document"]["name"]
+        error_info = _load_representations_by_loader(
+            loader, repre_ids, self.dbcon,
+            option=options, version_name=version_name
+        )
 
         if error_info:
             box = LoadErrorMessageBox(error_info)
@@ -1022,23 +995,6 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         self.model.refresh()
 
-    def show_right_mouse_menu(self, pos):
-        """Build RMB menu under mouse at current position (within widget)"""
-        pass
-        # Get mouse position
-        # globalpos = self.viewport().mapToGlobal(pos)
-        #
-        # menu = QtWidgets.QMenu(self)
-        #
-        # # Add enable all action
-        # download = QtWidgets.QAction(menu, text="Download")
-        # download.triggered.connect(
-        #     lambda: self._set_download('studio'))
-        #
-        # menu.addAction(download)
-        #
-        # menu.exec_(globalpos)
-
     def on_context_menu(self, point):
         """Shows menu with loader actions on Right-click.
 
@@ -1060,6 +1016,8 @@ class RepresentationWidget(QtWidgets.QWidget):
         items = []
         for row_index in rows:
             item = row_index.data(self.model.ItemRole)
+            item["selected_site"] = self.model.data(point_index,
+                                                    self.model.SiteNameRole)
             items.append(item)
 
         # Get all representation->loader combinations available for the
@@ -1071,6 +1029,7 @@ class RepresentationWidget(QtWidgets.QWidget):
             if hasattr(loader, "add_site_to_representation"):
                 loaders.append(loader)
 
+        loader = loaders[0]
         menu = OptionalMenu(self)
         if not loaders:
             # no loaders available
@@ -1090,9 +1049,48 @@ class RepresentationWidget(QtWidgets.QWidget):
             action = OptionalAction(("*" + " Add site"), None, False, menu)
             menu.addAction(action)
 
+            # Add tooltip and statustip from Loader docstring
+            tip = inspect.getdoc(loader)
+            if tip:
+                action.setToolTip(tip)
+                action.setStatusTip(tip)
+
+            action.setData(loader)
+
         # Show the context action menu
         global_point = self.tree_view.mapToGlobal(point)
         action = menu.exec_(global_point)
+
+        if not action or not action.data():
+            return
+
+        # Find the representation name and loader to trigger
+        loader = action.data()
+        repre_ids = []
+        data_by_repre_id = {}
+        for item in items:
+            data = {
+                "_id": item.get("_id"),
+                "site_name": item.get("selected_site"),
+                "project_name": self.dbcon.Session["AVALON_PROJECT"]
+            }
+
+            if not data["site_name"]:
+                continue
+
+            repre_ids.append(data["_id"])
+            data_by_repre_id[data["_id"]] = data
+
+            # # pipeline.load is useless here, no real "loading" of file
+            # # happening for now
+            # loader.load(representation, data=data)
+
+        errors = _load_representations_by_loader(loader, repre_ids, self.dbcon,
+            data_by_repre_id=data_by_repre_id)
+
+        if errors:
+            box = LoadErrorMessageBox(errors)
+            box.show()
 
     def _set_download(self):
         pass
@@ -1105,3 +1103,44 @@ class RepresentationWidget(QtWidgets.QWidget):
         """
         index = self.model.Columns.index(column_name)
         self.tree_view.setColumnHidden(index, not visible)
+
+
+def _load_representations_by_loader(loader, repre_ids, dbcon,
+                                    options=None,
+                                    data_by_repre_id=None):
+    """Loops through list of repre ids and loads them with one loader"""
+    error_info = []
+    repre_contexts = pipeline.get_repres_contexts(repre_ids, dbcon)
+    for repre_context in repre_contexts.values():
+        try:
+            data = data_by_repre_id.get(
+                repre_context["representation"]["_id"])
+            pipeline.load_with_repre_context(
+                loader,
+                repre_context,
+                options=options,
+                data=data
+            )
+        except pipeline.IncompatibleLoaderError as exc:
+            print(exc)
+            error_info.append((
+                "Incompatible Loader",
+                None,
+                repre_context["representation"]["name"],
+                repre_context["subset"]["name"],
+                repre_context["version"]["name"]
+            ))
+
+        except Exception as exc:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            formatted_traceback = "".join(traceback.format_exception(
+                exc_type, exc_value, exc_traceback
+            ))
+            error_info.append((
+                str(exc),
+                formatted_traceback,
+                repre_context["representation"]["name"],
+                repre_context["subset"]["name"],
+                repre_context["version"]["name"]
+            ))
+    return error_info
