@@ -17,10 +17,13 @@ def my_exception_hook(exctype, value, traceback):
 if __name__ == '__main__':
     import os
     os.environ["AVALON_MONGO"] = "mongodb://localhost:27017"
+    os.environ["PYPE_MONGO"] = "mongodb://localhost:27017"
     os.environ["AVALON_DB"] = "avalon"
     os.environ["AVALON_TIMEOUT"] = '3000'
     os.environ["PYPE_DEBUG"] = "3"
     os.environ["AVALON_CONFIG"] = "pype"
+    os.environ["AVALON_ASSET"] = "Jungle"
+
 
     import sys
 

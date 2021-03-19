@@ -823,6 +823,7 @@ class RepresentationModel(TreeModel):
     refreshed = QtCore.Signal(bool)
 
     SiteNameRole = QtCore.Qt.UserRole + 2
+    ProgressRole = QtCore.Qt.UserRole + 3
 
     Columns = [
         "name",
@@ -866,6 +867,13 @@ class RepresentationModel(TreeModel):
             if index.column() == self.Columns.index("remote_site"):
                 return item.get("remote_site_name", None)
 
+        if role == self.ProgressRole:
+            item = index.internalPointer()
+            if index.column() == self.Columns.index("active_site"):
+                return item.get("active_site_progress", None)
+            if index.column() == self.Columns.index("remote_site"):
+                return item.get("remote_site_progress", None)
+
         return super(RepresentationModel, self).data(index, role)
 
     def on_doc_fetched(self):
@@ -876,16 +884,24 @@ class RepresentationModel(TreeModel):
         for doc in self._docs:
             progress = self._get_progress_for_repre(doc)
 
+            # TODO ntwrk
+            active_site_icon = self.repre_icons.get(self.active_site)
+            active_site_icon.Disabled = True
+            remote_site_icon = self.repre_icons.get(self.remote_site)
+            remote_site_icon.Disabled = True
+
             data = {
                 "_id": doc["_id"],
                 "name": doc["name"],
                 "subset": doc["context"]["subset"],
                 "asset": doc["context"]["asset"],
 
-                "active_site": self.repre_icons.get(self.active_site),
-                "remote_site": self.repre_icons.get(self.remote_site),
+                "active_site": active_site_icon,
+                "remote_site": remote_site_icon,
                 "active_site_name": self.active_site,
-                "remote_site_name": self.remote_site
+                "remote_site_name": self.remote_site,
+                "active_site_progress": progress[self.active_site],
+                "remote_site_progress": progress[self.remote_site]
             }
             subsets.add(doc["context"]["subset"])
             assets.add(doc["context"]["subset"])
@@ -933,8 +949,11 @@ class RepresentationModel(TreeModel):
                 doc(dict): representation dict
             Returns:
                 (dict) with active and remote sites progress
+                {'studio': 1.0, 'gdrive': -1} - gdrive site is not present
+                {'studio': 1.0, 'gdrive': 0.0} - gdrive site is present, not
+                    uploaded yet
         """
-        progress = {self.active_site: 0, self.remote_site: 0}
+        progress = {self.active_site: -1, self.remote_site: -1}
         files = 0
         if not doc:
             return progress
@@ -947,6 +966,8 @@ class RepresentationModel(TreeModel):
                         progress[site["name"]] += 1
                     elif site.get("progress"):
                         progress[site["name"]] += site["progress"]
+                    else:
+                        progress[site["name"]] = 0
         files = max(1, files)  # for broken representations without files
         progress[self.active_site] = progress[self.active_site] / files
         progress[self.remote_site] = progress[self.remote_site] / files

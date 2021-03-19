@@ -401,20 +401,7 @@ class SubsetWidget(QtWidgets.QWidget):
 
         menu = OptionalMenu(self)
         if not loaders:
-            # no loaders available
-            submsg = "your selection."
-            if one_item_selected:
-                submsg = "this version."
-
-            msg = "No compatible loaders for {}".format(submsg)
-            self.echo(msg)
-
-            icon = qtawesome.icon(
-                "fa.exclamation",
-                color=QtGui.QColor(255, 51, 0)
-            )
-
-            action = OptionalAction(("*" + msg), icon, False, menu)
+            action = _get_no_loader_action(menu, one_item_selected)
             menu.addAction(action)
 
         else:
@@ -426,26 +413,9 @@ class SubsetWidget(QtWidgets.QWidget):
             # List the available loaders
             for representation, loader in sorted(loaders, key=sorter):
 
-                # Label
-                label = getattr(loader, "label", None)
-                if label is None:
-                    label = loader.__name__
+                label = _get_label_from_loader(loader, representation)
 
-                # Add the representation as suffix
-                label = "{0} ({1})".format(label, representation['name'])
-
-                # Support font-awesome icons using the `.icon` and `.color`
-                # attributes on plug-ins.
-                icon = getattr(loader, "icon", None)
-                if icon is not None:
-                    try:
-                        key = "fa.{0}".format(icon)
-                        color = getattr(loader, "color", "white")
-                        icon = qtawesome.icon(key, color=color)
-                    except Exception as e:
-                        print("Unable to set icon for loader "
-                              "{}: {}".format(loader, e))
-                        icon = None
+                icon = _get_icon_from_loader(loader)
 
                 # Optional action
                 use_option = hasattr(loader, "options")
@@ -1014,10 +984,15 @@ class RepresentationWidget(QtWidgets.QWidget):
         rows = selection.selectedRows(column=0)
 
         items = []
+        all_added = True
         for row_index in rows:
             item = row_index.data(self.model.ItemRole)
             item["selected_site"] = self.model.data(point_index,
                                                     self.model.SiteNameRole)
+            item["selected_site_progress"] = self.model.data(
+                point_index, self.model.ProgressRole)
+            if item["selected_site_progress"] < 0:
+                all_added = False
             items.append(item)
 
         # Get all representation->loader combinations available for the
@@ -1031,29 +1006,30 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         loader = loaders[0]
         menu = OptionalMenu(self)
-        if not loaders:
-            # no loaders available
-            submsg = "your selection."
 
-            msg = "No compatible loaders for {}".format(submsg)
-            self.echo(msg)
+        only_add_and_all_added = \
+            loader and hasattr(loader, "add_site_to_representation") \
+            and all_added
 
-            icon = qtawesome.icon(
-                "fa.exclamation",
-                color=QtGui.QColor(255, 51, 0)
-            )
-
-            action = OptionalAction(("*" + msg), icon, False, menu)
+        if not loaders or only_add_and_all_added:
+            action = _get_no_loader_action(menu)
             menu.addAction(action)
         else:
-            action = OptionalAction(("*" + " Add site"), None, False, menu)
-            menu.addAction(action)
+            icon = _get_icon_from_loader(loader)
+
+            label = _get_label_from_loader(loader)
+
+            # Optional action
+            use_option = hasattr(loader, "options")
+            action = OptionalAction(label, icon, use_option, menu)
 
             # Add tooltip and statustip from Loader docstring
             tip = inspect.getdoc(loader)
             if tip:
                 action.setToolTip(tip)
                 action.setStatusTip(tip)
+
+            menu.addAction(action)
 
             action.setData(loader)
 
@@ -1069,6 +1045,9 @@ class RepresentationWidget(QtWidgets.QWidget):
         repre_ids = []
         data_by_repre_id = {}
         for item in items:
+            if item.get("selected_site_progress", -1) >= 0.0:
+                continue
+
             data = {
                 "_id": item.get("_id"),
                 "site_name": item.get("selected_site"),
@@ -1080,10 +1059,6 @@ class RepresentationWidget(QtWidgets.QWidget):
 
             repre_ids.append(data["_id"])
             data_by_repre_id[data["_id"]] = data
-
-            # # pipeline.load is useless here, no real "loading" of file
-            # # happening for now
-            # loader.load(representation, data=data)
 
         errors = _load_representations_by_loader(loader, repre_ids, self.dbcon,
             data_by_repre_id=data_by_repre_id)
@@ -1144,3 +1119,46 @@ def _load_representations_by_loader(loader, repre_ids, dbcon,
                 repre_context["version"]["name"]
             ))
     return error_info
+
+
+def _get_icon_from_loader(loader):
+    """Pull icon info from loader class"""
+    # Support font-awesome icons using the `.icon` and `.color`
+    # attributes on plug-ins.
+    icon = getattr(loader, "icon", None)
+    if icon is not None:
+        try:
+            key = "fa.{0}".format(icon)
+            color = getattr(loader, "color", "white")
+            icon = qtawesome.icon(key, color=color)
+        except Exception as e:
+            print("Unable to set icon for loader "
+                  "{}: {}".format(loader, e))
+            icon = None
+    return icon
+
+
+def _get_label_from_loader(loader, representation=None):
+    """Pull label info from loader class"""
+    label = getattr(loader, "label", None)
+    if label is None:
+        label = loader.__name__
+    if representation:
+        # Add the representation as suffix
+        label = "{0} ({1})".format(label, representation['name'])
+    return label
+
+
+def _get_no_loader_action(menu, one_item_selected=False):
+    """Creates dummy no loader option in 'menu'"""
+    submsg = "your selection."
+    if one_item_selected:
+        submsg = "this version."
+    msg = "No compatible loaders for {}".format(submsg)
+    print(msg)
+    icon = qtawesome.icon(
+        "fa.exclamation",
+        color=QtGui.QColor(255, 51, 0)
+    )
+    action = OptionalAction(("*" + msg), icon, False, menu)
+    return action
