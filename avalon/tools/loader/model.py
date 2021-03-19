@@ -853,6 +853,18 @@ class RepresentationModel(TreeModel):
         self.refresh()
 
     def data(self, index, role):
+        if role == QtCore.Qt.DisplayRole:
+            item = index.internalPointer()
+            progress = None
+            if index.column() == self.Columns.index("active_site"):
+                progress = item.get("active_site_progress", 0)
+            elif index.column() == self.Columns.index("remote_site"):
+                progress = item.get("remote_site_progress", 0)
+            if progress is not None:
+                progress = max(progress, 0)
+                progress_str = "{}% avail.".format(int(progress * 100))
+                return progress_str
+
         if role == QtCore.Qt.DecorationRole:
             item = index.internalPointer()
             if index.column() == self.Columns.index("active_site"):
@@ -958,19 +970,23 @@ class RepresentationModel(TreeModel):
         if not doc:
             return progress
 
+        files = {self.active_site: 0, self.remote_site: 0}
         for file in doc.get("files", []):
-            files = 1
             for site in file.get("sites"):
                 if site["name"] in [self.active_site, self.remote_site]:
+                    files[site["name"]] += 1
                     if site.get("created_dt"):
-                        progress[site["name"]] += 1
+                        norm_progress = max(progress[site["name"]], 0)
+                        progress[site["name"]] = norm_progress + 1
                     elif site.get("progress"):
                         progress[site["name"]] += site["progress"]
                     else:
                         progress[site["name"]] = 0
-        files = max(1, files)  # for broken representations without files
-        progress[self.active_site] = progress[self.active_site] / files
-        progress[self.remote_site] = progress[self.remote_site] / files
+        # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
+        progress[self.active_site] = \
+            progress[self.active_site] / max(files[self.active_site], 1)
+        progress[self.remote_site] = \
+            progress[self.remote_site] / max(files[self.remote_site], 1)
         return progress
 
 
