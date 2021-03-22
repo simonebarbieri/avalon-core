@@ -1,3 +1,4 @@
+import os
 import copy
 
 from ... import (
@@ -12,6 +13,8 @@ from .. import lib
 from ...lib import MasterVersionType
 
 from pype.api import get_project_settings
+from pype.modules import ModulesManager
+from pype.modules.sync_server import sync_server
 
 
 def is_filtering_recursible():
@@ -111,14 +114,25 @@ class SubsetsModel(TreeModel):
         self.asset_doc_projection = asset_doc_projection
         self.subset_doc_projection = subset_doc_projection
 
+        self.repre_icons = {}
         self.sync_server_settings = None
+        self.active_site = self.active_provider = None
         proj_settings = get_project_settings(dbcon.Session["AVALON_PROJECT"])
-        if proj_settings.get('global').get('sync_server')['enabled']:
-            self.sync_server_settings = proj_settings.get('global').\
-                get('sync_server')
+        if proj_settings['global']['sync_server']['enabled']:
+            self.sync_server_settings = proj_settings['global']['sync_server']
             self.Columns.append("repre_info")
             self.column_labels_mapping["repre_info"] = "Repre info"
             self.repre_icons = get_repre_icons()
+
+            manager = ModulesManager()  #TODO doublecheck in Python2
+            self.sync_server = manager.modules_by_name["sync_server"]
+
+            project = dbcon.Session["AVALON_PROJECT"]
+            self.active_site = self.sync_server.get_active_site(project)
+
+            self.active_provider = \
+                self.sync_server.get_provider_for_site(project,
+                                                       self.active_site)
 
         self.columns_index = dict(
             (key, idx) for idx, key in enumerate(self.Columns)
@@ -380,17 +394,17 @@ class SubsetsModel(TreeModel):
 
         if self.sync_server_settings:
             version_ids = set()
-            for subset_id, doc in last_versions_by_subset_id.items():
+            for _subset_id, doc in last_versions_by_subset_id.items():
                 version_ids.add(doc["_id"])
 
-            site = 'studio'  # TODO
+            site = self.active_site
             query = self._repre_per_version_pipeline(list(version_ids), site)
 
             repre_info = {}
             for doc in self.dbcon.aggregate(query):
                 if self._doc_fetching_stop:
                     return
-                doc["provider"] = site
+                doc["provider"] = self.active_site
                 repre_info[doc["_id"]] = doc
 
             self._doc_payload["repre_info_by_version_id"] = repre_info
@@ -824,6 +838,7 @@ class RepresentationModel(TreeModel):
 
     SiteNameRole = QtCore.Qt.UserRole + 2
     ProgressRole = QtCore.Qt.UserRole + 3
+    SiteSideRole = QtCore.Qt.UserRole + 4
 
     Columns = [
         "name",
@@ -833,32 +848,56 @@ class RepresentationModel(TreeModel):
         "remote_site"
     ]
 
-    def __init__(self, dbconn, header, version_ids):
+    def __init__(self, dbcon, header, version_ids):
         super(RepresentationModel, self).__init__()
-        self.dbcon = dbconn
+        self.dbcon = dbcon
         self._data = []
         self._header = header
         self.version_ids = version_ids
 
-        self.active_site = 'studio'  # TODO
-        self.remote_site = 'gdrive'  # TODO
+        manager = ModulesManager()
+        self.sync_server = manager.modules_by_name["sync_server"]
+
+        self.project = dbcon.Session["AVALON_PROJECT"]
+
+        self.active_site = self.sync_server.get_active_site(self.project)
+        self.remote_site = self.sync_server.get_remote_site(self.project)
+
+        self.active_provider = \
+            self.sync_server.get_provider_for_site(self.project,
+                                                   self.active_site)
+        self.remote_provider = \
+            self.sync_server.get_provider_for_site(self.project,
+                                                   self.remote_site)
 
         self.doc_fetched.connect(self.on_doc_fetched)
 
         self._docs = {}
-        self.repre_icons = get_repre_icons()
+        self._icons = get_repre_icons()
+        self._icons["repre"] = qtawesome.icon("fa.file-o",
+                                              color=style.colors.default)
 
     def set_version_ids(self, version_ids):
         self.version_ids = version_ids
         self.refresh()
 
     def data(self, index, role):
+        item = index.internalPointer()
+        if role == QtCore.Qt.DecorationRole:
+            # Add icon to subset column
+            if index.column() == self.Columns.index("name"):
+                if item.get("isGroup"):
+                    return item["icon"]
+                else:
+                    return self._icons["repre"]
+
+        active_index = self.Columns.index("active_site")
+        remote_index = self.Columns.index("remote_site")
         if role == QtCore.Qt.DisplayRole:
-            item = index.internalPointer()
             progress = None
-            if index.column() == self.Columns.index("active_site"):
+            if index.column() == active_index:
                 progress = item.get("active_site_progress", 0)
-            elif index.column() == self.Columns.index("remote_site"):
+            elif index.column() == remote_index:
                 progress = item.get("remote_site_progress", 0)
             if progress is not None:
                 progress = max(progress, 0)
@@ -866,25 +905,28 @@ class RepresentationModel(TreeModel):
                 return progress_str
 
         if role == QtCore.Qt.DecorationRole:
-            item = index.internalPointer()
-            if index.column() == self.Columns.index("active_site"):
-                return item.get("active_site", None)
-            if index.column() == self.Columns.index("remote_site"):
-                return item.get("remote_site", None)
+            if index.column() == active_index:
+                return item.get("active_site_icon", None)
+            if index.column() == remote_index:
+                return item.get("remote_site_icon", None)
 
         if role == self.SiteNameRole:
-            item = index.internalPointer()
-            if index.column() == self.Columns.index("active_site"):
+            if index.column() == active_index:
                 return item.get("active_site_name", None)
-            if index.column() == self.Columns.index("remote_site"):
+            if index.column() == remote_index:
                 return item.get("remote_site_name", None)
 
+        if role == self.SiteSideRole:
+            if index.column() == active_index:
+                return "active"
+            if index.column() == remote_index:
+                return "remote"
+
         if role == self.ProgressRole:
-            item = index.internalPointer()
-            if index.column() == self.Columns.index("active_site"):
-                return item.get("active_site_progress", None)
-            if index.column() == self.Columns.index("remote_site"):
-                return item.get("remote_site_progress", None)
+            if index.column() == active_index:
+                return item.get("active_site_progress", 0)
+            if index.column() == remote_index:
+                return item.get("remote_site_progress", 0)
 
         return super(RepresentationModel, self).data(index, role)
 
@@ -893,14 +935,34 @@ class RepresentationModel(TreeModel):
         self.beginResetModel()
         subsets = set()
         assets = set()
+        repre_groups = {}
+        repre_groups_items = {}
+        group = None
         for doc in self._docs:
+            if len(self.version_ids) > 1:
+                group = repre_groups.get(doc["name"])
+                if not group:
+                    group_item = Item()
+                    group_item.update({
+                        "name": doc["name"],
+                        "isGroup": True,
+                        "childRow": 0,
+                        "active_site_name": self.active_site,
+                        "remote_site_name": self.remote_site,
+                        "icon": qtawesome.icon(
+                            "fa.folder",
+                            color=style.colors.default
+                        )
+                    })
+                    self.add_child(group_item, None)
+                    repre_groups[doc["name"]] = group_item
+                    repre_groups_items[doc["name"]] = 0
+                    group = group_item
+
             progress = self._get_progress_for_repre(doc)
 
-            # TODO ntwrk
-            active_site_icon = self.repre_icons.get(self.active_site)
-            active_site_icon.Disabled = True
-            remote_site_icon = self.repre_icons.get(self.remote_site)
-            remote_site_icon.Disabled = True
+            active_site_icon = self._icons.get(self.active_provider)
+            remote_site_icon = self._icons.get(self.remote_provider)
 
             data = {
                 "_id": doc["_id"],
@@ -908,8 +970,8 @@ class RepresentationModel(TreeModel):
                 "subset": doc["context"]["subset"],
                 "asset": doc["context"]["asset"],
 
-                "active_site": active_site_icon,
-                "remote_site": remote_site_icon,
+                "active_site_icon": active_site_icon,
+                "remote_site_icon": remote_site_icon,
                 "active_site_name": self.active_site,
                 "remote_site_name": self.remote_site,
                 "active_site_progress": progress[self.active_site],
@@ -921,8 +983,14 @@ class RepresentationModel(TreeModel):
             item = Item()
             item.update(data)
 
-            # TreeModel expects dict, attr here for later refactor
-            self.add_child(item, None)  # TODO parent
+            if group:
+                self._update_group_progress(
+                    doc["name"], group,
+                    progress[self.active_site],
+                    progress[self.remote_site],
+                    repre_groups_items)
+
+            self.add_child(item, group)
 
         self.endResetModel()
         self.refreshed.emit(False)
@@ -932,10 +1000,10 @@ class RepresentationModel(TreeModel):
         if self.version_ids:
             # Simple find here for now, expected to receive lower number of
             # representations and logic could be in Python
-            self._docs = self.dbcon.find(
+            self._docs = list(self.dbcon.find(
                 {"type": "representation", "parent": {"$in": self.version_ids}}
                 , self._get_projection()
-            )
+            ))
 
         self.doc_fetched.emit()
 
@@ -965,7 +1033,8 @@ class RepresentationModel(TreeModel):
                 {'studio': 1.0, 'gdrive': 0.0} - gdrive site is present, not
                     uploaded yet
         """
-        progress = {self.active_site: -1, self.remote_site: -1}
+        progress = {self.active_site: -1,
+                    self.remote_site: -1}
         files = 0
         if not doc:
             return progress
@@ -989,15 +1058,25 @@ class RepresentationModel(TreeModel):
             progress[self.remote_site] / max(files[self.remote_site], 1)
         return progress
 
+    def _update_group_progress(self, repre_name, group, active_progress,
+                               remote_progress, repre_groups_items):
+        repre_groups_items[repre_name] += 1
+        item_cnt = repre_groups_items[repre_name]
+        group["active_site_progress"] = \
+            (group.get("active_site_progress", 0) +
+             max(active_progress, 0)) / item_cnt
+        group["remote_site_progress"] = \
+            (group.get("remote_site_progress", 0) +
+             max(remote_progress, 0)) / item_cnt
+
 
 def get_repre_icons():
-    import pype.modules.sync_server as sync_server
-    import os
     resource_path = os.path.dirname(sync_server.__file__)
     resource_path = os.path.join(resource_path,
                                  "providers", "resources")
     icons = {}
-    for provider in ['studio', 'local_drive', 'gdrive']: # TODO get from sync module
+    # TODO get from sync module
+    for provider in ['studio', 'local_drive', 'gdrive']:
         pix_url = "{}/{}.png".format(resource_path, provider)
         icons[provider] = QtGui.QIcon(pix_url)
 

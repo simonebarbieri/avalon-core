@@ -922,8 +922,8 @@ class RepresentationWidget(QtWidgets.QWidget):
         ("name", 100),
         ("asset", 110),
         ("subset", 100),
-        ("active_site", 10),
-        ("remote_site", 10)
+        ("active_site", 100),
+        ("remote_site", 100)
     )
 
     default_hidden = ["asset", "subset"]
@@ -936,6 +936,8 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         model = RepresentationModel(dbcon, headers, [])
 
+        label = QtWidgets.QLabel("Representations", self)
+
         tree_view = DeselectableTreeView()
         tree_view.setModel(model)
         tree_view.setAllColumnsShowFocus(True)
@@ -945,6 +947,14 @@ class RepresentationWidget(QtWidgets.QWidget):
         tree_view.setSortingEnabled(True)
         tree_view.sortByColumn(1, QtCore.Qt.AscendingOrder)
         tree_view.setAlternatingRowColors(True)
+        tree_view.setIndentation(20)
+        tree_view.setStyleSheet("""
+            QTreeView::item{
+                padding: 5px 1px;
+                border: 0px;
+            }
+        """)
+        tree_view.collapseAll()
 
         for column_name, width in self.default_widths:
             idx = model.Columns.index(column_name)
@@ -952,6 +962,7 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(label)
         layout.addWidget(tree_view)
 
         # self.itemChanged.connect(self._on_item_changed)
@@ -991,8 +1002,12 @@ class RepresentationWidget(QtWidgets.QWidget):
                                                     self.model.SiteNameRole)
             item["selected_site_progress"] = self.model.data(
                 point_index, self.model.ProgressRole)
-            if item["selected_site_progress"] < 0:
+            if item["selected_site_progress"] < 0 or \
+               (item["selected_site_progress"] == 0 and item.get('isGroup')):
                 all_added = False
+
+            item["selected_side"] = self.model.data(point_index,
+                                                    self.model.SiteSideRole)
             items.append(item)
 
         # Get all representation->loader combinations available for the
@@ -1001,23 +1016,32 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         loaders = list()
         for loader in available_loaders:
-            if hasattr(loader, "add_site_to_representation"):
+            if self._is_representation_loader(loader):
                 loaders.append(loader)
 
         loader = loaders[0]
         menu = OptionalMenu(self)
 
         only_add_and_all_added = \
-            loader and hasattr(loader, "add_site_to_representation") \
+            loader and self._is_representation_loader(loader) \
             and all_added
 
-        if not loaders or only_add_and_all_added:
+        both_unavailable = item["active_site_progress"] <= 0 and\
+            item["remote_site_progress"] <= 0
+
+        if not loaders or only_add_and_all_added or both_unavailable:
             action = _get_no_loader_action(menu)
             menu.addAction(action)
         else:
             icon = _get_icon_from_loader(loader)
 
             label = _get_label_from_loader(loader)
+
+            if self._is_representation_loader(loader):
+                if item["selected_side"] == 'active':
+                    label = "Localize"
+                else:
+                    label = "Sync to Remote"
 
             # Optional action
             use_option = hasattr(loader, "options")
@@ -1066,6 +1090,13 @@ class RepresentationWidget(QtWidgets.QWidget):
         if errors:
             box = LoadErrorMessageBox(errors)
             box.show()
+
+    def _is_representation_loader(self, loader):
+        return hasattr(loader, "add_site_to_representation")
+
+
+    def set_version_ids(self, version_ids):
+        self.model.set_version_ids(version_ids)
 
     def _set_download(self):
         pass

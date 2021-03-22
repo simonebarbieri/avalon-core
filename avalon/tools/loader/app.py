@@ -254,7 +254,7 @@ class Window(QtWidgets.QDialog):
         self.data["state"]["assetIds"] = asset_ids
 
         representations = self.data["widgets"]["representations"]
-        representations.model.set_version_ids([])  # reset repre list
+        representations.set_version_ids([])  # reset repre list
 
     def _subsetschanged(self):
         asset_ids = self.data["state"]["assetIds"]
@@ -348,7 +348,7 @@ class Window(QtWidgets.QDialog):
 
         representations = self.data["widgets"]["representations"]
         version_ids = [doc["_id"] for doc in version_docs or []]
-        representations.model.set_version_ids(version_ids)
+        representations.set_version_ids(version_ids)
 
         representations.change_visibility("subset", len(rows) > 1)
         representations.change_visibility("asset", len(asset_docs) > 1)
