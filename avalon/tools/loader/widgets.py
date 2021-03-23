@@ -936,6 +936,9 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         model = RepresentationModel(dbcon, headers, [])
 
+        # proxy_model = QtCore.QSortFilterProxyModel(self)
+        # proxy_model.setSourceModel(model)
+
         label = QtWidgets.QLabel("Representations", self)
 
         tree_view = DeselectableTreeView()

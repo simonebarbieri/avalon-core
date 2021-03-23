@@ -12,10 +12,8 @@ from ..models import TreeModel, Item
 from .. import lib
 from ...lib import MasterVersionType
 
-from pype.api import get_project_settings
 from pype.modules import ModulesManager
-from pype.modules.sync_server import sync_server
-
+from pype.modules.sync_server import sync_server_module
 
 def is_filtering_recursible():
     """Does Qt binding support recursive filtering for QSortFilterProxyModel?
@@ -391,7 +389,7 @@ class SubsetsModel(TreeModel):
             for doc in self.dbcon.aggregate(query):
                 if self._doc_fetching_stop:
                     return
-                doc["provider"] = self.active_site
+                doc["provider"] = self.active_provider
                 repre_info[doc["_id"]] = doc
 
             self._doc_payload["repre_info_by_version_id"] = repre_info
@@ -853,6 +851,9 @@ class RepresentationModel(TreeModel):
     ProgressRole = QtCore.Qt.UserRole + 3
     SiteSideRole = QtCore.Qt.UserRole + 4
 
+    SortAscendingRole = QtCore.Qt.UserRole + 5
+    SortDescendingRole = QtCore.Qt.UserRole + 6
+
     Columns = [
         "name",
         "subset",
@@ -869,19 +870,27 @@ class RepresentationModel(TreeModel):
         self.version_ids = version_ids
 
         manager = ModulesManager()
-        self.sync_server = manager.modules_by_name["sync_server"]
+        sync_server = active_site = remote_site = None
+        active_provider = remote_provider = project = None
 
-        self.project = dbcon.Session["AVALON_PROJECT"]
+        project = dbcon.Session["AVALON_PROJECT"]
+        if project:
+            sync_server = manager.modules_by_name["sync_server"]
+            active_site = sync_server.get_active_site(project)
+            remote_site = sync_server.get_remote_site(project)
 
-        self.active_site = self.sync_server.get_active_site(self.project)
-        self.remote_site = self.sync_server.get_remote_site(self.project)
+            active_provider = \
+                sync_server.get_provider_for_site(project,
+                                                  active_site)
+            remote_provider = \
+                sync_server.get_provider_for_site(project,
+                                                  remote_site)
 
-        self.active_provider = \
-            self.sync_server.get_provider_for_site(self.project,
-                                                   self.active_site)
-        self.remote_provider = \
-            self.sync_server.get_provider_for_site(self.project,
-                                                   self.remote_site)
+        self.sync_server = sync_server
+        self.active_site = active_site
+        self.active_provider = active_provider
+        self.remote_site = remote_site
+        self.remote_provider = remote_provider
 
         self.doc_fetched.connect(self.on_doc_fetched)
 
@@ -896,6 +905,21 @@ class RepresentationModel(TreeModel):
 
     def data(self, index, role):
         item = index.internalPointer()
+
+        # if role == self.SortDescendingRole:
+        #     item = index.internalPointer()
+        #     if item.get("isGroup"):
+        #         # Ensure groups be on top when sorting by descending order
+        #         prefix = "1"
+        #         order = item["order"]
+        #     else:
+        #         prefix = "0"
+        #         order = str(super(RepresentationModel, self).data(
+        #             index, QtCore.Qt.DisplayRole
+        #         ))
+        #     return prefix + order
+
+
         if role == QtCore.Qt.DecorationRole:
             # Add icon to subset column
             if index.column() == self.Columns.index("name"):
@@ -1009,14 +1033,15 @@ class RepresentationModel(TreeModel):
         self.refreshed.emit(False)
 
     def refresh(self):
-
+        docs = []
         if self.version_ids:
             # Simple find here for now, expected to receive lower number of
             # representations and logic could be in Python
-            self._docs = list(self.dbcon.find(
+            docs = list(self.dbcon.find(
                 {"type": "representation", "parent": {"$in": self.version_ids}}
                 , self._get_projection()
             ))
+        self._docs = docs
 
         self.doc_fetched.emit()
 
@@ -1061,7 +1086,9 @@ class RepresentationModel(TreeModel):
                         norm_progress = max(progress[site["name"]], 0)
                         progress[site["name"]] = norm_progress + 1
                     elif site.get("progress"):
-                        progress[site["name"]] += site["progress"]
+                        norm_progress = max(progress[site["name"]], 0)
+                        progress[site["name"]] = norm_progress + \
+                                                 site["progress"]
                     else:
                         progress[site["name"]] = 0
         # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
@@ -1084,7 +1111,7 @@ class RepresentationModel(TreeModel):
 
 
 def get_repre_icons():
-    resource_path = os.path.dirname(sync_server.__file__)
+    resource_path = os.path.dirname(sync_server_module.__file__)
     resource_path = os.path.join(resource_path,
                                  "providers", "resources")
     icons = {}
