@@ -115,24 +115,11 @@ class SubsetsModel(TreeModel):
         self.subset_doc_projection = subset_doc_projection
 
         self.repre_icons = {}
-        self.sync_server_settings = None
+        self.sync_server = None
         self.active_site = self.active_provider = None
-        proj_settings = get_project_settings(dbcon.Session["AVALON_PROJECT"])
-        if proj_settings['global']['sync_server']['enabled']:
-            self.sync_server_settings = proj_settings['global']['sync_server']
-            self.Columns.append("repre_info")
-            self.column_labels_mapping["repre_info"] = "Repre info"
-            self.repre_icons = get_repre_icons()
 
-            manager = ModulesManager()  #TODO doublecheck in Python2
-            self.sync_server = manager.modules_by_name["sync_server"]
-
-            project = dbcon.Session["AVALON_PROJECT"]
-            self.active_site = self.sync_server.get_active_site(project)
-
-            self.active_provider = \
-                self.sync_server.get_provider_for_site(project,
-                                                       self.active_site)
+        self.Columns.append("repre_info")
+        self.column_labels_mapping["repre_info"] = "Repre info"
 
         self.columns_index = dict(
             (key, idx) for idx, key in enumerate(self.Columns)
@@ -392,7 +379,7 @@ class SubsetsModel(TreeModel):
             "last_versions_by_subset_id": last_versions_by_subset_id
         }
 
-        if self.sync_server_settings:
+        if self.sync_server:
             version_ids = set()
             for _subset_id, doc in last_versions_by_subset_id.items():
                 version_ids.add(doc["_id"])
@@ -431,6 +418,8 @@ class SubsetsModel(TreeModel):
     def refresh(self):
         self.stop_fetch_thread()
         self.clear()
+
+        self._reset_sync_server()
 
         if not self._asset_ids:
             return
@@ -493,6 +482,30 @@ class SubsetsModel(TreeModel):
         self.add_child(merge_group, parent_item)
 
         return merge_group
+
+
+    def _reset_sync_server(self):
+        """Sets/Resets sync server vars after every change (refresh.)"""
+        repre_icons = {}
+        sync_server = None
+        active_site = active_provider = None
+
+        project_name = self.dbcon.Session["AVALON_PROJECT"]
+        if project_name:
+            manager = ModulesManager()  #TODO doublecheck in Python2
+            sync_server = manager.modules_by_name["sync_server"]
+
+            if sync_server.enabled:
+                active_site = sync_server.get_active_site(project_name)
+                active_provider = sync_server.get_provider_for_site(
+                    project_name, active_site)
+
+                repre_icons = get_repre_icons()
+
+        self.repre_icons = repre_icons
+        self.sync_server = sync_server
+        self.active_site = active_site
+        self.active_provider = active_provider
 
     def _fill_subset_items(
         self, asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id,
