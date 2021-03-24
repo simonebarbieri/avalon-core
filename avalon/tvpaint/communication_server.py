@@ -691,8 +691,8 @@ class Communicator:
                 of size 2 `(C:/src/file.dll, C:/dst/file.dll)`.
         """
 
-        from win32com.shell import shell
         import pythoncom
+        from win32comext.shell import shell
 
         # Create temp folder where plugin files are temporary copied
         # - reason is that copy to TVPaint requires administartion permissions
