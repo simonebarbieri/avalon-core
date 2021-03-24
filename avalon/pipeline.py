@@ -1078,19 +1078,19 @@ def get_repres_contexts(representation_ids, dbcon=None):
 
     version_docs_by_id = {}
     hero_version_docs = []
-    versions_for_heros = set()
+    versions_for_hero = set()
     subset_ids = set()
     for version_doc in version_docs:
         if version_doc["type"] == "hero_version":
             hero_version_docs.append(version_doc)
-            versions_for_heros.add(version_doc["version_id"])
+            versions_for_hero.add(version_doc["version_id"])
         version_docs_by_id[version_doc["_id"]] = version_doc
         subset_ids.add(version_doc["parent"])
 
-    if versions_for_heros:
+    if versions_for_hero:
         _version_docs = dbcon.find({
             "type": "version",
-            "_id": {"$in": list(versions_for_heros)}
+            "_id": {"$in": list(versions_for_hero)}
         })
         _version_data_by_id = {
             version_doc["_id"]: version_doc["data"]
