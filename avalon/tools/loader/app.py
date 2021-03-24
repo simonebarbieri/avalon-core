@@ -137,7 +137,7 @@ class Window(QtWidgets.QDialog):
         self._assetschanged()
 
         # Defaults
-        self.resize(1330, 700)
+        self.resize(1530, 700)
 
     # -------------------------------
     # Delay calling blocking methods
