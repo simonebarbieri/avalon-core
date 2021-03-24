@@ -7,7 +7,7 @@ from ...vendor.Qt import QtCore, QtGui
 from ...vendor import qtawesome
 
 from .. import lib as tools_lib
-from ...lib import MasterVersionType
+from ...lib import HeroVersionType
 from ..models import TreeModel, Item
 
 from . import lib
@@ -34,7 +34,7 @@ class InventoryModel(TreeModel):
 
     def outdated(self, item):
         value = item.get("version")
-        if isinstance(value, MasterVersionType):
+        if isinstance(value, HeroVersionType):
             return False
 
         if item.get("version") == item.get("highest_version"):
@@ -245,11 +245,11 @@ class InventoryModel(TreeModel):
                 not_found_ids.append(repre_id)
                 continue
 
-            elif version["type"] == "master_version":
+            elif version["type"] == "hero_version":
                 _version = io.find_one({
                     "_id": version["version_id"]
                 })
-                version["name"] = MasterVersionType(_version["name"])
+                version["name"] = HeroVersionType(_version["name"])
                 version["data"] = _version["data"]
 
             subset = io.find_one({"_id": version["parent"]})

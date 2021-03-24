@@ -5,7 +5,7 @@ import numbers
 
 from ..vendor.Qt import QtWidgets, QtCore, QtGui
 from . import lib
-from ..lib import MasterVersionType
+from ..lib import HeroVersionType
 from .models import TreeModel
 
 log = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
         super(VersionDelegate, self).__init__(*args, **kwargs)
 
     def displayText(self, value, locale):
-        if isinstance(value, MasterVersionType):
+        if isinstance(value, HeroVersionType):
             return lib.format_version(value, True)
         assert isinstance(value, numbers.Integral), (
             "Version is not integer. \"{}\" {}".format(value, str(type(value)))
@@ -102,7 +102,7 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
         # Current value of the index
         item = index.data(TreeModel.ItemRole)
         value = index.data(QtCore.Qt.DisplayRole)
-        if item["version_document"]["type"] != "master_version":
+        if item["version_document"]["type"] != "hero_version":
             assert isinstance(value, numbers.Integral), (
                 "Version is not integer"
             )
@@ -117,9 +117,9 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
             sort=[("name", 1)]
         ))
 
-        master_version_doc = self.dbcon.find_one(
+        hero_version_doc = self.dbcon.find_one(
             {
-                "type": "master_version",
+                "type": "hero_version",
                 "parent": parent_id
             }, {
                 "name": 1,
@@ -128,7 +128,7 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
             }
         )
 
-        doc_for_master_version = None
+        doc_for_hero_version = None
 
         selected = None
         items = []
@@ -138,11 +138,11 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
                 continue
 
             if (
-                master_version_doc
-                and doc_for_master_version is None
-                and master_version_doc["version_id"] == version_doc["_id"]
+                hero_version_doc
+                and doc_for_hero_version is None
+                and hero_version_doc["version_id"] == version_doc["_id"]
             ):
-                doc_for_master_version = version_doc
+                doc_for_hero_version = version_doc
 
             label = lib.format_version(version_doc["name"])
             item = QtGui.QStandardItem(label)
@@ -152,15 +152,15 @@ class VersionDelegate(QtWidgets.QStyledItemDelegate):
             if version_doc["name"] == value:
                 selected = item
 
-        if master_version_doc and doc_for_master_version:
-            version_name = doc_for_master_version["name"]
+        if hero_version_doc and doc_for_hero_version:
+            version_name = doc_for_hero_version["name"]
             label = lib.format_version(version_name, True)
-            if isinstance(value, MasterVersionType):
+            if isinstance(value, HeroVersionType):
                 index = len(version_docs)
-            master_version_doc["name"] = MasterVersionType(version_name)
+            hero_version_doc["name"] = HeroVersionType(version_name)
 
             item = QtGui.QStandardItem(label)
-            item.setData(master_version_doc, QtCore.Qt.UserRole)
+            item.setData(hero_version_doc, QtCore.Qt.UserRole)
             items.append(item)
 
         # Reverse items so latest versions be upper
