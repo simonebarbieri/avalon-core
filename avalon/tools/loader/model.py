@@ -1,5 +1,6 @@
 import os
 import copy
+import re
 
 from ... import (
     style,
@@ -842,6 +843,23 @@ class FamiliesFilterProxyModel(GroupMemberFilterProxyModel):
         super(FamiliesFilterProxyModel, self).sort(column, order)
 
 
+class RepresentationSortProxyModel(GroupMemberFilterProxyModel):
+    """To properly sort progress string"""
+    def lessThan(self, left, right):
+        source_model = self.sourceModel()
+        progress_indexes = [source_model.Columns.index("active_site"),
+                            source_model.Columns.index("remote_site")]
+        if left.column() in progress_indexes:
+            left_data = self.sourceModel().data(left, QtCore.Qt.DisplayRole)
+            right_data = self.sourceModel().data(right, QtCore.Qt.DisplayRole)
+            left_val = re.sub("[^0-9]", '', left_data)
+            right_val = re.sub("[^0-9]", '', right_data)
+
+            return int(left_val) < int(right_val)
+
+        return super(RepresentationSortProxyModel, self).lessThan(left, right)
+
+
 class RepresentationModel(TreeModel):
 
     doc_fetched = QtCore.Signal()
@@ -850,9 +868,8 @@ class RepresentationModel(TreeModel):
     SiteNameRole = QtCore.Qt.UserRole + 2
     ProgressRole = QtCore.Qt.UserRole + 3
     SiteSideRole = QtCore.Qt.UserRole + 4
-
-    SortAscendingRole = QtCore.Qt.UserRole + 5
-    SortDescendingRole = QtCore.Qt.UserRole + 6
+    IdRole = QtCore.Qt.UserRole + 5
+    ContextRole = QtCore.Qt.UserRole + 6
 
     Columns = [
         "name",
@@ -906,24 +923,13 @@ class RepresentationModel(TreeModel):
     def data(self, index, role):
         item = index.internalPointer()
 
-        # if role == self.SortDescendingRole:
-        #     item = index.internalPointer()
-        #     if item.get("isGroup"):
-        #         # Ensure groups be on top when sorting by descending order
-        #         prefix = "1"
-        #         order = item["order"]
-        #     else:
-        #         prefix = "0"
-        #         order = str(super(RepresentationModel, self).data(
-        #             index, QtCore.Qt.DisplayRole
-        #         ))
-        #     return prefix + order
-
+        if role == self.IdRole:
+            return item.get("_id")
 
         if role == QtCore.Qt.DecorationRole:
             # Add icon to subset column
             if index.column() == self.Columns.index("name"):
-                if item.get("isGroup"):
+                if item.get("isMerged"):
                     return item["icon"]
                 else:
                     return self._icons["repre"]
@@ -936,9 +942,12 @@ class RepresentationModel(TreeModel):
                 progress = item.get("active_site_progress", 0)
             elif index.column() == remote_index:
                 progress = item.get("remote_site_progress", 0)
+
             if progress is not None:
-                progress = max(progress, 0)
-                progress_str = "{}% avail.".format(int(progress * 100))
+                if progress >= 0:  # site added, sync in progress
+                    progress_str = "{}% avail.".format(int(progress * 100))
+                else:  # site not added yet
+                    progress_str = "not avail."
                 return progress_str
 
         if role == QtCore.Qt.DecorationRole:
@@ -975,14 +984,16 @@ class RepresentationModel(TreeModel):
         repre_groups = {}
         repre_groups_items = {}
         group = None
+        self._items_by_id = {}
         for doc in self._docs:
             if len(self.version_ids) > 1:
                 group = repre_groups.get(doc["name"])
                 if not group:
                     group_item = Item()
                     group_item.update({
+                        "_id": doc["_id"],
                         "name": doc["name"],
-                        "isGroup": True,
+                        "isMerged": True,
                         "childRow": 0,
                         "active_site_name": self.active_site,
                         "remote_site_name": self.remote_site,
@@ -1090,7 +1101,11 @@ class RepresentationModel(TreeModel):
                         progress[site["name"]] = norm_progress + \
                                                  site["progress"]
                     else:
-                        progress[site["name"]] = 0
+                        # broken doc when uncaught error, safety
+                        if site.get("progress") == '':
+                            progress[site["name"]] = 0
+                        else:
+                            progress[site["name"]] = -1
         # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
         progress[self.active_site] = \
             progress[self.active_site] / max(files[self.active_site], 1)
@@ -1100,6 +1115,10 @@ class RepresentationModel(TreeModel):
 
     def _update_group_progress(self, repre_name, group, active_progress,
                                remote_progress, repre_groups_items):
+        """
+            Update final group progress
+            Called after every item in group is added
+        """
         repre_groups_items[repre_name] += 1
         item_cnt = repre_groups_items[repre_name]
         group["active_site_progress"] = \
