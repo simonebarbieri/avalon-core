@@ -700,7 +700,8 @@ class SubsetsModel(TreeModel):
     def _repre_per_version_pipeline(self, version_ids, site):
         query = [
                 {"$match": {"parent": {"$in": version_ids},
-                            "type": "representation"}},
+                            "type": "representation",
+                            "files.sites.name": {"$exists": 1}}},
                 {"$unwind": "$files"},
                 {'$addFields': {
                     'order_local': {
@@ -1052,7 +1053,8 @@ class RepresentationModel(TreeModel):
             # Simple find here for now, expected to receive lower number of
             # representations and logic could be in Python
             docs = list(self.dbcon.find(
-                {"type": "representation", "parent": {"$in": self.version_ids}}
+                {"type": "representation", "parent": {"$in": self.version_ids},
+                 "files.sites.name": {"$exists": 1}}
                 , self._get_projection()
             ))
         self._docs = docs
