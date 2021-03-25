@@ -278,7 +278,6 @@ class AvalonToolsHelper:
         )
 
         # window.setStyleSheet(style.load_stylesheet())
-        window.widgets["files"].widgets["save"].setEnabled(True)
 
         context = {
             "asset": api.Session["AVALON_ASSET"],
