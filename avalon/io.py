@@ -254,7 +254,7 @@ def parenthood(document):
         if document is None:
             break
 
-        if document.get("type") == "master_version":
+        if document.get("type") == "hero_version":
             _document = self.find_one({"_id": document["version_id"]})
             document["data"] = _document["data"]
 
