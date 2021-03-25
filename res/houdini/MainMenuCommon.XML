@@ -63,7 +63,7 @@ publish.show(parent=pipeline.get_main_window())
                 <label>Work Files ..</label>
                 <scriptCode><![CDATA[
 import hou
-from pype.tools import workfiles
+from avalon.tools import workfiles
 from avalon.houdini import pipeline
 workfiles.show(parent=pipeline.get_main_window())
                 ]]></scriptCode>
