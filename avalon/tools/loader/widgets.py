@@ -962,24 +962,17 @@ class RepresentationWidget(QtWidgets.QWidget):
         available_loaders = api.discover(api.Loader)
 
         loaders = list()
-        both_unavailable = False
-        add_site_loader = None
         for loader in available_loaders:
             if lib.is_representation_loader(loader):
-                if self.sync_server_enabled:
-                    add_site_loader = loader
-                else:
+                if not self.sync_server_enabled:
                     available_loaders.remove(loader)
-            # temporarily disabled all other loaders, when default loader per
-            # representation will be provided, add it here
-            # else:
-            #     loaders.append(loader)
 
         if self.tool_name:
             available_loaders = lib.remove_tool_name_from_loaders(
                 available_loaders, self.tool_name)
 
 
+        already_added_loaders = set()
         for item in items:
             # TODO deduplicate loaders
             repre_context = pipeline.get_representation_context(item["_id"])
@@ -1006,15 +999,19 @@ class RepresentationWidget(QtWidgets.QWidget):
                                  item.get('isMerged'))):
                             continue
 
-                loaders.append((item, loader))
+                if loader not in already_added_loaders:
+                    loaders.append((item, loader))
+                    already_added_loaders.add(loader)
 
         menu = OptionalMenu(self)
         if not loaders:
             action = lib.get_no_loader_action(menu)
             menu.addAction(action)
         else:
-            # if self.sync_server_enabled:
-            menu = lib.add_representation_loaders_to_menu(loaders, menu)
+            optional_labels = self._get_optional_labels(loaders, selected_side)
+
+            menu = lib.add_representation_loaders_to_menu(loaders, menu,
+                                                          optional_labels)
 
         # Show the context action menu
         global_point = self.tree_view.mapToGlobal(point)
@@ -1054,12 +1051,33 @@ class RepresentationWidget(QtWidgets.QWidget):
         errors = _load_representations_by_loader(loader, repre_ids, self.dbcon,
             data_by_repre_id=data_by_repre_id)
 
+        self.model.refresh()
         if errors:
             box = LoadErrorMessageBox(errors)
             box.show()
 
+    def _get_optional_labels(self, loaders, selected_side):
+        """Each loader could have specific label
+
+            Args:
+                loaders (tuple of dict, dict): (item, loader)
+                selected_side(string): active or remote
+
+            Returns:
+                (dict) {loader: string}
+        """
+        optional_labels = {}
+        if selected_side:
+            if selected_side == 'active':
+                txt = "Localize"
+            else:
+                txt = "Sync to Remote"
+            optional_labels = {loader: txt for _, loader in loaders
+                               if lib.is_representation_loader(loader)}
+        return optional_labels
+
     def _get_selected_side(self, point_index, rows):
-        """Get active/remote label according to column in 'point_index'"""
+        """Returns active/remote label according to column in 'point_index'"""
         selected_side = None
         if self.sync_server_enabled:
             if rows:

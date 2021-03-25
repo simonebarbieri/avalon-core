@@ -1031,11 +1031,14 @@ class RepresentationModel(TreeModel):
             item = Item()
             item.update(data)
 
+            current_progress = {
+                'active_site_progress': progress[self.active_site],
+                'remote_site_progress': progress[self.remote_site]
+            }
             if group:
                 self._update_group_progress(
                     doc["name"], group,
-                    progress[self.active_site],
-                    progress[self.remote_site],
+                    current_progress,
                     repre_groups_items)
 
             self.add_child(item, group)
@@ -1079,12 +1082,12 @@ class RepresentationModel(TreeModel):
             Returns:
                 (dict) with active and remote sites progress
                 {'studio': 1.0, 'gdrive': -1} - gdrive site is not present
+                    -1 is used to highlight the site should be added
                 {'studio': 1.0, 'gdrive': 0.0} - gdrive site is present, not
                     uploaded yet
         """
         progress = {self.active_site: -1,
                     self.remote_site: -1}
-        files = 0
         if not doc:
             return progress
 
@@ -1093,41 +1096,43 @@ class RepresentationModel(TreeModel):
             for site in file.get("sites"):
                 if site["name"] in [self.active_site, self.remote_site]:
                     files[site["name"]] += 1
+                    norm_progress = max(progress[site["name"]], 0)
                     if site.get("created_dt"):
-                        norm_progress = max(progress[site["name"]], 0)
                         progress[site["name"]] = norm_progress + 1
                     elif site.get("progress"):
-                        norm_progress = max(progress[site["name"]], 0)
                         progress[site["name"]] = norm_progress + \
                                                  site["progress"]
-                    else:
-                        # broken doc when uncaught error, safety
-                        if site.get("progress") == '':
-                            progress[site["name"]] = 0
-                        else:
-                            progress[site["name"]] = -1
-        # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
-        progress[self.active_site] = \
-            progress[self.active_site] / max(files[self.active_site], 1)
-        progress[self.remote_site] = \
-            progress[self.remote_site] / max(files[self.remote_site], 1)
-        return progress
+                    else:  # site exists, might be failed, do not add again
+                        progress[site["name"]] = 0
 
-    def _update_group_progress(self, repre_name, group, active_progress,
-                               remote_progress, repre_groups_items):
+        # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
+        avg_progress = {}
+        avg_progress[self.active_site] = \
+            progress[self.active_site] / max(files[self.active_site], 1)
+        avg_progress[self.remote_site] = \
+            progress[self.remote_site] / max(files[self.remote_site], 1)
+        return avg_progress
+
+    def _update_group_progress(self, repre_name, group, current_item_progress,
+                               repre_groups_items):
         """
             Update final group progress
             Called after every item in group is added
+
+            Args:
+                repre_name(string)
+                group(dict): info about group of selected items
+                current_item_progress(dict): {'active_site_progress': XX,
+                                              'remote_site_progress': YY}
+                repre_groups_items(dict)
+            Returns:
+                (dict): updated group info
         """
         repre_groups_items[repre_name] += 1
         item_cnt = repre_groups_items[repre_name]
-        group["active_site_progress"] = \
-            (group.get("active_site_progress", 0) +
-             max(active_progress, 0)) / item_cnt
-        group["remote_site_progress"] = \
-            (group.get("remote_site_progress", 0) +
-             max(remote_progress, 0)) / item_cnt
 
+        for key, progress in current_item_progress.items():
+            group[key] = (group.get(key, 0) + max(progress, 0)) / item_cnt
 
 def get_repre_icons():
     resource_path = os.path.dirname(sync_server_module.__file__)

@@ -45,7 +45,7 @@ def get_options(action, loader, parent):
     return options
 
 
-def add_representation_loaders_to_menu(loaders, menu):
+def add_representation_loaders_to_menu(loaders, menu, optional_labels=None):
     """
         Loops through provider loaders and adds them to 'menu'.
 
@@ -61,8 +61,12 @@ def add_representation_loaders_to_menu(loaders, menu):
     """
     # List the available loaders
     for representation, loader in loaders:
+        label = None
+        if optional_labels:
+            label = optional_labels.get(loader)
 
-        label = get_label_from_loader(loader, representation)
+        if not label:
+            label = get_label_from_loader(loader, representation)
 
         icon = get_icon_from_loader(loader)
 
