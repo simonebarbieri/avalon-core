@@ -264,7 +264,7 @@ class AvalonToolsHelper:
         if self._workfiles_tool is not None:
             return self._workfiles_tool
 
-        from ..tools.workfiles.app import (
+        from pype.tools.workfiles.app import (
             Window, validate_host_requirements
         )
         # Host validation
@@ -278,7 +278,6 @@ class AvalonToolsHelper:
         )
 
         # window.setStyleSheet(style.load_stylesheet())
-        window.widgets["files"].widgets["save"].setEnabled(True)
 
         context = {
             "asset": api.Session["AVALON_ASSET"],

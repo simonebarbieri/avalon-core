@@ -15,7 +15,7 @@ from wsrpc_aiohttp import (
 )
 
 from ..vendor.Qt import QtWidgets
-from ..tools import workfiles
+from pype.tools import workfiles
 from avalon.tools.webserver.app import WebServerTool
 from .ws_stub import AfterEffectsServerStub
 
@@ -60,7 +60,11 @@ def show(module_name):
         app = QtWidgets.QApplication(sys.argv)
 
     # Import and show tool.
-    tool_module = importlib.import_module("avalon.tools." + module_name)
+    if module_name == "workfiles":
+        # Use Pype's workfiles tool
+        tool_module = workfiles
+    else:
+        tool_module = importlib.import_module("avalon.tools." + module_name)
 
     if "loader" in module_name:
         tool_module.show(use_context=True)

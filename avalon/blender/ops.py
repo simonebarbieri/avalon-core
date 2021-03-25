@@ -12,7 +12,7 @@ import bpy.utils.previews
 
 from ..tools.creator.app import Window as creator_window
 from ..tools.loader.app import Window as loader_window
-from ..tools.workfiles.app import Window as workfiles_window
+from pype.tools.workfiles.app import Window as workfiles_window
 from ..tools.sceneinventory.app import Window as sceneinventory_window
 from ..tools import publish
 

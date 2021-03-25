@@ -18,7 +18,7 @@ from uuid import uuid4
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
-from ..tools import workfiles
+from pype.tools import workfiles
 from ..toonboom import setup_startup_scripts, check_libs
 
 self = sys.modules[__name__]
