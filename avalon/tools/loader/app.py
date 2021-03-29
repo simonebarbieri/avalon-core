@@ -66,12 +66,16 @@ class Window(QtWidgets.QDialog):
         thumbnail = ThumbnailWidget(io)
         representations = RepresentationWidget(io)
 
-        thumb_ver_body = QtWidgets.QWidget()
-        thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_body)
+        thumb_ver_splitter = QtWidgets.QSplitter()
+        thumb_ver_splitter.setOrientation(QtCore.Qt.Vertical)
+        thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_splitter)
         thumb_ver_layout.setContentsMargins(0, 0, 0, 0)
         thumb_ver_layout.addWidget(thumbnail)
         thumb_ver_layout.addWidget(version)
         thumb_ver_layout.addWidget(representations)
+        thumb_ver_splitter.setStretchFactor(0, 30)
+        thumb_ver_splitter.setStretchFactor(1, 35)
+        thumb_ver_splitter.setStretchFactor(1, 35)
 
         # Create splitter to show / hide family filters
         asset_filter_splitter = QtWidgets.QSplitter()
@@ -86,7 +90,7 @@ class Window(QtWidgets.QDialog):
         split = QtWidgets.QSplitter()
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
-        split.addWidget(thumb_ver_body)
+        split.addWidget(thumb_ver_splitter)
         split.setSizes([180, 850, 350])
 
         container_layout.addWidget(split)
@@ -137,7 +141,7 @@ class Window(QtWidgets.QDialog):
         self._assetschanged()
 
         # Defaults
-        self.resize(1530, 700)
+        self.resize(1630, 700)
 
     # -------------------------------
     # Delay calling blocking methods
@@ -327,13 +331,13 @@ class Window(QtWidgets.QDialog):
                 if not index or not index.isValid():
                     continue
                 item = index.data(subsets.model.ItemRole)
-                if (
-                    item is None
-                    or item.get("isGroup")
-                    or item.get("isMerged")
-                ):
+                if item is None:
                     continue
-                version_docs.append(item["version_document"])
+                if item.get("isGroup") or item.get("isMerged"):
+                    for child in item.children():
+                        version_docs.append(child["version_document"])
+                else:
+                    version_docs.append(item["version_document"])
 
         self.data["widgets"]["version"].set_version(version_doc)
 
