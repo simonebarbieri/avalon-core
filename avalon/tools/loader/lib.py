@@ -4,7 +4,25 @@ from ..widgets import OptionalMenu, OptionalAction, OptionDialog
 import inspect
 
 
+def change_visibility(model, view, column_name, visible):
+    """
+        Hides or shows particular 'column_name'.
+
+        "asset" and "subset" columns should be visible only in multiselect
+    """
+    index = model.Columns.index(column_name)
+    view.setColumnHidden(index, not visible)
+
+
 def is_representation_loader(loader):
+    return is_remove_site_loader(loader) or is_add_site_loader(loader)
+
+
+def is_remove_site_loader(loader):
+    return hasattr(loader, "remove_site_on_representation")
+
+
+def is_add_site_loader(loader):
     return hasattr(loader, "add_site_to_representation")
 
 
@@ -45,7 +63,7 @@ def get_options(action, loader, parent):
     return options
 
 
-def add_representation_loaders_to_menu(loaders, menu, optional_labels=None):
+def add_representation_loaders_to_menu(loaders, menu):
     """
         Loops through provider loaders and adds them to 'menu'.
 
@@ -62,8 +80,8 @@ def add_representation_loaders_to_menu(loaders, menu, optional_labels=None):
     # List the available loaders
     for representation, loader in loaders:
         label = None
-        if optional_labels:
-            label = optional_labels.get(loader)
+        if representation.get("custom_label"):
+            label = representation.get("custom_label")
 
         if not label:
             label = get_label_from_loader(loader, representation)
@@ -142,3 +160,14 @@ def get_no_loader_action(menu, one_item_selected=False):
     )
     action = OptionalAction(("*" + msg), icon, False, menu)
     return action
+
+def sort_loaders(loaders, custom_sorter=None):
+    def sorter(value):
+        """Sort the Loaders by their order and then their name"""
+        Plugin = value[1]
+        return Plugin.order, Plugin.__name__
+
+    if not custom_sorter:
+        custom_sorter = sorter
+
+    return sorted(loaders, key=custom_sorter)

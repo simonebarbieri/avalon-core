@@ -2,7 +2,6 @@ import os
 import sys
 import datetime
 import pprint
-import inspect
 import traceback
 import collections
 
@@ -100,12 +99,13 @@ class SubsetWidget(QtWidgets.QWidget):
         ("asset", 130),
         ("family", 90),
         ("version", 60),
-        ("time", 120),
+        ("time", 150),
         ("author", 85),
         ("frames", 95),
         ("duration", 60),
         ("handles", 75),
-        ("step", 80)
+        ("step", 50),
+        ("repre_info", 60)
     )
 
     def __init__(
@@ -200,6 +200,9 @@ class SubsetWidget(QtWidgets.QWidget):
         for column_name, width in self.default_widths:
             idx = model.Columns.index(column_name)
             view.setColumnWidth(idx, width)
+
+        if not model.sync_server:
+            lib.change_visibility(self.model, self.view, "repre_info", False)
 
         selection = view.selectionModel()
         selection.selectionChanged.connect(self.active_changed)
@@ -382,12 +385,7 @@ class SubsetWidget(QtWidgets.QWidget):
 
                 loaders.append((repre, loader))
 
-        def sorter(value):
-            """Sort the Loaders by their order and then their name"""
-            Plugin = value[1]
-            return Plugin.order, Plugin.__name__
-
-        loaders = sorted(loaders, key=sorter)
+        loaders = lib.sort_loaders(loaders)
 
         menu = OptionalMenu(self)
         if not loaders:
@@ -873,11 +871,13 @@ class RepresentationWidget(QtWidgets.QWidget):
         ("name", 100),
         ("asset", 110),
         ("subset", 100),
-        ("active_site", 100),
-        ("remote_site", 100)
+        ("active_site", 150),
+        ("remote_site", 140)
     )
 
     default_hidden = ["asset", "subset"]
+
+    commands = {'active': 'Download', 'remote': 'Upload'}
 
     def __init__(self, dbcon, tool_name=None, parent=None):
         super(RepresentationWidget, self).__init__(parent=parent)
@@ -930,8 +930,9 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         self.sync_server_enabled = model.sync_server.enabled
 
-        for column in self.default_hidden:
-            self.change_visibility(column, False)
+        for column_name in self.default_hidden:
+            lib.change_visibility(self.model, self.tree_view,
+                                  column_name, False)
 
         self.model.refresh()
 
@@ -973,8 +974,8 @@ class RepresentationWidget(QtWidgets.QWidget):
 
 
         already_added_loaders = set()
+        label_already_in_menu = set()
         for item in items:
-            # TODO deduplicate loaders
             repre_context = pipeline.get_representation_context(item["_id"])
             for loader in pipeline.loaders_from_repre_context(
                     available_loaders,
@@ -986,34 +987,63 @@ class RepresentationWidget(QtWidgets.QWidget):
                     if both_unavailable:
                         continue
 
-                    if not selected_side:
-                        continue
+                    for selected_side in self.commands.keys():
+                        item = item.copy()
+                        item["custom_label"] = None
+                        label = None
+                        selected_site_progress = item.get(
+                            "{}_site_progress".format(selected_side), -1)
 
-                    selected_site_progress = item.get(
-                        "{}_site_progress".format(selected_side))
+                        # only remove if actually present
+                        if lib.is_remove_site_loader(loader):
+                            label = "Remove {}".format(selected_side)
+                            if selected_site_progress < 1:
+                                continue
 
-                    # site already present
-                    if selected_site_progress is not None:
-                        if not(selected_site_progress < 0 or \
-                                (selected_site_progress == 0 and
-                                 item.get('isMerged'))):
+                        if lib.is_add_site_loader(loader):
+                            label = self.commands[selected_side]
+                            if selected_site_progress >= 0:
+                                label = 'Re-{} {}'.format(label, selected_side)
+
+                        if not label:
                             continue
 
-                if loader not in already_added_loaders:
-                    loaders.append((item, loader))
-                    already_added_loaders.add(loader)
+                        item["selected_side"] = selected_side
+                        item["custom_label"] = label
+
+                        if label not in label_already_in_menu:
+                            loaders.append((item, loader))
+                            already_added_loaders.add(loader)
+                            label_already_in_menu.add(label)
+
+                else:
+                    item = item.copy()
+                    item["custom_label"] = None
+
+                    if loader not in already_added_loaders:
+                        loaders.append((item, loader))
+                        already_added_loaders.add(loader)
+
+        loaders = lib.sort_loaders(loaders)
 
         menu = OptionalMenu(self)
         if not loaders:
             action = lib.get_no_loader_action(menu)
             menu.addAction(action)
         else:
-            optional_labels = self._get_optional_labels(loaders, selected_side)
+            menu = lib.add_representation_loaders_to_menu(loaders, menu)
 
-            menu = lib.add_representation_loaders_to_menu(loaders, menu,
-                                                          optional_labels)
+        self._process_action(items, menu, point)
 
-        # Show the context action menu
+    def _process_action(self, items, menu, point):
+        """
+            Show the context action menu and process selected
+
+            Args:
+                items(dict): menu items
+                menu(OptionalMenu)
+                point(PointIndex)
+        """
         global_point = self.tree_view.mapToGlobal(point)
         action = menu.exec_(global_point)
 
@@ -1024,16 +1054,10 @@ class RepresentationWidget(QtWidgets.QWidget):
         action_representation, loader = action.data()
         repre_ids = []
         data_by_repre_id = {}
+        selected_side = action_representation.get("selected_side")
+
         for item in items:
             if lib.is_representation_loader(loader):
-                if not selected_side:
-                    continue
-
-                selected_site_progress = item.get(
-                    "{}_site_progress".format(selected_side), -1)
-                if selected_site_progress >= 0:
-                    continue
-
                 site_name = "{}_site_name".format(selected_side)
                 data = {
                     "_id": item.get("_id"),
@@ -1098,8 +1122,7 @@ class RepresentationWidget(QtWidgets.QWidget):
 
             "asset" and "subset" columns should be visible only in multiselect
         """
-        index = self.model.Columns.index(column_name)
-        self.tree_view.setColumnHidden(index, not visible)
+        lib.change_visibility(self.model, self.tree_view, column_name, visible)
 
 
 def _load_representations_by_loader(loader, repre_ids, dbcon,

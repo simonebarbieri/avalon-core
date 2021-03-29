@@ -41,7 +41,8 @@ class SubsetsModel(TreeModel):
         "frames",
         "duration",
         "handles",
-        "step"
+        "step",
+        "repre_info"
     ]
 
     column_labels_mapping = {
@@ -54,7 +55,8 @@ class SubsetsModel(TreeModel):
         "frames": "Frames",
         "duration": "Duration",
         "handles": "Handles",
-        "step": "Step"
+        "step": "Step",
+        "repre_info": "Availability"
     }
 
     SortAscendingRole = QtCore.Qt.UserRole + 2
@@ -117,9 +119,6 @@ class SubsetsModel(TreeModel):
         self.sync_server = None
         self.active_site = self.active_provider = None
 
-        self.Columns.append("repre_info")
-        self.column_labels_mapping["repre_info"] = "Repre info"
-
         self.columns_index = dict(
             (key, idx) for idx, key in enumerate(self.Columns)
         )
@@ -138,6 +137,8 @@ class SubsetsModel(TreeModel):
         self._doc_payload = {}
 
         self.doc_fetched.connect(self.on_doc_fetched)
+
+        self.refresh()
 
     def set_assets(self, asset_ids):
         self._asset_ids = asset_ids
@@ -880,6 +881,14 @@ class RepresentationModel(TreeModel):
         "remote_site"
     ]
 
+    column_labels_mapping = {
+        "name": "Name",
+        "subset": "Subset",
+        "asset": "Asset",
+        "active_site": "Active",
+        "remote_site": "Remote"
+    }
+
     def __init__(self, dbcon, header, version_ids):
         super(RepresentationModel, self).__init__()
         self.dbcon = dbcon
@@ -939,16 +948,25 @@ class RepresentationModel(TreeModel):
         remote_index = self.Columns.index("remote_site")
         if role == QtCore.Qt.DisplayRole:
             progress = None
+            label = ''
             if index.column() == active_index:
+                label = 'downloaded'
                 progress = item.get("active_site_progress", 0)
             elif index.column() == remote_index:
+                label = 'uploaded'
                 progress = item.get("remote_site_progress", 0)
 
             if progress is not None:
-                if progress >= 0:  # site added, sync in progress
-                    progress_str = "{}% avail.".format(int(progress * 100))
-                else:  # site not added yet
-                    progress_str = "not avail."
+                # site added, sync in progress
+                progress_str = "not avail."
+                if progress >= 0:
+                    # progress == 0 for isMerged is unavailable
+                    if progress == 0 and item.get("isMerged"):
+                        progress_str = "not avail."
+                    else:
+                        progress_str = "{}% {}".format(int(progress * 100),
+                                                       label)
+
                 return progress_str
 
         if role == QtCore.Qt.DecorationRole:
@@ -1018,6 +1036,7 @@ class RepresentationModel(TreeModel):
                 "name": doc["name"],
                 "subset": doc["context"]["subset"],
                 "asset": doc["context"]["asset"],
+                "isMerged": False,
 
                 "active_site_icon": active_site_icon,
                 "remote_site_icon": remote_site_icon,
