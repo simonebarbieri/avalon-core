@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?> 
 <ExtensionList>
-    <Extension Id="com.pype.AE.panel">
+    <Extension Id="com.openpype.AE.panel">
         <HostList>
            
             <!-- Comment Host tags according to the apps you want your panel to support -->
