@@ -132,7 +132,7 @@ def update(container, version=-1):
     referenced then this function will need to see an update.
 
     Arguments:
-        container (avalon-core:container-1.0): Container to update,
+        container (openpype:container-1.0): Container to update,
             from `host.ls()`.
         version (int, optional): Update the container to this version.
             If no version is passed, the latest is assumed.
@@ -213,7 +213,7 @@ def remove(container):
     Deprecated; this functionality is replaced by `api.remove()`
 
     Arguments:
-        container (avalon-core:container-1.0): Which container
+        container (openpype:container-1.0): Which container
             to remove from scene.
 
     """
