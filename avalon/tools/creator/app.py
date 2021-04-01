@@ -10,7 +10,7 @@ from ... import api, io, style
 
 from .widgets import CreateErrorMessageBox
 from .. import lib
-from pype.api import get_current_project_settings
+from openpype.api import get_current_project_settings
 
 module = sys.modules[__name__]
 module.window = None

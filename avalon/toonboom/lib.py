@@ -13,7 +13,7 @@ import filecmp
 from uuid import uuid4
 
 from .server import Server
-from pype.tools import workfiles
+from openpype.tools import workfiles
 from ..vendor.Qt import QtWidgets
 
 self = sys.modules[__name__]
