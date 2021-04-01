@@ -236,7 +236,7 @@ def containerise(name: str,
         container.objects.link(obj)
 
     data = {
-        "schema": "avalon-core:container-2.0",
+        "schema": "openpype:container-2.0",
         "id": AVALON_CONTAINER_ID,
         "name": name,
         "namespace": namespace or '',
@@ -275,7 +275,7 @@ def containerise_existing(
         node_name = f"{node_name}_{suffix}"
     container.name = node_name
     data = {
-        "schema": "avalon-core:container-2.0",
+        "schema": "openpype:container-2.0",
         "id": AVALON_CONTAINER_ID,
         "name": name,
         "namespace": namespace or '',

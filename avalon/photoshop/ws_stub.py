@@ -95,7 +95,7 @@ class PhotoshopServerStub:
             }] - for created instances
             OR
             [{
-                "schema": "avalon-core:container-2.0",
+                "schema": "openpype:container-2.0",
                 "id": "pyblish.avalon.instance",
                 "name": "imageMG",
                 "namespace": "Jungle_imageMG_001",
@@ -341,7 +341,7 @@ class PhotoshopServerStub:
         else:
             # legacy version of metadata
             for layer_id, layer_meta in layers_data.items():
-                if layer_meta.get("schema") != "avalon-core:container-2.0":
+                if layer_meta.get("schema") != "openpype:container-2.0":
                     layer_meta["uuid"] = str(layer_id)
                 else:
                     layer_meta["members"] = [str(layer_id)]

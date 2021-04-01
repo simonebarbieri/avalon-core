@@ -967,7 +967,7 @@ def debug_host():
         containers = [
             {
                 "representation": "ee-ft-a-uuid1",
-                "schema": "avalon-core:container-1.0",
+                "schema": "openpype:container-1.0",
                 "name": "Bruce01",
                 "objectName": "Bruce01_node",
                 "namespace": "_bruce01_",
@@ -975,7 +975,7 @@ def debug_host():
             },
             {
                 "representation": "aa-bc-s-uuid2",
-                "schema": "avalon-core:container-1.0",
+                "schema": "openpype:container-1.0",
                 "name": "Bruce02",
                 "objectName": "Bruce01_node",
                 "namespace": "_bruce02_",

@@ -86,7 +86,7 @@ def containerise(
     """
 
     container_data = {
-        "schema": "avalon-core:container-2.0",
+        "schema": "openpype:container-2.0",
         "id": AVALON_CONTAINER_ID,
         "members": members,
         "name": name,
