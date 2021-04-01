@@ -264,7 +264,7 @@ class AvalonToolsHelper:
         if self._workfiles_tool is not None:
             return self._workfiles_tool
 
-        from pype.tools.workfiles.app import (
+        from openpype.tools.workfiles.app import (
             Window, validate_host_requirements
         )
         # Host validation
