@@ -9,6 +9,8 @@ from ..vendor import six, clique
 
 log = logging.getLogger(__name__)
 
+avalon_tab = "{}Tab".format(os.getenv("AVALON_LABEL") or "Avalon")
+avalon_data_group = "{}DataGroup".format(os.getenv("AVALON_LABEL") or "Avalon")
 
 @contextlib.contextmanager
 def maintained_selection():
@@ -324,10 +326,13 @@ def set_avalon_knob_data(node, data=None, prefix="avalon:"):
             'subset': 'subsetMain'
         }
     """
+    global avalon_tab
+    global avalon_data_group
+
     data = data or dict()
     create = OrderedDict()
 
-    tab_name = "AvalonTab"
+    tab_name = avalon_tab
     editable = ["asset", "subset", "name", "namespace"]
 
     existed_knobs = node.knobs()
@@ -361,7 +366,7 @@ def set_avalon_knob_data(node, data=None, prefix="avalon:"):
             (("warn", ""), warn),
             (("divd", ""), divd),
         ]
-        tab["avalonDataGroup"] = OrderedDict(head + create.items())
+        tab[avalon_data_group] = OrderedDict(head + create.items())
         create = tab
 
     imprint(node, create, tab=tab_name)
@@ -378,6 +383,9 @@ def get_avalon_knob_data(node, prefix="avalon:"):
     Returns:
         data (dict)
     """
+    global avalon_tab
+    global avalon_data_group
+
     # check if lists
     if not isinstance(prefix, list):
         prefix = list([prefix])
@@ -387,11 +395,11 @@ def get_avalon_knob_data(node, prefix="avalon:"):
     # loop prefix
     for p in prefix:
         # check if the node is avalon tracked
-        if "AvalonTab" not in node.knobs():
+        if avalon_tab not in node.knobs():
             continue
         try:
             # check if data available on the node
-            test = node['avalonDataGroup'].value()
+            test = node[avalon_data_group].value()
             log.debug("Only testing if data avalable: `{}`".format(test))
         except NameError as e:
             # if it doesn't then create it
