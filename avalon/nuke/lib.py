@@ -9,8 +9,9 @@ from ..vendor import six, clique
 
 log = logging.getLogger(__name__)
 
-avalon_tab = "{}Tab".format(os.getenv("AVALON_LABEL") or "Avalon")
-avalon_data_group = "{}DataGroup".format(os.getenv("AVALON_LABEL") or "Avalon")
+avalon_label = os.getenv("AVALON_LABEL") or "Avalon"
+avalon_tab = "{}".format(avalon_label)
+avalon_data_group = "{}DataGroup".format(avalon_label.capitalize())
 
 @contextlib.contextmanager
 def maintained_selection():
