@@ -12,7 +12,7 @@ import bpy.utils.previews
 
 from ..tools.creator.app import Window as creator_window
 from ..tools.loader.app import Window as loader_window
-from pype.tools.workfiles.app import Window as workfiles_window
+from openpype.tools.workfiles.app import Window as workfiles_window
 from ..tools.sceneinventory.app import Window as sceneinventory_window
 from ..tools import publish
 
@@ -256,7 +256,7 @@ class TOPBAR_MT_avalon(bpy.types.Menu):
     """Avalon menu."""
 
     bl_idname = "TOPBAR_MT_avalon"
-    bl_label = "Avalon"
+    bl_label = os.environ.get("AVALON_LABEL")
 
     def draw(self, context):
         """Draw the menu in the UI."""

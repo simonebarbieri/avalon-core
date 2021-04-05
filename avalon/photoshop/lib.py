@@ -15,7 +15,7 @@ from wsrpc_aiohttp import (
 )
 
 from ..vendor.Qt import QtWidgets
-from pype.tools import workfiles
+from openpype.tools import workfiles
 
 from avalon.tools.webserver.app import WebServerTool
 from .ws_stub import PhotoshopServerStub

@@ -161,7 +161,7 @@ def containerise(name, namespace, nodes, context, loader=None, suffix="_CON"):
     namespace = path
 
     data = {
-        "schema": "avalon-core:container-2.0",
+        "schema": "openpype:container-2.0",
         "id": AVALON_CONTAINER_ID,
         "name": new_name,
         "namespace": namespace,

@@ -190,7 +190,7 @@ def containerise(name,
         container (str): Name of container assembly
     """
     data = {
-        "schema": "avalon-core:container-2.0",
+        "schema": "openpype:container-2.0",
         "id": pipeline.AVALON_CONTAINER_ID,
         "name": name,
         "namespace": namespace,
