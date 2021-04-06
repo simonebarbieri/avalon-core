@@ -181,7 +181,7 @@ function start()
       {
         "module": "avalon.toonboom",
         "method": "show",
-        "args": ["avalon.tools.workfiles"]
+        "args": ["pype.tools.workfiles"]
       },
       false
     );

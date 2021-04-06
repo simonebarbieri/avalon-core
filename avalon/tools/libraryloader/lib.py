@@ -1,7 +1,7 @@
 import os
 import importlib
 import logging
-from pype.api import Anatomy
+from openpype.api import Anatomy
 
 log = logging.getLogger(__name__)
 

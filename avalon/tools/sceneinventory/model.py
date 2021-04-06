@@ -2,12 +2,12 @@ import logging
 
 from collections import defaultdict
 
-from ... import api, io, style
+from ... import api, io, style, schema
 from ...vendor.Qt import QtCore, QtGui
 from ...vendor import qtawesome
 
 from .. import lib as tools_lib
-from ...lib import MasterVersionType
+from ...lib import HeroVersionType
 from ..models import TreeModel, Item
 
 from . import lib
@@ -34,7 +34,7 @@ class InventoryModel(TreeModel):
 
     def outdated(self, item):
         value = item.get("version")
-        if isinstance(value, MasterVersionType):
+        if isinstance(value, HeroVersionType):
             return False
 
         if item.get("version") == item.get("highest_version"):
@@ -245,11 +245,11 @@ class InventoryModel(TreeModel):
                 not_found_ids.append(repre_id)
                 continue
 
-            elif version["type"] == "master_version":
+            elif version["type"] == "hero_version":
                 _version = io.find_one({
                     "_id": version["version_id"]
                 })
-                version["name"] = MasterVersionType(_version["name"])
+                version["name"] = HeroVersionType(_version["name"])
                 version["data"] = _version["data"]
 
             subset = io.find_one({"_id": version["parent"]})
@@ -302,14 +302,15 @@ class InventoryModel(TreeModel):
 
             # Get the primary family
             no_family = ""
-            if subset["schema"] == "avalon-core:subset-3.0":
-                families = subset["data"]["families"]
-                prim_family = families[0] if families else no_family
-            else:
+            maj_version, _ = schema.get_schema_version(subset["schema"])
+            if maj_version < 3:
                 prim_family = version["data"].get("family")
                 if not prim_family:
                     families = version["data"].get("families")
                     prim_family = families[0] if families else no_family
+            else:
+                families = subset["data"].get("families") or []
+                prim_family = families[0] if families else no_family
 
             # Get the label and icon for the family if in configuration
             family_config = self.family_config_cache.family_config(prim_family)

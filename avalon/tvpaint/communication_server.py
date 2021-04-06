@@ -264,7 +264,7 @@ class AvalonToolsHelper:
         if self._workfiles_tool is not None:
             return self._workfiles_tool
 
-        from ..tools.workfiles.app import (
+        from openpype.tools.workfiles.app import (
             Window, validate_host_requirements
         )
         # Host validation
@@ -278,7 +278,6 @@ class AvalonToolsHelper:
         )
 
         # window.setStyleSheet(style.load_stylesheet())
-        window.widgets["files"].widgets["save"].setEnabled(True)
 
         context = {
             "asset": api.Session["AVALON_ASSET"],
@@ -691,8 +690,8 @@ class Communicator:
                 of size 2 `(C:/src/file.dll, C:/dst/file.dll)`.
         """
 
-        from win32com.shell import shell
         import pythoncom
+        from win32comext.shell import shell
 
         # Create temp folder where plugin files are temporary copied
         # - reason is that copy to TVPaint requires administartion permissions

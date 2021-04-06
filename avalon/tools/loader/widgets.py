@@ -11,7 +11,7 @@ from ...vendor import qtawesome
 from ... import api
 from ... import pipeline
 from ... import style
-from ...lib import MasterVersionType
+from ...lib import HeroVersionType
 
 from .. import lib as tools_lib
 from ..delegates import VersionDelegate, PrettyTimeDelegate
@@ -638,17 +638,17 @@ class VersionTextEdit(QtWidgets.QTextEdit):
         if not version_doc:
             version_doc = self.dbcon.find_one({
                 "_id": version_id,
-                "type": {"$in": ["version", "master_version"]}
+                "type": {"$in": ["version", "hero_version"]}
             })
             assert version_doc, "Not a valid version id"
 
-        if version_doc["type"] == "master_version":
+        if version_doc["type"] == "hero_version":
             _version_doc = self.dbcon.find_one({
                 "_id": version_doc["version_id"],
                 "type": "version"
             })
             version_doc["data"] = _version_doc["data"]
-            version_doc["name"] = MasterVersionType(
+            version_doc["name"] = HeroVersionType(
                 _version_doc["name"]
             )
 
@@ -672,8 +672,8 @@ class VersionTextEdit(QtWidgets.QTextEdit):
         self.data["source"] = source
         self.data["raw"] = version_doc
 
-        if version_doc["type"] == "master_version":
-            version_name = "Master"
+        if version_doc["type"] == "hero_version":
+            version_name = "hero"
         else:
             version_name = tools_lib.format_version(version_doc["name"])
 

@@ -340,7 +340,7 @@ function deleteItem(item_id){
 function getWorkArea(comp_id){
     /**
      * Returns information about workarea - are that will be
-     * rendered. All calculation will be done in Pype, 
+     * rendered. All calculation will be done in OpenPype,
      * easier to modify without redeploy of extension.
      * 
      * Returns
@@ -359,7 +359,7 @@ function getWorkArea(comp_id){
 
 function setWorkArea(comp_id, workAreaStart, workAreaDuration, frameRate){
     /**
-     * Sets work area info from outside (from Ftrack via Pype)
+     * Sets work area info from outside (from Ftrack via OpenPype)
      */
     var item = app.project.itemByID(comp_id);
     if (item){

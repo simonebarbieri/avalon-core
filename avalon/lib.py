@@ -316,7 +316,7 @@ def find_submodule(module, submodule):
     )
 
 
-class MasterVersionType(object):
+class HeroVersionType(object):
     def __init__(self, version):
         assert isinstance(version, numbers.Integral), (
             "Version is not an integer. \"{}\" {}".format(

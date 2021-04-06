@@ -7,7 +7,7 @@ from functools import partial
 from ...vendor.Qt import QtWidgets, QtCore
 from ...vendor import qtawesome
 from ... import io, api, style
-from ...lib import MasterVersionType
+from ...lib import HeroVersionType
 
 from .. import lib as tools_lib
 from ..delegates import VersionDelegate
@@ -82,15 +82,15 @@ class View(QtWidgets.QTreeView):
 
         loaded_versions = io.find({
             "_id": {"$in": version_ids},
-            "type": {"$in": ["version", "master_version"]}
+            "type": {"$in": ["version", "hero_version"]}
         })
 
-        loaded_master_versions = []
+        loaded_hero_versions = []
         versions_by_parent_id = collections.defaultdict(list)
         version_parents = []
         for version in loaded_versions:
-            if version["type"] == "master_version":
-                loaded_master_versions.append(version)
+            if version["type"] == "hero_version":
+                loaded_hero_versions.append(version)
             else:
                 parent_id = version["parent"]
                 versions_by_parent_id[parent_id].append(version)
@@ -98,19 +98,19 @@ class View(QtWidgets.QTreeView):
                     version_parents.append(parent_id)
 
         all_versions = io.find({
-            "type": {"$in": ["master_version", "version"]},
+            "type": {"$in": ["hero_version", "version"]},
             "parent": {"$in": version_parents}
         })
-        master_versions = []
+        hero_versions = []
         versions = []
         for version in all_versions:
-            if version["type"] == "master_version":
-                master_versions.append(version)
+            if version["type"] == "hero_version":
+                hero_versions.append(version)
             else:
                 versions.append(version)
 
-        has_loaded_master_versions = len(loaded_master_versions) > 0
-        has_available_master_version = len(master_versions) > 0
+        has_loaded_hero_versions = len(loaded_hero_versions) > 0
+        has_available_hero_version = len(hero_versions) > 0
         has_outdated = False
 
         for version in versions:
@@ -125,7 +125,7 @@ class View(QtWidgets.QTreeView):
                 break
 
         switch_to_versioned = None
-        if has_loaded_master_versions:
+        if has_loaded_hero_versions:
             def _on_switch_to_versioned(items):
                 repre_ids = []
                 for item in items:
@@ -149,23 +149,23 @@ class View(QtWidgets.QTreeView):
                     if version_id not in version_ids:
                         version_ids.append(version_id)
 
-                master_versions = io.find(
+                hero_versions = io.find(
                     {
                         "_id": {"$in": version_ids},
-                        "type": "master_version"
+                        "type": "hero_version"
                     },
                     {"version_id": 1}
                 )
 
                 version_ids = set()
-                for master_version in master_versions:
-                    version_id = master_version["version_id"]
+                for hero_version in hero_versions:
+                    version_id = hero_version["version_id"]
                     version_ids.add(version_id)
-                    master_version_id = master_version["_id"]
+                    hero_version_id = hero_version["_id"]
                     for _repre_id, _version_id in (
                         version_id_by_repre_id.items()
                     ):
-                        if _version_id == master_version_id:
+                        if _version_id == hero_version_id:
                             version_id_by_repre_id[_repre_id] = _version_id
 
                 version_docs = io.find(
@@ -202,7 +202,7 @@ class View(QtWidgets.QTreeView):
             )
 
         update_to_latest_action = None
-        if has_outdated or has_loaded_master_versions:
+        if has_outdated or has_loaded_hero_versions:
             # update to latest version
             def _on_update_to_latest(items):
                 for item in items:
@@ -222,12 +222,12 @@ class View(QtWidgets.QTreeView):
                 lambda: _on_update_to_latest(items)
             )
 
-        change_to_master = None
-        if has_available_master_version:
-            # change to master version
-            def _on_update_to_master(items):
+        change_to_hero = None
+        if has_available_hero_version:
+            # change to hero version
+            def _on_update_to_hero(items):
                 for item in items:
-                    api.update(item, MasterVersionType(-1))
+                    api.update(item, HeroVersionType(-1))
                 self.data_changed.emit()
 
             # TODO change icon
@@ -235,13 +235,13 @@ class View(QtWidgets.QTreeView):
                 "fa.asterisk",
                 color="#00b359"
             )
-            change_to_master = QtWidgets.QAction(
+            change_to_hero = QtWidgets.QAction(
                 change_icon,
-                "Change to Master",
+                "Change to hero",
                 menu
             )
-            change_to_master.triggered.connect(
-                lambda: _on_update_to_master(items)
+            change_to_hero.triggered.connect(
+                lambda: _on_update_to_hero(items)
             )
 
         # set version
@@ -277,8 +277,8 @@ class View(QtWidgets.QTreeView):
         if update_to_latest_action:
             menu.addAction(update_to_latest_action)
 
-        if change_to_master:
-            menu.addAction(change_to_master)
+        if change_to_hero:
+            menu.addAction(change_to_hero)
 
         menu.addAction(set_version_action)
         menu.addAction(switch_asset_action)
@@ -554,27 +554,27 @@ class View(QtWidgets.QTreeView):
             sort=[("name", 1)]
         ))
 
-        master_version = io.find_one({
+        hero_version = io.find_one({
             "parent": version["parent"],
-            "type": "master_version"
+            "type": "hero_version"
         })
-        if master_version:
-            _version_id = master_version["version_id"]
+        if hero_version:
+            _version_id = hero_version["version_id"]
             for _version in versions:
                 if _version["_id"] != _version_id:
                     continue
 
-                master_version["name"] = MasterVersionType(
+                hero_version["name"] = HeroVersionType(
                     _version["name"]
                 )
-                master_version["data"] = _version["data"]
+                hero_version["data"] = _version["data"]
                 break
 
         # Get index among the listed versions
         current_item = None
         current_version = active["version"]
-        if isinstance(current_version, MasterVersionType):
-            current_item = master_version
+        if isinstance(current_version, HeroVersionType):
+            current_item = hero_version
         else:
             for version in versions:
                 if version["name"] == current_version:
@@ -582,8 +582,8 @@ class View(QtWidgets.QTreeView):
                     break
 
         all_versions = []
-        if master_version:
-            all_versions.append(master_version)
+        if hero_version:
+            all_versions.append(hero_version)
         all_versions.extend(reversed(versions))
 
         if current_item:
@@ -594,8 +594,8 @@ class View(QtWidgets.QTreeView):
         versions_by_label = dict()
         labels = []
         for version in all_versions:
-            is_master = version["type"] == "master_version"
-            label = tools_lib.format_version(version["name"], is_master)
+            is_hero = version["type"] == "hero_version"
+            label = tools_lib.format_version(version["name"], is_hero)
             labels.append(label)
             versions_by_label[label] = version["name"]
 
@@ -804,15 +804,15 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 version_ids.append(repre["parent"])
 
         versions = io.find({
-            "type": {"$in": ["version", "master_version"]},
+            "type": {"$in": ["version", "hero_version"]},
             "_id": {"$in": list(set(version_ids))}
         })
         content_versions = {}
-        master_version_ids = set()
+        hero_version_ids = set()
         for version in versions:
             content_versions[version["_id"]] = version
-            if version["type"] == "master_version":
-                master_version_ids.add(version["_id"])
+            if version["type"] == "hero_version":
+                hero_version_ids.add(version["_id"])
 
         missing_versions = []
         subset_ids = []
@@ -866,7 +866,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self.content_versions = content_versions
         self.content_repres = content_repres
 
-        self.master_version_ids = master_version_ids
+        self.hero_version_ids = hero_version_ids
 
         self.missing_assets = missing_assets
         self.missing_versions = missing_versions
@@ -1062,8 +1062,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         return list(possible_subsets or list())
 
     def _representations_box_values(self):
-        # NOTE master versions are not used because it is expected that
-        # master version has same representations as latests
+        # NOTE hero versions are not used because it is expected that
+        # hero version has same representations as latests
         selected_asset = self._assets_box.currentText()
         selected_subset = self._subsets_box.currentText()
 
@@ -1541,8 +1541,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             "parent": {"$in": subset_ids}
         }, sort=[("name", -1)]))
 
-        master_version_docs = list(io.find({
-            "type": "master_version",
+        hero_version_docs = list(io.find({
+            "type": "hero_version",
             "parent": {"$in": subset_ids}
         }))
 
@@ -1555,11 +1555,11 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 version_ids.append(version_doc["_id"])
                 version_docs_by_parent_id[parent_id] = version_doc
 
-        master_version_docs_by_parent_id = {}
-        for master_version_doc in master_version_docs:
-            version_ids.append(master_version_doc["_id"])
-            parent_id = master_version_doc["parent"]
-            master_version_docs_by_parent_id[parent_id] = master_version_doc
+        hero_version_docs_by_parent_id = {}
+        for hero_version_doc in hero_version_docs:
+            version_ids.append(hero_version_doc["_id"])
+            parent_id = hero_version_doc["parent"]
+            hero_version_docs_by_parent_id[parent_id] = hero_version_doc
 
         repre_docs = io.find({
             "type": "representation",
@@ -1600,13 +1600,13 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
             repre_doc = None
             subset_id = subset_doc["_id"]
-            if container_version["type"] == "master_version":
-                master_version = master_version_docs_by_parent_id.get(
+            if container_version["type"] == "hero_version":
+                hero_version = hero_version_docs_by_parent_id.get(
                     subset_id
                 )
-                if master_version:
+                if hero_version:
                     _repres = repre_docs_by_parent_id_by_name.get(
-                        master_version["_id"]
+                        hero_version["_id"]
                     )
                     if selected_representation:
                         repre_doc = _repres.get(selected_representation)

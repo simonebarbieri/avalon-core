@@ -17,7 +17,7 @@ async function startUp(url){
     var res = await promis; 
     log.warn("res: " + res);
 
-    promis = runEvalScript("getEnv('PYPE_DEBUG')");
+    promis = runEvalScript("getEnv('OPENPYPE_DEBUG')");
     var debug = await promis;
     log.warn("debug: " + debug);
     if (debug && debug.toString() == '3'){

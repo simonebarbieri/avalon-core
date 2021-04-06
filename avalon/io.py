@@ -94,7 +94,7 @@ def _install_sentry():
 def _from_environment():
     session = session_data_from_environment(context_keys=True)
 
-    session["schema"] = "avalon-core:session-2.0"
+    session["schema"] = "openpype:session-2.0"
     try:
         schema.validate(session)
     except schema.ValidationError as e:
@@ -254,7 +254,7 @@ def parenthood(document):
         if document is None:
             break
 
-        if document.get("type") == "master_version":
+        if document.get("type") == "hero_version":
             _document = self.find_one({"_id": document["version_id"]})
             document["data"] = _document["data"]
 

@@ -24,10 +24,10 @@ def global_family_cache():
     return _GLOBAL_FAMILY_CACHE
 
 
-def format_version(value, master_version=False):
+def format_version(value, hero_version=False):
     """Formats integer to displayable version name"""
     label = "v{0:03d}".format(value)
-    if not master_version:
+    if not hero_version:
         return label
     return "[{}]".format(label)
 

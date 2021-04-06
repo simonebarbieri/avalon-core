@@ -383,7 +383,7 @@ def containerise(name,
     container = cmds.sets(nodes, name="%s_%s_%s" % (namespace, name, suffix))
 
     data = [
-        ("schema", "avalon-core:container-2.0"),
+        ("schema", "openpype:container-2.0"),
         ("id", AVALON_CONTAINER_ID),
         ("name", name),
         ("namespace", namespace),
@@ -439,7 +439,7 @@ def parse_container(container):
     data = lib.read(container)
 
     # Backwards compatibility pre-schemas for containers
-    data["schema"] = data.get("schema", "avalon-core:container-1.0")
+    data["schema"] = data.get("schema", "openpype:container-1.0")
 
     # Append transient data
     data["objectName"] = container
