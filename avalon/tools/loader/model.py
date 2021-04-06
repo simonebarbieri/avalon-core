@@ -13,8 +13,8 @@ from ..models import TreeModel, Item
 from .. import lib
 from ...lib import HeroVersionType
 
-from pype.modules import ModulesManager
-from pype.modules.sync_server import sync_server_module
+from openpype.modules import ModulesManager
+from openpype.modules.sync_server import sync_server_module
 
 def is_filtering_recursible():
     """Does Qt binding support recursive filtering for QSortFilterProxyModel?
