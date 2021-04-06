@@ -792,9 +792,20 @@ class Communicator:
         plugin_dir = os.path.join(source_plugins_dir, "plugin")
 
         to_copy = []
+        to_remove = []
+        # Remove old plugin name
+        deprecated_filepath = os.path.join(
+            host_plugins_path, "AvalonPlugin.dll"
+        )
+        if os.path.exists(deprecated_filepath):
+            to_remove.append(deprecated_filepath)
+
         for filename in os.listdir(plugin_dir):
             src_full_path = os.path.join(plugin_dir, filename)
             dst_full_path = os.path.join(host_plugins_path, filename)
+            if dst_full_path in to_remove:
+                to_remove.remove(dst_full_path)
+
             if (
                 not os.path.exists(dst_full_path)
                 or not filecmp.cmp(src_full_path, dst_full_path)
@@ -816,7 +827,7 @@ class Communicator:
                 to_copy.append((localization_file_src, localization_file_dst))
 
         # Skip copy if everything is done
-        if not to_copy:
+        if not to_copy and not to_remove:
             return
 
         # Try to copy
