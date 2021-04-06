@@ -266,31 +266,31 @@ class AfterEffectsServerStub():
 
         log.debug("Couldn't import {} file".format(path))
 
-    def replace_item(self, item, path, item_name):
+    def replace_item(self, item_id, path, item_name):
         """ Replace FootageItem with new file
 
             Args:
-                item (dict):
+                item_id (int):
                 path (string):absolute path
                 item_name (string): label on item in Project list
 
         """
         self.websocketserver.call(self.client.call
                                   ('AfterEffects.replace_item',
-                                   item_id=item.id,
+                                   item_id=item_id,
                                    path=path, item_name=item_name))
 
-    def rename_item(self, item, item_name):
+    def rename_item(self, item_id, item_name):
         """ Replace item with item_name
 
             Args:
-                item (dict):
+                item_id (int):
                 item_name (string): label on item in Project list
 
         """
         self.websocketserver.call(self.client.call
                                   ('AfterEffects.rename_item',
-                                   item_id=item.id,
+                                   item_id=item_id,
                                    item_name=item_name))
 
     def delete_item(self, item_id):

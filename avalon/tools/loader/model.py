@@ -11,7 +11,7 @@ from ...vendor import qtawesome
 
 from ..models import TreeModel, Item
 from .. import lib
-from ...lib import MasterVersionType
+from ...lib import HeroVersionType
 
 from pype.modules import ModulesManager
 from pype.modules.sync_server import sync_server_module
@@ -73,7 +73,7 @@ class SubsetsModel(TreeModel):
         (0, 204, 106), # Dark Green
         (247, 99, 12), # Orange
     ]
-    not_last_master_brush = QtGui.QBrush(QtGui.QColor(254, 121, 121))
+    not_last_hero_brush = QtGui.QBrush(QtGui.QColor(254, 121, 121))
 
     # Should be minimum of required asset document keys
     asset_doc_projection = {
@@ -154,16 +154,16 @@ class SubsetsModel(TreeModel):
         if index.column() == self.columns_index["version"]:
             item = index.internalPointer()
             parent = item["_id"]
-            if isinstance(value, MasterVersionType):
+            if isinstance(value, HeroVersionType):
                 versions = list(self.dbcon.find({
-                    "type": {"$in": ["version", "master_version"]},
+                    "type": {"$in": ["version", "hero_version"]},
                     "parent": parent
                 }, sort=[("name", -1)]))
 
                 version = None
                 last_version = None
                 for __version in versions:
-                    if __version["type"] == "master_version":
+                    if __version["type"] == "hero_version":
                         version = __version
                     elif last_version is None:
                         last_version = __version
@@ -335,13 +335,13 @@ class SubsetsModel(TreeModel):
             doc["_id"] = doc.pop("_version_id")
             last_versions_by_subset_id[doc["parent"]] = doc
 
-        master_versions = self.dbcon.find({
-            "type": "master_version",
+        hero_versions = self.dbcon.find({
+            "type": "hero_version",
             "parent": {"$in": subset_ids}
         })
         missing_versions = []
-        for master_version in master_versions:
-            version_id = master_version["version_id"]
+        for hero_version in hero_versions:
+            version_id = hero_version["version_id"]
             if version_id not in last_versions_by_subset_id:
                 missing_versions.append(version_id)
 
@@ -356,9 +356,9 @@ class SubsetsModel(TreeModel):
                 for missing_version_doc in missing_version_docs
             }
 
-        for master_version in master_versions:
-            version_id = master_version["version_id"]
-            subset_id = master_version["parent"]
+        for hero_version in hero_versions:
+            version_id = hero_version["version_id"]
+            subset_id = hero_version["parent"]
 
             version_doc = last_versions_by_subset_id.get(subset_id)
             if version_doc is None:
@@ -366,12 +366,12 @@ class SubsetsModel(TreeModel):
                 if version_doc is None:
                     continue
 
-            master_version["data"] = version_doc["data"]
-            master_version["name"] = MasterVersionType(version_doc["name"])
-            # Add information if master version is from latest version
-            master_version["is_from_latest"] = version_id == version_doc["_id"]
+            hero_version["data"] = version_doc["data"]
+            hero_version["name"] = HeroVersionType(version_doc["name"])
+            # Add information if hero version is from latest version
+            hero_version["is_from_latest"] = version_id == version_doc["_id"]
 
-            last_versions_by_subset_id[subset_id] = master_version
+            last_versions_by_subset_id[subset_id] = hero_version
 
         self._doc_payload = {
             "asset_docs_by_id": asset_docs_by_id,
@@ -674,9 +674,9 @@ class SubsetsModel(TreeModel):
         elif role == QtCore.Qt.ForegroundRole:
             item = index.internalPointer()
             version_doc = item.get("version_document")
-            if version_doc and version_doc.get("type") == "master_version":
+            if version_doc and version_doc.get("type") == "hero_version":
                 if not version_doc["is_from_latest"]:
-                    return self.not_last_master_brush
+                    return self.not_last_hero_brush
 
         return super(SubsetsModel, self).data(index, role)
 

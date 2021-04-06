@@ -1,4 +1,5 @@
 /* global QTcpSocket, QByteArray, QDataStream, QTimer, QTextCodec, QIODevice, QApplication, include */
+/* global QTcpSocket, QByteArray, QDataStream, QTimer, QTextCodec, QIODevice, QApplication, include */
 /*
 Avalon Harmony Integration - Client
 -----------------------------------
@@ -355,14 +356,15 @@ function start() {
     app.avalonMenu = null;
 
     for (var i = 0 ; i < actions.length; i++) {
-        if (actions[i].text == 'Avalon') {
+        label = System.getenv('AVALON_LABEL')
+        if (actions[i].text == label) {
             app.avalonMenu = true;
         }
     }
 
     var menu = null;
     if (app.avalonMenu == null) {
-        menu = menuBar.addMenu('Avalon');
+        menu = menuBar.addMenu(System.getenv('AVALON_LABEL'));
     }
     // menu = menuBar.addMenu('Avalon');
 
@@ -388,11 +390,11 @@ function start() {
         app.avalonClient.send({
             'module': 'avalon.harmony.lib',
             'method': 'show',
-            'args': ['avalon.tools.workfiles']
+            'args': ['pype.tools.workfiles']
         }, false);
     };
     if (app.avalonMenu == null) {
-        action = menu.addAction('Workfiles');
+        action = menu.addAction('Workfiles...');
         action.triggered.connect(self.onWorkfiles);
     }
 
