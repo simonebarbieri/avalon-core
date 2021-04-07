@@ -390,7 +390,7 @@ function start() {
         app.avalonClient.send({
             'module': 'avalon.harmony.lib',
             'method': 'show',
-            'args': ['pype.tools.workfiles']
+            'args': ['openpype.tools.workfiles']
         }, false);
     };
     if (app.avalonMenu == null) {
