@@ -499,6 +499,8 @@ class SubsetsModel(TreeModel):
                 active_site = sync_server.get_active_site(project_name)
                 active_provider = sync_server.get_provider_for_site(
                     project_name, active_site)
+                if active_site == 'studio':  # for studio use explicit icon
+                    active_provider = 'studio'
 
                 repre_icons = get_repre_icons()
 
@@ -909,6 +911,9 @@ class RepresentationModel(TreeModel):
             active_provider = \
                 sync_server.get_provider_for_site(project,
                                                   active_site)
+            if active_site == 'studio':
+                active_provider = 'studio'
+
             remote_provider = \
                 sync_server.get_provider_for_site(project,
                                                   remote_site)
