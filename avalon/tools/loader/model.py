@@ -908,6 +908,7 @@ class RepresentationModel(TreeModel):
             active_site = sync_server.get_active_site(project)
             remote_site = sync_server.get_remote_site(project)
 
+            # TODO refactor
             active_provider = \
                 sync_server.get_provider_for_site(project,
                                                   active_site)
@@ -917,6 +918,9 @@ class RepresentationModel(TreeModel):
             remote_provider = \
                 sync_server.get_provider_for_site(project,
                                                   remote_site)
+
+            if remote_site == 'studio':
+                remote_provider = 'studio'
 
         self.sync_server = sync_server
         self.active_site = active_site

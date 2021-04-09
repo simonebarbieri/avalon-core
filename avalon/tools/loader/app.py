@@ -85,16 +85,13 @@ class Window(QtWidgets.QDialog):
         asset_filter_splitter.setStretchFactor(0, 65)
         asset_filter_splitter.setStretchFactor(1, 35)
 
-        self.default_central_split_sizes = [180, 850, 350]
-        self.already_resized = False
         container_layout = QtWidgets.QHBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
         split = QtWidgets.QSplitter()
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
         split.addWidget(thumb_ver_splitter)
-        split.setSizes(self.default_central_split_sizes)
-        self.main_split = split
+        split.setSizes([150, 840, 610])
 
         container_layout.addWidget(split)
 
@@ -144,7 +141,7 @@ class Window(QtWidgets.QDialog):
         self._assetschanged()
 
         # Defaults
-        self.resize(1630, 700)
+        self.resize(1600, 700)
 
     # -------------------------------
     # Delay calling blocking methods
@@ -357,10 +354,8 @@ class Window(QtWidgets.QDialog):
         version_ids = [doc["_id"] for doc in version_docs or []]
         representations.set_version_ids(version_ids)
 
-        self._resize_main_split(rows, asset_docs)
-
-        representations.change_visibility("subset", len(rows) > 1)
-        representations.change_visibility("asset", len(asset_docs) > 1)
+        # representations.change_visibility("subset", len(rows) > 1)
+        # representations.change_visibility("asset", len(asset_docs) > 1)
 
 
     def _set_context(self, context, refresh=True):
@@ -457,19 +452,6 @@ class Window(QtWidgets.QDialog):
         )
         dialog.grouped.connect(self._assetschanged)
         dialog.show()
-
-    def _resize_main_split(self, rows, asset_docs):
-        """Try to increase screen estate for repre widget if multiple select"""
-        sizes = self.default_central_split_sizes
-        if len(rows) > 1 or len(asset_docs) > 1:
-            sizes = self.main_split.sizes()
-            if not self.already_resized:
-                sizes = [sizes[0], sizes[1]*0.85, sizes[2]*1.15]
-                self.already_resized = True
-        else:
-            self.already_resized = False
-
-        self.main_split.setSizes(sizes)
 
 
 class SubsetGroupingDialog(QtWidgets.QDialog):
