@@ -100,13 +100,13 @@ class SubsetWidget(QtWidgets.QWidget):
         ("asset", 130),
         ("family", 90),
         ("version", 60),
-        ("time", 130),
+        ("time", 125),
         ("author", 75),
-        ("frames", 50),
+        ("frames", 55),
         ("duration", 60),
-        ("handles", 45),
+        ("handles", 55),
         ("step", 10),
-        ("repre_info", 70)
+        ("repre_info", 65)
     )
 
     def __init__(
@@ -870,10 +870,10 @@ class RepresentationWidget(QtWidgets.QWidget):
 
     default_widths = (
         ("name", 100),
-        ("subset", 170),
-        ("asset", 160),
-        ("active_site", 75),
-        ("remote_site", 75)
+        ("subset", 160),
+        ("asset", 150),
+        ("active_site", 85),
+        ("remote_site", 85)
     )
 
     commands = {'active': 'Download', 'remote': 'Upload'}
