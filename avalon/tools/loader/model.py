@@ -485,7 +485,6 @@ class SubsetsModel(TreeModel):
 
         return merge_group
 
-
     def _reset_sync_server(self):
         """Sets/Resets sync server vars after every change (refresh.)"""
         repre_icons = {}
@@ -494,7 +493,7 @@ class SubsetsModel(TreeModel):
 
         project_name = self.dbcon.Session["AVALON_PROJECT"]
         if project_name:
-            manager = ModulesManager()  #TODO doublecheck in Python2
+            manager = ModulesManager()
             sync_server = manager.modules_by_name["sync_server"]
 
             if sync_server.enabled:
@@ -704,42 +703,42 @@ class SubsetsModel(TreeModel):
 
     def _repre_per_version_pipeline(self, version_ids, site):
         query = [
-                {"$match": {"parent": {"$in": version_ids},
-                            "type": "representation",
-                            "files.sites.name": {"$exists": 1}}},
-                {"$unwind": "$files"},
-                {'$addFields': {
-                    'order_local': {
-                        '$filter': {'input': '$files.sites', 'as': 'p',
-                                    'cond': {'$eq': ['$$p.name', site]}
-                                    }}
-                }},
-                {'$addFields': {
-                    'progress_local': {'$first': {
-                        '$cond': [{'$size': "$order_local.progress"},
-                                  "$order_local.progress",
-                                  # if exists created_dt count is as available
-                                  {'$cond': [
-                                      {'$size': "$order_local.created_dt"},
-                                      [1],
-                                      [0]
-                                  ]}
-                                  ]}}
-                }},
-                {'$group': {  # first group by repre
-                    '_id': '$_id',
-                    'parent': {'$first': '$parent'},
-                    'files_count': {'$sum': 1},
-                    'files_avail': {'$sum': "$progress_local"},
-                    'avail_ratio': {'$first': {
-                        '$divide': [{'$sum': "$progress_local"}, {'$sum': 1}]}}
-                }},
-                {'$group': {  # second group by parent, eg version_id
-                    '_id': '$parent',
-                    'repre_count': {'$sum': 1},  # total representations
-                    # fully available representation for site
-                    'avail_repre': {'$sum': "$avail_ratio"}
-                }},
+            {"$match": {"parent": {"$in": version_ids},
+                        "type": "representation",
+                        "files.sites.name": {"$exists": 1}}},
+            {"$unwind": "$files"},
+            {'$addFields': {
+                'order_local': {
+                    '$filter': {'input': '$files.sites', 'as': 'p',
+                                'cond': {'$eq': ['$$p.name', site]}
+                                }}
+            }},
+            {'$addFields': {
+                'progress_local': {'$first': {
+                    '$cond': [{'$size': "$order_local.progress"},
+                              "$order_local.progress",
+                              # if exists created_dt count is as available
+                              {'$cond': [
+                                  {'$size': "$order_local.created_dt"},
+                                  [1],
+                                  [0]
+                              ]}
+                              ]}}
+            }},
+            {'$group': {  # first group by repre
+                '_id': '$_id',
+                'parent': {'$first': '$parent'},
+                'files_count': {'$sum': 1},
+                'files_avail': {'$sum': "$progress_local"},
+                'avail_ratio': {'$first': {
+                    '$divide': [{'$sum': "$progress_local"}, {'$sum': 1}]}}
+            }},
+            {'$group': {  # second group by parent, eg version_id
+                '_id': '$parent',
+                'repre_count': {'$sum': 1},  # total representations
+                # fully available representation for site
+                'avail_repre': {'$sum': "$avail_ratio"}
+            }},
         ]
         return query
 
@@ -1082,9 +1081,7 @@ class RepresentationModel(TreeModel):
             # representations and logic could be in Python
             docs = list(self.dbcon.find(
                 {"type": "representation", "parent": {"$in": self.version_ids},
-                 "files.sites.name": {"$exists": 1}}
-                , self._get_projection()
-            ))
+                 "files.sites.name": {"$exists": 1}}, self._get_projection()))
         self._docs = docs
 
         self.doc_fetched.emit()
@@ -1163,6 +1160,7 @@ class RepresentationModel(TreeModel):
 
         for key, progress in current_item_progress.items():
             group[key] = (group.get(key, 0) + max(progress, 0)) / item_cnt
+
 
 def get_repre_icons():
     resource_path = os.path.dirname(sync_server_module.__file__)

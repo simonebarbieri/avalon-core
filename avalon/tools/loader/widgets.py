@@ -5,15 +5,14 @@ import pprint
 import traceback
 import collections
 
-from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
+from ...vendor.Qt import QtWidgets, QtCore, QtGui
 from ... import api
 from ... import pipeline
-from ... import style
 from ...lib import HeroVersionType
 
 from .. import lib as tools_lib
 from ..delegates import VersionDelegate, PrettyTimeDelegate
-from ..widgets import OptionalMenu, OptionalAction, OptionDialog
+from ..widgets import OptionalMenu
 from ..views import TreeViewSpinner, DeselectableTreeView
 
 from .model import (
@@ -133,14 +132,14 @@ class SubsetWidget(QtWidgets.QWidget):
         family_proxy = FamiliesFilterProxyModel(family_config_cache)
         family_proxy.setSourceModel(proxy)
 
-        filter = QtWidgets.QLineEdit()
-        filter.setPlaceholderText("Filter subsets..")
+        subset_filter = QtWidgets.QLineEdit()
+        subset_filter.setPlaceholderText("Filter subsets..")
 
         groupable = QtWidgets.QCheckBox("Enable Grouping")
         groupable.setChecked(enable_grouping)
 
         top_bar_layout = QtWidgets.QHBoxLayout()
-        top_bar_layout.addWidget(filter)
+        top_bar_layout.addWidget(subset_filter)
         top_bar_layout.addWidget(groupable)
 
         view = TreeViewSpinner()
@@ -187,7 +186,7 @@ class SubsetWidget(QtWidgets.QWidget):
         self.proxy = proxy
         self.model = model
         self.view = view
-        self.filter = filter
+        self.filter = subset_filter
         self.family_proxy = family_proxy
 
         # settings and connections
@@ -428,7 +427,6 @@ class SubsetWidget(QtWidgets.QWidget):
                 continue
             repre_ids.append(representation["_id"])
 
-        version_name = item["version_document"]["name"]
         error_info = _load_representations_by_loader(
             loader, repre_ids, self.dbcon,
             options=options
@@ -482,12 +480,12 @@ class SubsetWidget(QtWidgets.QWidget):
             subsets.append(item["subset"])
 
         for asset_id in asset_ids:
-            filter = {
+            filtr = {
                 "type": "subset",
                 "parent": asset_id,
                 "name": {"$in": subsets},
             }
-            self.dbcon.update_many(filter, update)
+            self.dbcon.update_many(filtr, update)
 
     def echo(self, message):
         print(message)
@@ -684,7 +682,7 @@ class ThumbnailWidget(QtWidgets.QLabel):
         pixmap = self.scale_pixmap(pixmap)
         self.setPixmap(pixmap)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, _event):
         if not self.current_thumbnail:
             return
         cur_pix = self.scale_pixmap(self.current_thumbnail)
@@ -743,7 +741,7 @@ class VersionWidget(QtWidgets.QWidget):
         super(VersionWidget, self).__init__(parent=parent)
 
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0, 0, 0, 0)
         label = QtWidgets.QLabel("Version", self)
         data = VersionTextEdit(dbcon, self)
         data.setReadOnly(True)
@@ -967,7 +965,6 @@ class RepresentationWidget(QtWidgets.QWidget):
             available_loaders = lib.remove_tool_name_from_loaders(
                 available_loaders, self.tool_name)
 
-
         already_added_loaders = set()
         label_already_in_menu = set()
         for item in items:
@@ -1067,8 +1064,8 @@ class RepresentationWidget(QtWidgets.QWidget):
 
             repre_ids.append(item.get("_id"))
 
-        errors = _load_representations_by_loader(loader, repre_ids, self.dbcon,
-            data_by_repre_id=data_by_repre_id)
+        errors = _load_representations_by_loader(
+            loader, repre_ids, self.dbcon, data_by_repre_id=data_by_repre_id)
 
         self.model.refresh()
         if errors:
@@ -1130,7 +1127,6 @@ def _load_representations_by_loader(loader, repre_ids, dbcon,
     options = options or {}
     for repre_context in repre_contexts.values():
         try:
-            data = {}
             if data_by_repre_id:
                 _id = repre_context["representation"]["_id"]
                 data = data_by_repre_id.get(_id)

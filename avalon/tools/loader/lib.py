@@ -1,6 +1,6 @@
-from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
+from ...vendor.Qt import QtGui
 from ...vendor import qtawesome
-from ..widgets import OptionalMenu, OptionalAction, OptionDialog
+from ..widgets import OptionalAction, OptionDialog
 import inspect
 
 
@@ -111,10 +111,8 @@ def add_representation_loaders_to_menu(loaders, menu):
 def remove_tool_name_from_loaders(available_loaders, tool_name):
     for loader in available_loaders:
         if hasattr(loader, "tool_names"):
-            if not (
-                    "*" in loader.tool_names or
-                    tool_name in loader.tool_names
-            ):
+            if not ("*" in loader.tool_names or
+                    tool_name in loader.tool_names):
                 available_loaders.remove(loader)
     return available_loaders
 
@@ -160,6 +158,7 @@ def get_no_loader_action(menu, one_item_selected=False):
     )
     action = OptionalAction(("*" + msg), icon, False, menu)
     return action
+
 
 def sort_loaders(loaders, custom_sorter=None):
     def sorter(value):
