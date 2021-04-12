@@ -1,6 +1,7 @@
 import os
 import copy
 import re
+import math
 
 from ... import (
     style,
@@ -276,8 +277,9 @@ class SubsetsModel(TreeModel):
 
         repre_info = item.get("repre_info")
         if repre_info:
-            repres = "{}/{}".format(int(repre_info['avail_repre']),
-                                    int(repre_info['repre_count']))
+            repres = "{}/{}".format(
+                math.floor(float(repre_info['avail_repre'])),
+                math.floor(float(repre_info['repre_count'])))
             item["repre_info"] = repres
             item["repre_icon"] = self.repre_icons.get(repre_info["provider"])
 
