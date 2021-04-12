@@ -89,7 +89,7 @@ class Window(QtWidgets.QDialog):
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
         split.addWidget(thumb_ver_splitter)
-        split.setSizes([250, 850, 600])
+        split.setSizes([250, 820, 630])
 
         container_layout.addWidget(split)
 
@@ -139,7 +139,7 @@ class Window(QtWidgets.QDialog):
         self._assetschanged()
 
         # Defaults
-        self.resize(1700, 700)
+        self.resize(1800, 900)
 
     # -------------------------------
     # Delay calling blocking methods

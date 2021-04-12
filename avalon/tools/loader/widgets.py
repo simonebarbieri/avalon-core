@@ -101,7 +101,7 @@ class SubsetWidget(QtWidgets.QWidget):
         ("version", 60),
         ("time", 125),
         ("author", 75),
-        ("frames", 55),
+        ("frames", 75),
         ("duration", 60),
         ("handles", 55),
         ("step", 10),
@@ -867,9 +867,9 @@ class FamilyListWidget(QtWidgets.QListWidget):
 class RepresentationWidget(QtWidgets.QWidget):
 
     default_widths = (
-        ("name", 100),
+        ("name", 140),
         ("subset", 160),
-        ("asset", 150),
+        ("asset", 160),
         ("active_site", 85),
         ("remote_site", 85)
     )
