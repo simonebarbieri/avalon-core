@@ -99,8 +99,8 @@ class SubsetWidget(QtWidgets.QWidget):
         ("subset", 200),
         ("asset", 130),
         ("family", 90),
-        ("version", 50),
-        ("time", 120),
+        ("version", 60),
+        ("time", 130),
         ("author", 75),
         ("frames", 50),
         ("duration", 60),
@@ -743,7 +743,7 @@ class VersionWidget(QtWidgets.QWidget):
         super(VersionWidget, self).__init__(parent=parent)
 
         layout = QtWidgets.QVBoxLayout(self)
-
+        layout.setContentsMargins(0,0,0,0)
         label = QtWidgets.QLabel("Version", self)
         data = VersionTextEdit(dbcon, self)
         data.setReadOnly(True)
@@ -869,14 +869,12 @@ class FamilyListWidget(QtWidgets.QListWidget):
 class RepresentationWidget(QtWidgets.QWidget):
 
     default_widths = (
-        ("name", 85),
-        ("subset", 115),
-        ("asset", 110),
-        ("active_site", 140),
-        ("remote_site", 140)
+        ("name", 100),
+        ("subset", 170),
+        ("asset", 160),
+        ("active_site", 75),
+        ("remote_site", 75)
     )
-
-    default_hidden = ["asset", "subset"]
 
     commands = {'active': 'Download', 'remote': 'Upload'}
 
@@ -930,10 +928,6 @@ class RepresentationWidget(QtWidgets.QWidget):
         self.proxy_model = proxy_model
 
         self.sync_server_enabled = model.sync_server.enabled
-
-        # for column_name in self.default_hidden:
-        #     lib.change_visibility(self.model, self.tree_view,
-        #                           column_name, False)
 
         self.model.refresh()
 

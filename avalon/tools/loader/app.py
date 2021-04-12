@@ -68,14 +68,12 @@ class Window(QtWidgets.QDialog):
 
         thumb_ver_splitter = QtWidgets.QSplitter()
         thumb_ver_splitter.setOrientation(QtCore.Qt.Vertical)
-        thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_splitter)
-        thumb_ver_layout.setContentsMargins(0, 0, 0, 0)
-        thumb_ver_layout.addWidget(thumbnail)
-        thumb_ver_layout.addWidget(version)
-        thumb_ver_layout.addWidget(representations)
+        thumb_ver_splitter.addWidget(thumbnail)
+        thumb_ver_splitter.addWidget(version)
+        thumb_ver_splitter.addWidget(representations)
         thumb_ver_splitter.setStretchFactor(0, 30)
         thumb_ver_splitter.setStretchFactor(1, 35)
-        thumb_ver_splitter.setStretchFactor(1, 35)
+        thumb_ver_splitter.setStretchFactor(2, 35)
 
         # Create splitter to show / hide family filters
         asset_filter_splitter = QtWidgets.QSplitter()
@@ -91,7 +89,7 @@ class Window(QtWidgets.QDialog):
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
         split.addWidget(thumb_ver_splitter)
-        split.setSizes([150, 840, 610])
+        split.setSizes([250, 850, 600])
 
         container_layout.addWidget(split)
 
@@ -141,7 +139,7 @@ class Window(QtWidgets.QDialog):
         self._assetschanged()
 
         # Defaults
-        self.resize(1600, 700)
+        self.resize(1700, 700)
 
     # -------------------------------
     # Delay calling blocking methods

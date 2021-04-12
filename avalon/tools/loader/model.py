@@ -961,10 +961,8 @@ class RepresentationModel(TreeModel):
             progress = None
             label = ''
             if index.column() == active_index:
-                label = 'downloaded'
                 progress = item.get("active_site_progress", 0)
             elif index.column() == remote_index:
-                label = 'uploaded'
                 progress = item.get("remote_site_progress", 0)
 
             if progress is not None:
