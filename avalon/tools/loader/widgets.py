@@ -867,9 +867,9 @@ class FamilyListWidget(QtWidgets.QListWidget):
 class RepresentationWidget(QtWidgets.QWidget):
 
     default_widths = (
-        ("name", 140),
-        ("subset", 160),
-        ("asset", 160),
+        ("name", 120),
+        ("subset", 125),
+        ("asset", 125),
         ("active_site", 85),
         ("remote_site", 85)
     )
