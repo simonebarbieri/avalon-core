@@ -137,6 +137,11 @@ class Window(QtWidgets.QDialog):
             action.setData(host.remove_instance)
             actions.append(action)
 
+        if hasattr(host, "select_instance"):
+            action = QtWidgets.QAction("Select instance", menu)
+            action.setData(host.select_instance)
+            actions.append(action)
+
         if not actions:
             actions.append(QtWidgets.QAction("* Nothing to do", menu))
 
