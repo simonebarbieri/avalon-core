@@ -1081,12 +1081,13 @@ class RepresentationModel(TreeModel):
             # representations and logic could be in Python
             docs = list(self.dbcon.find(
                 {"type": "representation", "parent": {"$in": self.version_ids},
-                 "files.sites.name": {"$exists": 1}}, self._get_projection()))
+                 "files.sites.name": {"$exists": 1}}, self.projection()))
         self._docs = docs
 
         self.doc_fetched.emit()
 
-    def _get_projection(self):
+    @classmethod
+    def projection(cls):
         return {
             "_id": 1,
             "name": 1,
