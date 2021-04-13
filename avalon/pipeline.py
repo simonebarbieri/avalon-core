@@ -634,7 +634,7 @@ def discover(superclass):
             print("Warning: Overwriting %s" % plugin.__name__)
         plugins[plugin.__name__] = plugin
 
-        sorted_plugins = sorted(
+    sorted_plugins = sorted(
         plugins.values(), key=lambda Plugin: Plugin.__name__
     )
     self.last_discovered_plugins[superclass.__name__] = sorted_plugins
