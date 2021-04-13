@@ -9,7 +9,8 @@ from ..widgets import AssetWidget
 from .. import lib
 
 from .widgets import (
-    SubsetWidget, VersionWidget, FamilyListWidget, ThumbnailWidget
+    SubsetWidget, VersionWidget, FamilyListWidget, ThumbnailWidget,
+    RepresentationWidget
 )
 
 module = sys.modules[__name__]
@@ -63,12 +64,16 @@ class Window(QtWidgets.QDialog):
         )
         version = VersionWidget(io)
         thumbnail = ThumbnailWidget(io)
+        representations = RepresentationWidget(io)
 
-        thumb_ver_body = QtWidgets.QWidget()
-        thumb_ver_layout = QtWidgets.QVBoxLayout(thumb_ver_body)
-        thumb_ver_layout.setContentsMargins(0, 0, 0, 0)
-        thumb_ver_layout.addWidget(thumbnail)
-        thumb_ver_layout.addWidget(version)
+        thumb_ver_splitter = QtWidgets.QSplitter()
+        thumb_ver_splitter.setOrientation(QtCore.Qt.Vertical)
+        thumb_ver_splitter.addWidget(thumbnail)
+        thumb_ver_splitter.addWidget(version)
+        thumb_ver_splitter.addWidget(representations)
+        thumb_ver_splitter.setStretchFactor(0, 30)
+        thumb_ver_splitter.setStretchFactor(1, 35)
+        thumb_ver_splitter.setStretchFactor(2, 35)
 
         # Create splitter to show / hide family filters
         asset_filter_splitter = QtWidgets.QSplitter()
@@ -83,8 +88,8 @@ class Window(QtWidgets.QDialog):
         split = QtWidgets.QSplitter()
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
-        split.addWidget(thumb_ver_body)
-        split.setSizes([180, 950, 200])
+        split.addWidget(thumb_ver_splitter)
+        split.setSizes([250, 1000, 550])
 
         container_layout.addWidget(split)
 
@@ -109,7 +114,8 @@ class Window(QtWidgets.QDialog):
                 "assets": assets,
                 "subsets": subsets,
                 "version": version,
-                "thumbnail": thumbnail
+                "thumbnail": thumbnail,
+                "representations": representations
             },
             "label": {
                 "message": message,
@@ -133,7 +139,7 @@ class Window(QtWidgets.QDialog):
         self._assetschanged()
 
         # Defaults
-        self.resize(1330, 700)
+        self.resize(1800, 900)
 
     # -------------------------------
     # Delay calling blocking methods
@@ -249,6 +255,9 @@ class Window(QtWidgets.QDialog):
 
         self.data["state"]["assetIds"] = asset_ids
 
+        representations = self.data["widgets"]["representations"]
+        representations.set_version_ids([])  # reset repre list
+
     def _subsetschanged(self):
         asset_ids = self.data["state"]["assetIds"]
         # Skip setting colors if not asset multiselection
@@ -320,24 +329,32 @@ class Window(QtWidgets.QDialog):
                 if not index or not index.isValid():
                     continue
                 item = index.data(subsets.model.ItemRole)
-                if (
-                    item is None
-                    or item.get("isGroup")
-                    or item.get("isMerged")
-                ):
+                if item is None:
                     continue
-                version_docs.append(item["version_document"])
+                if item.get("isGroup") or item.get("isMerged"):
+                    for child in item.children():
+                        version_docs.append(child["version_document"])
+                else:
+                    version_docs.append(item["version_document"])
 
         self.data["widgets"]["version"].set_version(version_doc)
 
         thumbnail_docs = version_docs
+        assets_widget = self.data["widgets"]["assets"]
+        asset_docs = assets_widget.get_selected_assets()
         if not thumbnail_docs:
-            assets_widget = self.data["widgets"]["assets"]
-            asset_docs = assets_widget.get_selected_assets()
             if len(asset_docs) > 0:
                 thumbnail_docs = asset_docs
 
         self.data["widgets"]["thumbnail"].set_thumbnail(thumbnail_docs)
+
+        representations = self.data["widgets"]["representations"]
+        version_ids = [doc["_id"] for doc in version_docs or []]
+        representations.set_version_ids(version_ids)
+
+        # representations.change_visibility("subset", len(rows) > 1)
+        # representations.change_visibility("asset", len(asset_docs) > 1)
+
 
     def _set_context(self, context, refresh=True):
         """Set the selection in the interface using a context.

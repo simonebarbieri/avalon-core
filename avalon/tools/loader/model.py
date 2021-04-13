@@ -1,4 +1,7 @@
+import os
 import copy
+import re
+import math
 
 from ... import (
     style,
@@ -11,6 +14,8 @@ from ..models import TreeModel, Item
 from .. import lib
 from ...lib import HeroVersionType
 
+from openpype.modules import ModulesManager
+from openpype.modules.sync_server import sync_server_module
 
 def is_filtering_recursible():
     """Does Qt binding support recursive filtering for QSortFilterProxyModel?
@@ -37,7 +42,8 @@ class SubsetsModel(TreeModel):
         "frames",
         "duration",
         "handles",
-        "step"
+        "step",
+        "repre_info"
     ]
 
     column_labels_mapping = {
@@ -50,7 +56,8 @@ class SubsetsModel(TreeModel):
         "frames": "Frames",
         "duration": "Duration",
         "handles": "Handles",
-        "step": "Step"
+        "step": "Step",
+        "repre_info": "Availability"
     }
 
     SortAscendingRole = QtCore.Qt.UserRole + 2
@@ -109,6 +116,10 @@ class SubsetsModel(TreeModel):
         self.asset_doc_projection = asset_doc_projection
         self.subset_doc_projection = subset_doc_projection
 
+        self.repre_icons = {}
+        self.sync_server = None
+        self.active_site = self.active_provider = None
+
         self.columns_index = dict(
             (key, idx) for idx, key in enumerate(self.Columns)
         )
@@ -127,6 +138,8 @@ class SubsetsModel(TreeModel):
         self._doc_payload = {}
 
         self.doc_fetched.connect(self.on_doc_fetched)
+
+        self.refresh()
 
     def set_assets(self, asset_ids):
         self._asset_ids = asset_ids
@@ -259,8 +272,16 @@ class SubsetsModel(TreeModel):
             "duration": duration,
             "handles": handles,
             "frames": frames,
-            "step": version_data.get("step", None)
+            "step": version_data.get("step", None),
         })
+
+        repre_info = item.get("repre_info")
+        if repre_info:
+            repres = "{}/{}".format(
+                int(math.floor(float(repre_info['avail_repre']))),
+                int(math.floor(float(repre_info['repre_count']))))
+            item["repre_info"] = repres
+            item["repre_icon"] = self.repre_icons.get(repre_info["provider"])
 
     def _fetch(self):
         asset_docs = self.dbcon.find(
@@ -359,6 +380,24 @@ class SubsetsModel(TreeModel):
             "subset_docs_by_id": subset_docs_by_id,
             "last_versions_by_subset_id": last_versions_by_subset_id
         }
+
+        if self.sync_server:
+            version_ids = set()
+            for _subset_id, doc in last_versions_by_subset_id.items():
+                version_ids.add(doc["_id"])
+
+            site = self.active_site
+            query = self._repre_per_version_pipeline(list(version_ids), site)
+
+            repre_info = {}
+            for doc in self.dbcon.aggregate(query):
+                if self._doc_fetching_stop:
+                    return
+                doc["provider"] = self.active_provider
+                repre_info[doc["_id"]] = doc
+
+            self._doc_payload["repre_info_by_version_id"] = repre_info
+
         self.doc_fetched.emit()
 
     def fetch_subset_and_version(self):
@@ -382,6 +421,8 @@ class SubsetsModel(TreeModel):
         self.stop_fetch_thread()
         self.clear()
 
+        self._reset_sync_server()
+
         if not self._asset_ids:
             return
 
@@ -400,6 +441,11 @@ class SubsetsModel(TreeModel):
         last_versions_by_subset_id = self._doc_payload.get(
             "last_versions_by_subset_id"
         )
+
+        repre_info_by_version_id = self._doc_payload.get(
+            "repre_info_by_version_id"
+        )
+
         if (
             asset_docs_by_id is None
             or subset_docs_by_id is None
@@ -411,7 +457,8 @@ class SubsetsModel(TreeModel):
             return
 
         self._fill_subset_items(
-            asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id
+            asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id,
+            repre_info_by_version_id
         )
 
     def create_multiasset_group(
@@ -438,8 +485,34 @@ class SubsetsModel(TreeModel):
 
         return merge_group
 
+    def _reset_sync_server(self):
+        """Sets/Resets sync server vars after every change (refresh.)"""
+        repre_icons = {}
+        sync_server = None
+        active_site = active_provider = None
+
+        project_name = self.dbcon.Session["AVALON_PROJECT"]
+        if project_name:
+            manager = ModulesManager()
+            sync_server = manager.modules_by_name["sync_server"]
+
+            if sync_server.enabled:
+                active_site = sync_server.get_active_site(project_name)
+                active_provider = sync_server.get_provider_for_site(
+                    project_name, active_site)
+                if active_site == 'studio':  # for studio use explicit icon
+                    active_provider = 'studio'
+
+                repre_icons = get_repre_icons()
+
+        self.repre_icons = repre_icons
+        self.sync_server = sync_server
+        self.active_site = active_site
+        self.active_provider = active_provider
+
     def _fill_subset_items(
-        self, asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id
+        self, asset_docs_by_id, subset_docs_by_id, last_versions_by_subset_id,
+        repre_info_by_version_id
     ):
         _groups_tuple = self.groups_config.split_subsets_for_groups(
             subset_docs_by_id.values(), self._grouping
@@ -527,6 +600,8 @@ class SubsetsModel(TreeModel):
                     subset_doc["_id"]
                 )
                 data["last_version"] = last_version
+                data["repre_info"] = repre_info_by_version_id.get(
+                    last_version["_id"])
 
                 item = Item()
                 item.update(data)
@@ -595,6 +670,10 @@ class SubsetsModel(TreeModel):
                 item = index.internalPointer()
                 return item.get("familyIcon", None)
 
+            if index.column() == self.columns_index.get("repre_info"):
+                item = index.internalPointer()
+                return item.get("repre_icon", None)
+
         elif role == QtCore.Qt.ForegroundRole:
             item = index.internalPointer()
             version_doc = item.get("version_document")
@@ -621,6 +700,47 @@ class SubsetsModel(TreeModel):
                 return self.column_labels_mapping.get(key) or key
 
         super(TreeModel, self).headerData(section, orientation, role)
+
+    def _repre_per_version_pipeline(self, version_ids, site):
+        query = [
+            {"$match": {"parent": {"$in": version_ids},
+                        "type": "representation",
+                        "files.sites.name": {"$exists": 1}}},
+            {"$unwind": "$files"},
+            {'$addFields': {
+                'order_local': {
+                    '$filter': {'input': '$files.sites', 'as': 'p',
+                                'cond': {'$eq': ['$$p.name', site]}
+                                }}
+            }},
+            {'$addFields': {
+                'progress_local': {'$first': {
+                    '$cond': [{'$size': "$order_local.progress"},
+                              "$order_local.progress",
+                              # if exists created_dt count is as available
+                              {'$cond': [
+                                  {'$size': "$order_local.created_dt"},
+                                  [1],
+                                  [0]
+                              ]}
+                              ]}}
+            }},
+            {'$group': {  # first group by repre
+                '_id': '$_id',
+                'parent': {'$first': '$parent'},
+                'files_count': {'$sum': 1},
+                'files_avail': {'$sum': "$progress_local"},
+                'avail_ratio': {'$first': {
+                    '$divide': [{'$sum': "$progress_local"}, {'$sum': 1}]}}
+            }},
+            {'$group': {  # second group by parent, eg version_id
+                '_id': '$parent',
+                'repre_count': {'$sum': 1},  # total representations
+                # fully available representation for site
+                'avail_repre': {'$sum': "$avail_ratio"}
+            }},
+        ]
+        return query
 
 
 class GroupMemberFilterProxyModel(QtCore.QSortFilterProxyModel):
@@ -726,3 +846,331 @@ class FamiliesFilterProxyModel(GroupMemberFilterProxyModel):
             self.setSortRole(model.SortDescendingRole)
 
         super(FamiliesFilterProxyModel, self).sort(column, order)
+
+
+class RepresentationSortProxyModel(GroupMemberFilterProxyModel):
+    """To properly sort progress string"""
+    def lessThan(self, left, right):
+        source_model = self.sourceModel()
+        progress_indexes = [source_model.Columns.index("active_site"),
+                            source_model.Columns.index("remote_site")]
+        if left.column() in progress_indexes:
+            left_data = self.sourceModel().data(left, QtCore.Qt.DisplayRole)
+            right_data = self.sourceModel().data(right, QtCore.Qt.DisplayRole)
+            left_val = re.sub("[^0-9]", '', left_data)
+            right_val = re.sub("[^0-9]", '', right_data)
+
+            return int(left_val) < int(right_val)
+
+        return super(RepresentationSortProxyModel, self).lessThan(left, right)
+
+
+class RepresentationModel(TreeModel):
+
+    doc_fetched = QtCore.Signal()
+    refreshed = QtCore.Signal(bool)
+
+    SiteNameRole = QtCore.Qt.UserRole + 2
+    ProgressRole = QtCore.Qt.UserRole + 3
+    SiteSideRole = QtCore.Qt.UserRole + 4
+    IdRole = QtCore.Qt.UserRole + 5
+    ContextRole = QtCore.Qt.UserRole + 6
+
+    Columns = [
+        "name",
+        "subset",
+        "asset",
+        "active_site",
+        "remote_site"
+    ]
+
+    column_labels_mapping = {
+        "name": "Name",
+        "subset": "Subset",
+        "asset": "Asset",
+        "active_site": "Active",
+        "remote_site": "Remote"
+    }
+
+    def __init__(self, dbcon, header, version_ids):
+        super(RepresentationModel, self).__init__()
+        self.dbcon = dbcon
+        self._data = []
+        self._header = header
+        self.version_ids = version_ids
+
+        manager = ModulesManager()
+        sync_server = active_site = remote_site = None
+        active_provider = remote_provider = project = None
+
+        project = dbcon.Session["AVALON_PROJECT"]
+        if project:
+            sync_server = manager.modules_by_name["sync_server"]
+            active_site = sync_server.get_active_site(project)
+            remote_site = sync_server.get_remote_site(project)
+
+            # TODO refactor
+            active_provider = \
+                sync_server.get_provider_for_site(project,
+                                                  active_site)
+            if active_site == 'studio':
+                active_provider = 'studio'
+
+            remote_provider = \
+                sync_server.get_provider_for_site(project,
+                                                  remote_site)
+
+            if remote_site == 'studio':
+                remote_provider = 'studio'
+
+        self.sync_server = sync_server
+        self.active_site = active_site
+        self.active_provider = active_provider
+        self.remote_site = remote_site
+        self.remote_provider = remote_provider
+
+        self.doc_fetched.connect(self.on_doc_fetched)
+
+        self._docs = {}
+        self._icons = get_repre_icons()
+        self._icons["repre"] = qtawesome.icon("fa.file-o",
+                                              color=style.colors.default)
+
+    def set_version_ids(self, version_ids):
+        self.version_ids = version_ids
+        self.refresh()
+
+    def data(self, index, role):
+        item = index.internalPointer()
+
+        if role == self.IdRole:
+            return item.get("_id")
+
+        if role == QtCore.Qt.DecorationRole:
+            # Add icon to subset column
+            if index.column() == self.Columns.index("name"):
+                if item.get("isMerged"):
+                    return item["icon"]
+                else:
+                    return self._icons["repre"]
+
+        active_index = self.Columns.index("active_site")
+        remote_index = self.Columns.index("remote_site")
+        if role == QtCore.Qt.DisplayRole:
+            progress = None
+            label = ''
+            if index.column() == active_index:
+                progress = item.get("active_site_progress", 0)
+            elif index.column() == remote_index:
+                progress = item.get("remote_site_progress", 0)
+
+            if progress is not None:
+                # site added, sync in progress
+                progress_str = "not avail."
+                if progress >= 0:
+                    # progress == 0 for isMerged is unavailable
+                    if progress == 0 and item.get("isMerged"):
+                        progress_str = "not avail."
+                    else:
+                        progress_str = "{}% {}".format(int(progress * 100),
+                                                       label)
+
+                return progress_str
+
+        if role == QtCore.Qt.DecorationRole:
+            if index.column() == active_index:
+                return item.get("active_site_icon", None)
+            if index.column() == remote_index:
+                return item.get("remote_site_icon", None)
+
+        if role == self.SiteNameRole:
+            if index.column() == active_index:
+                return item.get("active_site_name", None)
+            if index.column() == remote_index:
+                return item.get("remote_site_name", None)
+
+        if role == self.SiteSideRole:
+            if index.column() == active_index:
+                return "active"
+            if index.column() == remote_index:
+                return "remote"
+
+        if role == self.ProgressRole:
+            if index.column() == active_index:
+                return item.get("active_site_progress", 0)
+            if index.column() == remote_index:
+                return item.get("remote_site_progress", 0)
+
+        return super(RepresentationModel, self).data(index, role)
+
+    def on_doc_fetched(self):
+        self.clear()
+        self.beginResetModel()
+        subsets = set()
+        assets = set()
+        repre_groups = {}
+        repre_groups_items = {}
+        group = None
+        self._items_by_id = {}
+        for doc in self._docs:
+            if len(self.version_ids) > 1:
+                group = repre_groups.get(doc["name"])
+                if not group:
+                    group_item = Item()
+                    group_item.update({
+                        "_id": doc["_id"],
+                        "name": doc["name"],
+                        "isMerged": True,
+                        "childRow": 0,
+                        "active_site_name": self.active_site,
+                        "remote_site_name": self.remote_site,
+                        "icon": qtawesome.icon(
+                            "fa.folder",
+                            color=style.colors.default
+                        )
+                    })
+                    self.add_child(group_item, None)
+                    repre_groups[doc["name"]] = group_item
+                    repre_groups_items[doc["name"]] = 0
+                    group = group_item
+
+            progress = self._get_progress_for_repre(doc)
+
+            active_site_icon = self._icons.get(self.active_provider)
+            remote_site_icon = self._icons.get(self.remote_provider)
+
+            data = {
+                "_id": doc["_id"],
+                "name": doc["name"],
+                "subset": doc["context"]["subset"],
+                "asset": doc["context"]["asset"],
+                "isMerged": False,
+
+                "active_site_icon": active_site_icon,
+                "remote_site_icon": remote_site_icon,
+                "active_site_name": self.active_site,
+                "remote_site_name": self.remote_site,
+                "active_site_progress": progress[self.active_site],
+                "remote_site_progress": progress[self.remote_site]
+            }
+            subsets.add(doc["context"]["subset"])
+            assets.add(doc["context"]["subset"])
+
+            item = Item()
+            item.update(data)
+
+            current_progress = {
+                'active_site_progress': progress[self.active_site],
+                'remote_site_progress': progress[self.remote_site]
+            }
+            if group:
+                self._update_group_progress(
+                    doc["name"], group,
+                    current_progress,
+                    repre_groups_items)
+
+            self.add_child(item, group)
+
+        self.endResetModel()
+        self.refreshed.emit(False)
+
+    def refresh(self):
+        docs = []
+        if self.version_ids:
+            # Simple find here for now, expected to receive lower number of
+            # representations and logic could be in Python
+            docs = list(self.dbcon.find(
+                {"type": "representation", "parent": {"$in": self.version_ids},
+                 "files.sites.name": {"$exists": 1}}, self.projection()))
+        self._docs = docs
+
+        self.doc_fetched.emit()
+
+    @classmethod
+    def projection(cls):
+        return {
+            "_id": 1,
+            "name": 1,
+            "context.subset": 1,
+            "context.asset": 1,
+            "context.version": 1,
+            "context.representation": 1,
+            'files.sites': 1
+        }
+
+    def _get_progress_for_repre(self, doc):
+        """
+            Calculates average progress for representation.
+
+            If site has created_dt >> fully available >> progress == 1
+
+            Could be calculated in aggregate if it would be too slow
+            Args:
+                doc(dict): representation dict
+            Returns:
+                (dict) with active and remote sites progress
+                {'studio': 1.0, 'gdrive': -1} - gdrive site is not present
+                    -1 is used to highlight the site should be added
+                {'studio': 1.0, 'gdrive': 0.0} - gdrive site is present, not
+                    uploaded yet
+        """
+        progress = {self.active_site: -1,
+                    self.remote_site: -1}
+        if not doc:
+            return progress
+
+        files = {self.active_site: 0, self.remote_site: 0}
+        for file in doc.get("files", []):
+            for site in file.get("sites"):
+                if site["name"] in [self.active_site, self.remote_site]:
+                    files[site["name"]] += 1
+                    norm_progress = max(progress[site["name"]], 0)
+                    if site.get("created_dt"):
+                        progress[site["name"]] = norm_progress + 1
+                    elif site.get("progress"):
+                        progress[site["name"]] = norm_progress + \
+                                                 site["progress"]
+                    else:  # site exists, might be failed, do not add again
+                        progress[site["name"]] = 0
+
+        # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
+        avg_progress = {}
+        avg_progress[self.active_site] = \
+            progress[self.active_site] / max(files[self.active_site], 1)
+        avg_progress[self.remote_site] = \
+            progress[self.remote_site] / max(files[self.remote_site], 1)
+        return avg_progress
+
+    def _update_group_progress(self, repre_name, group, current_item_progress,
+                               repre_groups_items):
+        """
+            Update final group progress
+            Called after every item in group is added
+
+            Args:
+                repre_name(string)
+                group(dict): info about group of selected items
+                current_item_progress(dict): {'active_site_progress': XX,
+                                              'remote_site_progress': YY}
+                repre_groups_items(dict)
+            Returns:
+                (dict): updated group info
+        """
+        repre_groups_items[repre_name] += 1
+        item_cnt = repre_groups_items[repre_name]
+
+        for key, progress in current_item_progress.items():
+            group[key] = (group.get(key, 0) + max(progress, 0)) / item_cnt
+
+
+def get_repre_icons():
+    resource_path = os.path.dirname(sync_server_module.__file__)
+    resource_path = os.path.join(resource_path,
+                                 "providers", "resources")
+    icons = {}
+    # TODO get from sync module
+    for provider in ['studio', 'local_drive', 'gdrive']:
+        pix_url = "{}/{}.png".format(resource_path, provider)
+        icons[provider] = QtGui.QIcon(pix_url)
+
+    return icons

@@ -2,27 +2,27 @@ import os
 import sys
 import datetime
 import pprint
-import inspect
 import traceback
 import collections
 
-from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
-from ...vendor import qtawesome
+from ...vendor.Qt import QtWidgets, QtCore, QtGui
 from ... import api
 from ... import pipeline
-from ... import style
 from ...lib import HeroVersionType
 
 from .. import lib as tools_lib
 from ..delegates import VersionDelegate, PrettyTimeDelegate
-from ..widgets import OptionalMenu, OptionalAction, OptionDialog
-from ..views import TreeViewSpinner
+from ..widgets import OptionalMenu
+from ..views import TreeViewSpinner, DeselectableTreeView
 
 from .model import (
     SubsetsModel,
     SubsetFilterProxyModel,
     FamiliesFilterProxyModel,
+    RepresentationModel,
+    RepresentationSortProxyModel
 )
+from . import lib
 
 
 class LoadErrorMessageBox(QtWidgets.QDialog):
@@ -95,16 +95,17 @@ class SubsetWidget(QtWidgets.QWidget):
     version_changed = QtCore.Signal()   # version state changed for a subset
 
     default_widths = (
-        ("subset", 190),
+        ("subset", 200),
         ("asset", 130),
         ("family", 90),
         ("version", 60),
-        ("time", 120),
-        ("author", 85),
-        ("frames", 80),
+        ("time", 125),
+        ("author", 75),
+        ("frames", 75),
         ("duration", 60),
         ("handles", 55),
-        ("step", 50)
+        ("step", 10),
+        ("repre_info", 65)
     )
 
     def __init__(
@@ -131,14 +132,14 @@ class SubsetWidget(QtWidgets.QWidget):
         family_proxy = FamiliesFilterProxyModel(family_config_cache)
         family_proxy.setSourceModel(proxy)
 
-        filter = QtWidgets.QLineEdit()
-        filter.setPlaceholderText("Filter subsets..")
+        subset_filter = QtWidgets.QLineEdit()
+        subset_filter.setPlaceholderText("Filter subsets..")
 
         groupable = QtWidgets.QCheckBox("Enable Grouping")
         groupable.setChecked(enable_grouping)
 
         top_bar_layout = QtWidgets.QHBoxLayout()
-        top_bar_layout.addWidget(filter)
+        top_bar_layout.addWidget(subset_filter)
         top_bar_layout.addWidget(groupable)
 
         view = TreeViewSpinner()
@@ -185,7 +186,7 @@ class SubsetWidget(QtWidgets.QWidget):
         self.proxy = proxy
         self.model = model
         self.view = view
-        self.filter = filter
+        self.filter = subset_filter
         self.family_proxy = family_proxy
 
         # settings and connections
@@ -199,6 +200,9 @@ class SubsetWidget(QtWidgets.QWidget):
         for column_name, width in self.default_widths:
             idx = model.Columns.index(column_name)
             view.setColumnWidth(idx, width)
+
+        if not model.sync_server:
+            lib.change_visibility(self.model, self.view, "repre_info", False)
 
         selection = view.selectionModel()
         selection.selectionChanged.connect(self.active_changed)
@@ -310,34 +314,14 @@ class SubsetWidget(QtWidgets.QWidget):
         selection = self.view.selectionModel()
         rows = selection.selectedRows(column=0)
 
-        items = []
-        for row_index in rows:
-            item = row_index.data(self.model.ItemRole)
-            if item.get("isGroup"):
-                continue
-
-            elif item.get("isMerged"):
-                for idx in range(row_index.model().rowCount(row_index)):
-                    child_index = row_index.child(idx, 0)
-                    item = child_index.data(self.model.ItemRole)
-                    if item not in items:
-                        items.append(item)
-
-            else:
-                if item not in items:
-                    items.append(item)
+        items = lib.get_selected_items(rows, self.model.ItemRole)
 
         # Get all representation->loader combinations available for the
         # index under the cursor, so we can list the user the options.
         available_loaders = api.discover(api.Loader)
         if self.tool_name:
-            for loader in available_loaders:
-                if hasattr(loader, "tool_names"):
-                    if not (
-                        "*" in loader.tool_names or
-                        self.tool_name in loader.tool_names
-                    ):
-                        available_loaders.remove(loader)
+            available_loaders = lib.remove_tool_name_from_loaders(
+                available_loaders, self.tool_name)
 
         loaders = list()
 
@@ -362,6 +346,9 @@ class SubsetWidget(QtWidgets.QWidget):
                     available_loaders,
                     repre_context
                 ):
+                    if lib.is_representation_loader(loader):
+                        continue
+
                     # skip multiple select variant if one is selected
                     if one_item_selected:
                         loaders.append((repre_doc, loader))
@@ -398,70 +385,14 @@ class SubsetWidget(QtWidgets.QWidget):
 
                 loaders.append((repre, loader))
 
+        loaders = lib.sort_loaders(loaders)
+
         menu = OptionalMenu(self)
         if not loaders:
-            # no loaders available
-            submsg = "your selection."
-            if one_item_selected:
-                submsg = "this version."
-
-            msg = "No compatible loaders for {}".format(submsg)
-            self.echo(msg)
-
-            icon = qtawesome.icon(
-                "fa.exclamation",
-                color=QtGui.QColor(255, 51, 0)
-            )
-
-            action = OptionalAction(("*" + msg), icon, False, menu)
+            action = lib.get_no_loader_action(menu, one_item_selected)
             menu.addAction(action)
-
         else:
-            def sorter(value):
-                """Sort the Loaders by their order and then their name"""
-                Plugin = value[1]
-                return Plugin.order, Plugin.__name__
-
-            # List the available loaders
-            for representation, loader in sorted(loaders, key=sorter):
-
-                # Label
-                label = getattr(loader, "label", None)
-                if label is None:
-                    label = loader.__name__
-
-                # Add the representation as suffix
-                label = "{0} ({1})".format(label, representation['name'])
-
-                # Support font-awesome icons using the `.icon` and `.color`
-                # attributes on plug-ins.
-                icon = getattr(loader, "icon", None)
-                if icon is not None:
-                    try:
-                        key = "fa.{0}".format(icon)
-                        color = getattr(loader, "color", "white")
-                        icon = qtawesome.icon(key, color=color)
-                    except Exception as e:
-                        print("Unable to set icon for loader "
-                              "{}: {}".format(loader, e))
-                        icon = None
-
-                # Optional action
-                use_option = hasattr(loader, "options")
-                action = OptionalAction(label, icon, use_option, menu)
-                if use_option:
-                    # Add option box tip
-                    action.set_option_tip(loader.options)
-
-                action.setData((representation, loader))
-
-                # Add tooltip and statustip from Loader docstring
-                tip = inspect.getdoc(loader)
-                if tip:
-                    action.setToolTip(tip)
-                    action.setStatusTip(tip)
-
-                menu.addAction(action)
+            menu = lib.add_representation_loaders_to_menu(loaders, menu)
 
         # Show the context action menu
         global_point = self.view.mapToGlobal(point)
@@ -472,19 +403,8 @@ class SubsetWidget(QtWidgets.QWidget):
         # Find the representation name and loader to trigger
         action_representation, loader = action.data()
         representation_name = action_representation["name"]  # extension
-        options = None
 
-        # Pop option dialog
-        if getattr(action, "optioned", False):
-            dialog = OptionDialog(self)
-            dialog.setWindowTitle(action.label + " Options")
-            dialog.create(loader.options)
-
-            if not dialog.exec_():
-                return
-
-            # Get option
-            options = dialog.parse()
+        options = lib.get_options(action, loader, self)
 
         # Run the loader for all selected indices, for those that have the
         # same representation available
@@ -507,38 +427,10 @@ class SubsetWidget(QtWidgets.QWidget):
                 continue
             repre_ids.append(representation["_id"])
 
-        error_info = []
-        repre_contexts = pipeline.get_repres_contexts(repre_ids, self.dbcon)
-        for repre_context in repre_contexts.values():
-            try:
-                pipeline.load_with_repre_context(
-                    loader,
-                    repre_context,
-                    options=options
-                )
-
-            except pipeline.IncompatibleLoaderError as exc:
-                self.echo(exc)
-                error_info.append((
-                    "Incompatible Loader",
-                    None,
-                    representation_name,
-                    item["subset"],
-                    item["version_document"]["name"]
-                ))
-
-            except Exception as exc:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                formatted_traceback = "".join(traceback.format_exception(
-                    exc_type, exc_value, exc_traceback
-                ))
-                error_info.append((
-                    str(exc),
-                    formatted_traceback,
-                    representation_name,
-                    item["subset"],
-                    item["version_document"]["name"]
-                ))
+        error_info = _load_representations_by_loader(
+            loader, repre_ids, self.dbcon,
+            options=options
+        )
 
         if error_info:
             box = LoadErrorMessageBox(error_info)
@@ -588,12 +480,12 @@ class SubsetWidget(QtWidgets.QWidget):
             subsets.append(item["subset"])
 
         for asset_id in asset_ids:
-            filter = {
+            filtr = {
                 "type": "subset",
                 "parent": asset_id,
                 "name": {"$in": subsets},
             }
-            self.dbcon.update_many(filter, update)
+            self.dbcon.update_many(filtr, update)
 
     def echo(self, message):
         print(message)
@@ -790,7 +682,7 @@ class ThumbnailWidget(QtWidgets.QLabel):
         pixmap = self.scale_pixmap(pixmap)
         self.setPixmap(pixmap)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, _event):
         if not self.current_thumbnail:
             return
         cur_pix = self.scale_pixmap(self.current_thumbnail)
@@ -849,7 +741,7 @@ class VersionWidget(QtWidgets.QWidget):
         super(VersionWidget, self).__init__(parent=parent)
 
         layout = QtWidgets.QVBoxLayout(self)
-
+        layout.setContentsMargins(0, 0, 0, 0)
         label = QtWidgets.QLabel("Version", self)
         data = VersionTextEdit(dbcon, self)
         data.setReadOnly(True)
@@ -970,3 +862,300 @@ class FamilyListWidget(QtWidgets.QListWidget):
         menu.addAction(state_unchecked)
 
         menu.exec_(globalpos)
+
+
+class RepresentationWidget(QtWidgets.QWidget):
+
+    default_widths = (
+        ("name", 120),
+        ("subset", 125),
+        ("asset", 125),
+        ("active_site", 85),
+        ("remote_site", 85)
+    )
+
+    commands = {'active': 'Download', 'remote': 'Upload'}
+
+    def __init__(self, dbcon, tool_name=None, parent=None):
+        super(RepresentationWidget, self).__init__(parent=parent)
+
+        self.dbcon = dbcon
+        self.tool_name = tool_name
+
+        headers = [item[0] for item in self.default_widths]
+
+        model = RepresentationModel(dbcon, headers, [])
+
+        proxy_model = RepresentationSortProxyModel(self)
+        proxy_model.setSourceModel(model)
+
+        label = QtWidgets.QLabel("Representations", self)
+
+        tree_view = DeselectableTreeView()
+        tree_view.setModel(proxy_model)
+        tree_view.setAllColumnsShowFocus(True)
+        tree_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        tree_view.setSelectionMode(
+            QtWidgets.QAbstractItemView.ExtendedSelection)
+        tree_view.setSortingEnabled(True)
+        tree_view.sortByColumn(1, QtCore.Qt.AscendingOrder)
+        tree_view.setAlternatingRowColors(True)
+        tree_view.setIndentation(20)
+        tree_view.setStyleSheet("""
+            QTreeView::item{
+                padding: 5px 1px;
+                border: 0px;
+            }
+        """)
+        tree_view.collapseAll()
+
+        for column_name, width in self.default_widths:
+            idx = model.Columns.index(column_name)
+            tree_view.setColumnWidth(idx, width)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(label)
+        layout.addWidget(tree_view)
+
+        # self.itemChanged.connect(self._on_item_changed)
+        tree_view.customContextMenuRequested.connect(self.on_context_menu)
+
+        self.tree_view = tree_view
+        self.model = model
+        self.proxy_model = proxy_model
+
+        self.sync_server_enabled = model.sync_server.enabled
+
+        self.model.refresh()
+
+    def on_context_menu(self, point):
+        """Shows menu with loader actions on Right-click.
+
+        Registered actions are filtered by selection and help of
+        `loaders_from_representation` from avalon api. Intersection of actions
+        is shown when more subset is selected. When there are not available
+        actions for selected subsets then special action is shown (works as
+        info message to user): "*No compatible loaders for your selection"
+
+        """
+        point_index = self.tree_view.indexAt(point)
+        if not point_index.isValid():
+            return
+
+        # Get selected subsets without groups
+        selection = self.tree_view.selectionModel()
+        rows = selection.selectedRows(column=0)
+
+        items = lib.get_selected_items(rows, self.model.ItemRole)
+
+        selected_side = self._get_selected_side(point_index, rows)
+
+        # Get all representation->loader combinations available for the
+        # index under the cursor, so we can list the user the options.
+        available_loaders = api.discover(api.Loader)
+
+        loaders = list()
+        for loader in available_loaders:
+            if lib.is_representation_loader(loader):
+                if not self.sync_server_enabled:
+                    available_loaders.remove(loader)
+
+        if self.tool_name:
+            available_loaders = lib.remove_tool_name_from_loaders(
+                available_loaders, self.tool_name)
+
+        already_added_loaders = set()
+        label_already_in_menu = set()
+        for item in items:
+            repre_context = pipeline.get_representation_context(item["_id"])
+            for loader in pipeline.loaders_from_repre_context(
+                    available_loaders,
+                    repre_context
+            ):
+                if lib.is_representation_loader(loader):
+                    both_unavailable = item["active_site_progress"] <= 0 and \
+                                       item["remote_site_progress"] <= 0
+                    if both_unavailable:
+                        continue
+
+                    for selected_side in self.commands.keys():
+                        item = item.copy()
+                        item["custom_label"] = None
+                        label = None
+                        selected_site_progress = item.get(
+                            "{}_site_progress".format(selected_side), -1)
+
+                        # only remove if actually present
+                        if lib.is_remove_site_loader(loader):
+                            label = "Remove {}".format(selected_side)
+                            if selected_site_progress < 1:
+                                continue
+
+                        if lib.is_add_site_loader(loader):
+                            label = self.commands[selected_side]
+                            if selected_site_progress >= 0:
+                                label = 'Re-{} {}'.format(label, selected_side)
+
+                        if not label:
+                            continue
+
+                        item["selected_side"] = selected_side
+                        item["custom_label"] = label
+
+                        if label not in label_already_in_menu:
+                            loaders.append((item, loader))
+                            already_added_loaders.add(loader)
+                            label_already_in_menu.add(label)
+
+                else:
+                    item = item.copy()
+                    item["custom_label"] = None
+
+                    if loader not in already_added_loaders:
+                        loaders.append((item, loader))
+                        already_added_loaders.add(loader)
+
+        loaders = lib.sort_loaders(loaders)
+
+        menu = OptionalMenu(self)
+        if not loaders:
+            action = lib.get_no_loader_action(menu)
+            menu.addAction(action)
+        else:
+            menu = lib.add_representation_loaders_to_menu(loaders, menu)
+
+        self._process_action(items, menu, point)
+
+    def _process_action(self, items, menu, point):
+        """
+            Show the context action menu and process selected
+
+            Args:
+                items(dict): menu items
+                menu(OptionalMenu)
+                point(PointIndex)
+        """
+        global_point = self.tree_view.mapToGlobal(point)
+        action = menu.exec_(global_point)
+
+        if not action or not action.data():
+            return
+
+        # Find the representation name and loader to trigger
+        action_representation, loader = action.data()
+        repre_ids = []
+        data_by_repre_id = {}
+        selected_side = action_representation.get("selected_side")
+
+        for item in items:
+            if lib.is_representation_loader(loader):
+                site_name = "{}_site_name".format(selected_side)
+                data = {
+                    "_id": item.get("_id"),
+                    "site_name": item.get(site_name),
+                    "project_name": self.dbcon.Session["AVALON_PROJECT"]
+                }
+
+                if not data["site_name"]:
+                    continue
+
+                data_by_repre_id[data["_id"]] = data
+
+            repre_ids.append(item.get("_id"))
+
+        errors = _load_representations_by_loader(
+            loader, repre_ids, self.dbcon, data_by_repre_id=data_by_repre_id)
+
+        self.model.refresh()
+        if errors:
+            box = LoadErrorMessageBox(errors)
+            box.show()
+
+    def _get_optional_labels(self, loaders, selected_side):
+        """Each loader could have specific label
+
+            Args:
+                loaders (tuple of dict, dict): (item, loader)
+                selected_side(string): active or remote
+
+            Returns:
+                (dict) {loader: string}
+        """
+        optional_labels = {}
+        if selected_side:
+            if selected_side == 'active':
+                txt = "Localize"
+            else:
+                txt = "Sync to Remote"
+            optional_labels = {loader: txt for _, loader in loaders
+                               if lib.is_representation_loader(loader)}
+        return optional_labels
+
+    def _get_selected_side(self, point_index, rows):
+        """Returns active/remote label according to column in 'point_index'"""
+        selected_side = None
+        if self.sync_server_enabled:
+            if rows:
+                source_index = self.proxy_model.mapToSource(point_index)
+                selected_side = self.model.data(source_index,
+                                                self.model.SiteSideRole)
+        return selected_side
+
+    def set_version_ids(self, version_ids):
+        self.model.set_version_ids(version_ids)
+
+    def _set_download(self):
+        pass
+
+    def change_visibility(self, column_name, visible):
+        """
+            Hides or shows particular 'column_name'.
+
+            "asset" and "subset" columns should be visible only in multiselect
+        """
+        lib.change_visibility(self.model, self.tree_view, column_name, visible)
+
+
+def _load_representations_by_loader(loader, repre_ids, dbcon,
+                                    options=None,
+                                    data_by_repre_id=None):
+    """Loops through list of repre ids and loads them with one loader"""
+    error_info = []
+    repre_contexts = pipeline.get_repres_contexts(repre_ids, dbcon)
+
+    options = options or {}
+    for repre_context in repre_contexts.values():
+        try:
+            if data_by_repre_id:
+                _id = repre_context["representation"]["_id"]
+                data = data_by_repre_id.get(_id)
+                options.update(data)
+            pipeline.load_with_repre_context(
+                loader,
+                repre_context,
+                options=options
+            )
+        except pipeline.IncompatibleLoaderError as exc:
+            print(exc)
+            error_info.append((
+                "Incompatible Loader",
+                None,
+                repre_context["representation"]["name"],
+                repre_context["subset"]["name"],
+                repre_context["version"]["name"]
+            ))
+
+        except Exception as exc:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            formatted_traceback = "".join(traceback.format_exception(
+                exc_type, exc_value, exc_traceback
+            ))
+            error_info.append((
+                str(exc),
+                formatted_traceback,
+                repre_context["representation"]["name"],
+                repre_context["subset"]["name"],
+                repre_context["version"]["name"]
+            ))
+    return error_info
