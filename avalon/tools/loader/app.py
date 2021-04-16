@@ -13,6 +13,8 @@ from .widgets import (
     RepresentationWidget
 )
 
+from openpype.modules import ModulesManager
+
 module = sys.modules[__name__]
 module.window = None
 
@@ -66,14 +68,17 @@ class Window(QtWidgets.QDialog):
         thumbnail = ThumbnailWidget(io)
         representations = RepresentationWidget(io)
 
+        manager = ModulesManager()
+        sync_server = manager.modules_by_name["sync_server"]
+
         thumb_ver_splitter = QtWidgets.QSplitter()
         thumb_ver_splitter.setOrientation(QtCore.Qt.Vertical)
         thumb_ver_splitter.addWidget(thumbnail)
         thumb_ver_splitter.addWidget(version)
-        thumb_ver_splitter.addWidget(representations)
+        if sync_server.enabled:
+            thumb_ver_splitter.addWidget(representations)
         thumb_ver_splitter.setStretchFactor(0, 30)
         thumb_ver_splitter.setStretchFactor(1, 35)
-        thumb_ver_splitter.setStretchFactor(2, 35)
 
         # Create splitter to show / hide family filters
         asset_filter_splitter = QtWidgets.QSplitter()
@@ -89,7 +94,6 @@ class Window(QtWidgets.QDialog):
         split.addWidget(asset_filter_splitter)
         split.addWidget(subsets)
         split.addWidget(thumb_ver_splitter)
-        split.setSizes([250, 1000, 550])
 
         container_layout.addWidget(split)
 
@@ -139,7 +143,12 @@ class Window(QtWidgets.QDialog):
         self._assetschanged()
 
         # Defaults
-        self.resize(1800, 900)
+        if sync_server.enabled:
+            split.setSizes([250, 1000, 550])
+            self.resize(1800, 900)
+        else:
+            split.setSizes([250, 850, 200])
+            self.resize(1300, 700)
 
     # -------------------------------
     # Delay calling blocking methods

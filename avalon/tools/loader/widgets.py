@@ -201,7 +201,7 @@ class SubsetWidget(QtWidgets.QWidget):
             idx = model.Columns.index(column_name)
             view.setColumnWidth(idx, width)
 
-        if not model.sync_server:
+        if not model.sync_server or not model.sync_server.enabled:
             lib.change_visibility(self.model, self.view, "repre_info", False)
 
         selection = view.selectionModel()

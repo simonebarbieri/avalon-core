@@ -381,7 +381,7 @@ class SubsetsModel(TreeModel):
             "last_versions_by_subset_id": last_versions_by_subset_id
         }
 
-        if self.sync_server:
+        if self.sync_server.enabled:
             version_ids = set()
             for _subset_id, doc in last_versions_by_subset_id.items():
                 version_ids.add(doc["_id"])
@@ -600,8 +600,9 @@ class SubsetsModel(TreeModel):
                     subset_doc["_id"]
                 )
                 data["last_version"] = last_version
-                data["repre_info"] = repre_info_by_version_id.get(
-                    last_version["_id"])
+                if repre_info_by_version_id:
+                    data["repre_info"] = repre_info_by_version_id.get(
+                        last_version["_id"])
 
                 item = Item()
                 item.update(data)
