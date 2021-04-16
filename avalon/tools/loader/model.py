@@ -715,7 +715,7 @@ class SubsetsModel(TreeModel):
                                 }}
             }},
             {'$addFields': {
-                'progress_local': {'$first': {
+                'progress_local': {"$arrayElemAt": [{
                     '$cond': [{'$size': "$order_local.progress"},
                               "$order_local.progress",
                               # if exists created_dt count is as available
@@ -724,7 +724,7 @@ class SubsetsModel(TreeModel):
                                   [1],
                                   [0]
                               ]}
-                              ]}}
+                              ]}, 0]}
             }},
             {'$group': {  # first group by repre
                 '_id': '$_id',
