@@ -65,7 +65,9 @@ class InventoryModel(TreeModel):
             self.remote_site = remote_site
             self.remote_provider = remote_provider
             self._icons = tools_lib.get_repre_icons()
-            self.Columns.extend(['active_site', 'remote_site'])
+            if 'active_site' not in self.Columns and \
+                'remote_site' not in self.Columns:
+                self.Columns.extend(['active_site', 'remote_site'])
 
     def outdated(self, item):
         value = item.get("version")
