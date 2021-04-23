@@ -6,7 +6,9 @@ import collections
 from .. import io, api, style
 from ..vendor import qtawesome
 
-from ..vendor.Qt import QtWidgets, QtCore
+from ..vendor.Qt import QtWidgets, QtCore, QtGui
+
+from openpype.modules.sync_server import sync_server_module
 
 self = sys.modules[__name__]
 self._jobs = dict()
@@ -550,3 +552,72 @@ def create_qthread(func, *args, **kwargs):
         def run(self):
             func(*args, **kwargs)
     return Thread()
+
+
+def get_repre_icons():
+    resource_path = os.path.dirname(sync_server_module.__file__)
+    resource_path = os.path.join(resource_path,
+                                 "providers", "resources")
+    icons = {}
+    # TODO get from sync module
+    for provider in ['studio', 'local_drive', 'gdrive']:
+        pix_url = "{}/{}.png".format(resource_path, provider)
+        icons[provider] = QtGui.QIcon(pix_url)
+
+    return icons
+
+
+def get_progress_for_repre(doc, active_site, remote_site):
+    """
+        Calculates average progress for representation.
+
+        If site has created_dt >> fully available >> progress == 1
+
+        Could be calculated in aggregate if it would be too slow
+        Args:
+            doc(dict): representation dict
+        Returns:
+            (dict) with active and remote sites progress
+            {'studio': 1.0, 'gdrive': -1} - gdrive site is not present
+                -1 is used to highlight the site should be added
+            {'studio': 1.0, 'gdrive': 0.0} - gdrive site is present, not
+                uploaded yet
+    """
+    progress = {active_site: -1,
+                remote_site: -1}
+    if not doc:
+        return progress
+
+    files = {active_site: 0, remote_site: 0}
+    for file in doc.get("files", []):
+        for site in file.get("sites"):
+            if site["name"] in [active_site, remote_site]:
+                files[site["name"]] += 1
+                norm_progress = max(progress[site["name"]], 0)
+                if site.get("created_dt"):
+                    progress[site["name"]] = norm_progress + 1
+                elif site.get("progress"):
+                    progress[site["name"]] = norm_progress + \
+                                             site["progress"]
+                else:  # site exists, might be failed, do not add again
+                    progress[site["name"]] = 0
+
+    # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
+    avg_progress = {}
+    avg_progress[active_site] = \
+        progress[active_site] / max(files[active_site], 1)
+    avg_progress[remote_site] = \
+        progress[remote_site] / max(files[remote_site], 1)
+    return avg_progress
+
+
+def is_representation_loader(loader):
+    return is_remove_site_loader(loader) or is_add_site_loader(loader)
+
+
+def is_remove_site_loader(loader):
+    return hasattr(loader, "remove_site_on_representation")
+
+
+def is_add_site_loader(loader):
+    return hasattr(loader, "add_site_to_representation")

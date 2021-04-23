@@ -14,18 +14,6 @@ def change_visibility(model, view, column_name, visible):
     view.setColumnHidden(index, not visible)
 
 
-def is_representation_loader(loader):
-    return is_remove_site_loader(loader) or is_add_site_loader(loader)
-
-
-def is_remove_site_loader(loader):
-    return hasattr(loader, "remove_site_on_representation")
-
-
-def is_add_site_loader(loader):
-    return hasattr(loader, "add_site_to_representation")
-
-
 def get_selected_items(rows, item_role):
     items = []
     for row_index in rows:

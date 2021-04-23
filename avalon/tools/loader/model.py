@@ -1,4 +1,3 @@
-import os
 import copy
 import re
 import math
@@ -15,7 +14,6 @@ from .. import lib
 from ...lib import HeroVersionType
 
 from openpype.modules import ModulesManager
-from openpype.modules.sync_server import sync_server_module
 
 
 def is_filtering_recursible():
@@ -504,7 +502,7 @@ class SubsetsModel(TreeModel):
                 if active_site == 'studio':  # for studio use explicit icon
                     active_provider = 'studio'
 
-                repre_icons = get_repre_icons()
+                repre_icons = lib.get_repre_icons()
 
         self.repre_icons = repre_icons
         self.sync_server = sync_server
@@ -934,7 +932,7 @@ class RepresentationModel(TreeModel):
         self.doc_fetched.connect(self.on_doc_fetched)
 
         self._docs = {}
-        self._icons = get_repre_icons()
+        self._icons = lib.get_repre_icons()
         self._icons["repre"] = qtawesome.icon("fa.file-o",
                                               color=style.colors.default)
 
@@ -1036,7 +1034,9 @@ class RepresentationModel(TreeModel):
                     repre_groups_items[doc["name"]] = 0
                     group = group_item
 
-            progress = self._get_progress_for_repre(doc)
+            progress = lib.get_progress_for_repre(doc,
+                                                  self.active_site,
+                                                  self.remote_site)
 
             active_site_icon = self._icons.get(self.active_provider)
             remote_site_icon = self._icons.get(self.remote_provider)
@@ -1107,49 +1107,6 @@ class RepresentationModel(TreeModel):
             'files.sites': 1
         }
 
-    def _get_progress_for_repre(self, doc):
-        """
-            Calculates average progress for representation.
-
-            If site has created_dt >> fully available >> progress == 1
-
-            Could be calculated in aggregate if it would be too slow
-            Args:
-                doc(dict): representation dict
-            Returns:
-                (dict) with active and remote sites progress
-                {'studio': 1.0, 'gdrive': -1} - gdrive site is not present
-                    -1 is used to highlight the site should be added
-                {'studio': 1.0, 'gdrive': 0.0} - gdrive site is present, not
-                    uploaded yet
-        """
-        progress = {self.active_site: -1,
-                    self.remote_site: -1}
-        if not doc:
-            return progress
-
-        files = {self.active_site: 0, self.remote_site: 0}
-        for file in doc.get("files", []):
-            for site in file.get("sites"):
-                if site["name"] in [self.active_site, self.remote_site]:
-                    files[site["name"]] += 1
-                    norm_progress = max(progress[site["name"]], 0)
-                    if site.get("created_dt"):
-                        progress[site["name"]] = norm_progress + 1
-                    elif site.get("progress"):
-                        progress[site["name"]] = norm_progress + \
-                                                 site["progress"]
-                    else:  # site exists, might be failed, do not add again
-                        progress[site["name"]] = 0
-
-        # for example 13 fully avail. files out of 26 >> 13/26 = 0.5
-        avg_progress = {}
-        avg_progress[self.active_site] = \
-            progress[self.active_site] / max(files[self.active_site], 1)
-        avg_progress[self.remote_site] = \
-            progress[self.remote_site] / max(files[self.remote_site], 1)
-        return avg_progress
-
     def _sum_group_progress(self, repre_name, group, current_item_progress,
                             repre_groups_items):
         """
@@ -1172,15 +1129,3 @@ class RepresentationModel(TreeModel):
 
         return group
 
-
-def get_repre_icons():
-    resource_path = os.path.dirname(sync_server_module.__file__)
-    resource_path = os.path.join(resource_path,
-                                 "providers", "resources")
-    icons = {}
-    # TODO get from sync module
-    for provider in ['studio', 'local_drive', 'gdrive']:
-        pix_url = "{}/{}.png".format(resource_path, provider)
-        icons[provider] = QtGui.QIcon(pix_url)
-
-    return icons
