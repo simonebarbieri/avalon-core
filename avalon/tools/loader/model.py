@@ -17,6 +17,7 @@ from ...lib import HeroVersionType
 from openpype.modules import ModulesManager
 from openpype.modules.sync_server import sync_server_module
 
+
 def is_filtering_recursible():
     """Does Qt binding support recursive filtering for QSortFilterProxyModel?
 
@@ -63,16 +64,16 @@ class SubsetsModel(TreeModel):
     SortAscendingRole = QtCore.Qt.UserRole + 2
     SortDescendingRole = QtCore.Qt.UserRole + 3
     merged_subset_colors = [
-        (55, 161, 222), # Light Blue
-        (231, 176, 0), # Yellow
-        (154, 13, 255), # Purple
-        (130, 184, 30), # Light Green
-        (211, 79, 63), # Light Red
-        (179, 181, 182), # Grey
-        (194, 57, 179), # Pink
-        (0, 120, 215), # Dark Blue
-        (0, 204, 106), # Dark Green
-        (247, 99, 12), # Orange
+        (55, 161, 222),  # Light Blue
+        (231, 176, 0),  # Yellow
+        (154, 13, 255),  # Purple
+        (130, 184, 30),  # Light Green
+        (211, 79, 63),  # Light Red
+        (179, 181, 182),  # Grey
+        (194, 57, 179),  # Pink
+        (0, 120, 215),  # Dark Blue
+        (0, 204, 106),  # Dark Green
+        (247, 99, 12),  # Orange
     ]
     not_last_hero_brush = QtGui.QBrush(QtGui.QColor(254, 121, 121))
 
@@ -902,7 +903,7 @@ class RepresentationModel(TreeModel):
 
         manager = ModulesManager()
         sync_server = active_site = remote_site = None
-        active_provider = remote_provider = project = None
+        active_provider = remote_provider = None
 
         project = dbcon.Session["AVALON_PROJECT"]
         if project:
@@ -1065,12 +1066,19 @@ class RepresentationModel(TreeModel):
                 'remote_site_progress': progress[self.remote_site]
             }
             if group:
-                self._update_group_progress(
-                    doc["name"], group,
-                    current_progress,
-                    repre_groups_items)
+                group = self._sum_group_progress(doc["name"], group,
+                                                 current_progress,
+                                                 repre_groups_items)
 
             self.add_child(item, group)
+
+        # finalize group average progress
+        for group_name, group in repre_groups.items():
+            items_cnt = repre_groups_items[group_name]
+            active_progress = group.get("active_site_progress", 0)
+            group["active_site_progress"] = active_progress / items_cnt
+            remote_progress = group.get("remote_site_progress", 0)
+            group["remote_site_progress"] = remote_progress / items_cnt
 
         self.endResetModel()
         self.refreshed.emit(False)
@@ -1142,8 +1150,8 @@ class RepresentationModel(TreeModel):
             progress[self.remote_site] / max(files[self.remote_site], 1)
         return avg_progress
 
-    def _update_group_progress(self, repre_name, group, current_item_progress,
-                               repre_groups_items):
+    def _sum_group_progress(self, repre_name, group, current_item_progress,
+                            repre_groups_items):
         """
             Update final group progress
             Called after every item in group is added
@@ -1158,10 +1166,11 @@ class RepresentationModel(TreeModel):
                 (dict): updated group info
         """
         repre_groups_items[repre_name] += 1
-        item_cnt = repre_groups_items[repre_name]
 
         for key, progress in current_item_progress.items():
-            group[key] = (group.get(key, 0) + max(progress, 0)) / item_cnt
+            group[key] = (group.get(key, 0) + max(progress, 0))
+
+        return group
 
 
 def get_repre_icons():
