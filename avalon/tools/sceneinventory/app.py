@@ -16,7 +16,6 @@ from .proxy import FilterProxyModel
 from .model import InventoryModel
 
 from openpype.modules import ModulesManager
-from openpype.plugins.load.add_site import AddSyncSite
 
 DEFAULT_COLOR = "#fb9c15"
 
@@ -299,7 +298,6 @@ class View(QtWidgets.QTreeView):
         if self.sync_enabled:
             menu = self.handle_sync_server(menu, repre_ids)
 
-
     def handle_sync_server(self, menu, repre_ids):
         """
             Adds actions for download/upload when SyncServer is enabled
@@ -366,7 +364,7 @@ class View(QtWidgets.QTreeView):
                 site = remote_site
 
             if check_progress == 1:
-                AddSyncSite.add_site_to_representation(project, repre_id, site)
+                self.sync_server.add_site(project, repre_id, site, force=True)
 
     def build_item_menu(self, items):
         """Create menu for the selected items"""

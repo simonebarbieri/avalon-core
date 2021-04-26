@@ -51,7 +51,7 @@ class InventoryModel(TreeModel):
                 sync_server.get_provider_for_site(project,
                                                   active_site)
             if active_site == 'studio':
-                active_provider = 'studio' # sanitized for icon
+                active_provider = 'studio'  # sanitized for icon
 
             remote_provider = \
                 sync_server.get_provider_for_site(project,
@@ -66,7 +66,7 @@ class InventoryModel(TreeModel):
             self.remote_provider = remote_provider
             self._icons = tools_lib.get_repre_icons()
             if 'active_site' not in self.Columns and \
-                'remote_site' not in self.Columns:
+                    'remote_site' not in self.Columns:
                 self.Columns.extend(['active_site', 'remote_site'])
 
     def outdated(self, item):
