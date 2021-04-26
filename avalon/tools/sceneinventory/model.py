@@ -140,9 +140,9 @@ class InventoryModel(TreeModel):
             if item.get("isGroupNode"):
                 column_name = self.Columns[index.column()]
                 if column_name == 'active_site':
-                    return self._icons.get(item.get('active_site'))
+                    return self._icons.get(item.get('active_site_provider'))
                 if column_name == 'remote_site':
-                    return self._icons.get(item.get('remote_site'))
+                    return self._icons.get(item.get('remote_site_provider'))
 
         if role == QtCore.Qt.DisplayRole and item.get("isGroupNode"):
             column_name = self.Columns[index.column()]
@@ -397,7 +397,9 @@ class InventoryModel(TreeModel):
                                                             self.active_site,
                                                             self.remote_site)
                 group_node["active_site"] = self.active_site
+                group_node["active_site_provider"] = self.active_provider
                 group_node["remote_site"] = self.remote_site
+                group_node["remote_site_provider"] = self.remote_provider
                 group_node["active_site_progress"] = progress[self.active_site]
                 group_node["remote_site_progress"] = progress[self.remote_site]
 
