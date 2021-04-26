@@ -317,7 +317,7 @@ class View(QtWidgets.QTreeView):
         download_active_action.triggered.connect(
             lambda: self._add_sites(repre_ids, 'active_site'))
 
-        upload_icon = qtawesome.icon("fa.download", color=DEFAULT_COLOR)
+        upload_icon = qtawesome.icon("fa.upload", color=DEFAULT_COLOR)
         upload_remote_action = QtWidgets.QAction(
             upload_icon,
             "Upload",
