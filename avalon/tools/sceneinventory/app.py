@@ -366,6 +366,8 @@ class View(QtWidgets.QTreeView):
             if check_progress == 1:
                 self.sync_server.add_site(project, repre_id, site, force=True)
 
+        self.data_changed.emit()
+
     def build_item_menu(self, items):
         """Create menu for the selected items"""
 
