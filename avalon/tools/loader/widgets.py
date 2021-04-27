@@ -346,7 +346,8 @@ class SubsetWidget(QtWidgets.QWidget):
                     available_loaders,
                     repre_context
                 ):
-                    if lib.is_representation_loader(loader):
+                    # do not allow download whole repre, select specific repre
+                    if tools_lib.is_representation_loader(loader):
                         continue
 
                     # skip multiple select variant if one is selected
@@ -957,7 +958,7 @@ class RepresentationWidget(QtWidgets.QWidget):
 
         loaders = list()
         for loader in available_loaders:
-            if lib.is_representation_loader(loader):
+            if tools_lib.is_representation_loader(loader):
                 if not self.sync_server_enabled:
                     available_loaders.remove(loader)
 
@@ -973,7 +974,7 @@ class RepresentationWidget(QtWidgets.QWidget):
                     available_loaders,
                     repre_context
             ):
-                if lib.is_representation_loader(loader):
+                if tools_lib.is_representation_loader(loader):
                     both_unavailable = item["active_site_progress"] <= 0 and \
                                        item["remote_site_progress"] <= 0
                     if both_unavailable:
@@ -987,12 +988,12 @@ class RepresentationWidget(QtWidgets.QWidget):
                             "{}_site_progress".format(selected_side), -1)
 
                         # only remove if actually present
-                        if lib.is_remove_site_loader(loader):
+                        if tools_lib.is_remove_site_loader(loader):
                             label = "Remove {}".format(selected_side)
                             if selected_site_progress < 1:
                                 continue
 
-                        if lib.is_add_site_loader(loader):
+                        if tools_lib.is_add_site_loader(loader):
                             label = self.commands[selected_side]
                             if selected_site_progress >= 0:
                                 label = 'Re-{} {}'.format(label, selected_side)
@@ -1049,7 +1050,7 @@ class RepresentationWidget(QtWidgets.QWidget):
         selected_side = action_representation.get("selected_side")
 
         for item in items:
-            if lib.is_representation_loader(loader):
+            if tools_lib.is_representation_loader(loader):
                 site_name = "{}_site_name".format(selected_side)
                 data = {
                     "_id": item.get("_id"),
@@ -1089,7 +1090,7 @@ class RepresentationWidget(QtWidgets.QWidget):
             else:
                 txt = "Sync to Remote"
             optional_labels = {loader: txt for _, loader in loaders
-                               if lib.is_representation_loader(loader)}
+                               if tools_lib.is_representation_loader(loader)}
         return optional_labels
 
     def _get_selected_side(self, point_index, rows):
