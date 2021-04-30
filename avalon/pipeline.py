@@ -1649,13 +1649,10 @@ def get_representation_path(representation, root=None, dbcon=None):
             )
             return None
 
-        # hierarchy may be equal to "" so it is not possible to use `or`
-        hierarchy = asset.get("data", {}).get("hierarchy")
-        if hierarchy is None:
-            # default list() in get would not discover missing parents on asset
-            parents = asset.get("data", {}).get("parents")
-            if parents is not None:
-                hierarchy = "/".join(parents)
+        # default list() in get would not discover missing parents on asset
+        parents = asset.get("data", {}).get("parents")
+        if parents is not None:
+            hierarchy = "/".join(parents)
 
         # Cannot fail, required members only
         data = {
