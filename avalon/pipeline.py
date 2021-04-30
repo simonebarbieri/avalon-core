@@ -1675,6 +1675,11 @@ def get_representation_path(representation, root=None, dbcon=None):
 
         try:
             path = format_template_with_optional_keys(data, template)
+            # Force replacing backslashes with forward slashed if not on
+            #   windows
+            if platform.system().lower() != "windows":
+                path = path.replace("\\", "/")
+
         except KeyError as e:
             log.debug("Template references unavailable data: %s" % e)
             return None
@@ -1689,6 +1694,11 @@ def get_representation_path(representation, root=None, dbcon=None):
             return None
 
         path = representation["data"]["path"]
+        # Force replacing backslashes with forward slashed if not on
+        #   windows
+        if platform.system().lower() != "windows":
+            path = path.replace("\\", "/")
+
         if os.path.exists(path):
             return os.path.normpath(path)
 
