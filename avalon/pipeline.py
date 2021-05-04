@@ -1614,6 +1614,10 @@ def get_representation_path(representation, root=None, dbcon=None):
             context = representation["context"]
             context["root"] = root
             path = format_template_with_optional_keys(context, template)
+            # Force replacing backslashes with forward slashed if not on
+            #   windows
+            if platform.system().lower() != "windows":
+                path = path.replace("\\", "/")
         except KeyError:
             # Template references unavailable data
             return None
@@ -1645,13 +1649,10 @@ def get_representation_path(representation, root=None, dbcon=None):
             )
             return None
 
-        # hierarchy may be equal to "" so it is not possible to use `or`
-        hierarchy = asset.get("data", {}).get("hierarchy")
-        if hierarchy is None:
-            # default list() in get would not discover missing parents on asset
-            parents = asset.get("data", {}).get("parents")
-            if parents is not None:
-                hierarchy = "/".join(parents)
+        # default list() in get would not discover missing parents on asset
+        parents = asset.get("data", {}).get("parents")
+        if parents is not None:
+            hierarchy = "/".join(parents)
 
         # Cannot fail, required members only
         data = {
@@ -1674,6 +1675,11 @@ def get_representation_path(representation, root=None, dbcon=None):
 
         try:
             path = format_template_with_optional_keys(data, template)
+            # Force replacing backslashes with forward slashed if not on
+            #   windows
+            if platform.system().lower() != "windows":
+                path = path.replace("\\", "/")
+
         except KeyError as e:
             log.debug("Template references unavailable data: %s" % e)
             return None
@@ -1688,6 +1694,11 @@ def get_representation_path(representation, root=None, dbcon=None):
             return None
 
         path = representation["data"]["path"]
+        # Force replacing backslashes with forward slashed if not on
+        #   windows
+        if platform.system().lower() != "windows":
+            path = path.replace("\\", "/")
+
         if os.path.exists(path):
             return os.path.normpath(path)
 
